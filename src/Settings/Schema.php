@@ -57,8 +57,9 @@ final class Schema {
 		}
 
 		$schema = array(
-			'general'  => self::general(),
-			'company'  => self::company(),
+			'general'   => self::general(),
+			'company'   => self::company(),
+			'numbering' => self::numbering(),
 			'design'   => array(
 				'label'    => __( 'Design', 'facture-pdf-lumia' ),
 				'priority' => 70,
@@ -222,6 +223,71 @@ final class Schema {
 				'legal'    => array(
 					'label'  => __( 'Informations légales', 'facture-pdf-lumia' ),
 					'fields' => self::toggleable_text_fields( $legal ),
+				),
+			),
+		);
+	}
+
+	/**
+	 * Onglet Numérotation.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function numbering(): array {
+		return array(
+			'label'    => __( 'Numérotation', 'facture-pdf-lumia' ),
+			'priority' => 30,
+			'sections' => array(
+				'format'   => array(
+					'label'       => __( 'Format du numéro', 'facture-pdf-lumia' ),
+					'description' => __( 'Le numéro est attribué définitivement à la première génération de la facture. Modifier le format n\'affecte que les factures émises ensuite.', 'facture-pdf-lumia' ),
+					'after'       => array( \Lumia\FacturePDF\Admin\NumberingTab::class, 'render_tags' ),
+					'fields'      => array(
+						'format'       => array(
+							'type'        => 'text',
+							'label'       => __( 'Format', 'facture-pdf-lumia' ),
+							'description' => __( 'Doit contenir le tag {number}. Voir la liste des tags disponibles ci-dessous.', 'facture-pdf-lumia' ),
+							'default'     => 'FA-{year}-{number:4}',
+							'placeholder' => 'FA-{year}-{number:4}',
+							'sanitize'    => array( \Lumia\FacturePDF\Admin\NumberingTab::class, 'sanitize_format' ),
+						),
+						'start_number' => array(
+							'type'        => 'number',
+							'label'       => __( 'Premier numéro', 'facture-pdf-lumia' ),
+							'description' => __( 'Valeur du compteur pour la toute première facture. À ajuster en reprise d\'existant, pour poursuivre une numérotation démarrée ailleurs.', 'facture-pdf-lumia' ),
+							'default'     => 1,
+							'min'         => 1,
+							'max'         => 999999999,
+							'step'        => 1,
+						),
+					),
+				),
+				'reset'    => array(
+					'label'  => __( 'Remise à zéro', 'facture-pdf-lumia' ),
+					'fields' => array(
+						'reset_enabled' => array(
+							'type'        => 'checkbox',
+							'label'       => __( 'Réinitialiser périodiquement', 'facture-pdf-lumia' ),
+							'description' => __( 'Le compteur repart du premier numéro à chaque nouvelle période. Penser à inclure {year} — et {month} en périodicité mensuelle — dans le format, sans quoi les numéros se répéteraient d\'une période à l\'autre.', 'facture-pdf-lumia' ),
+							'default'     => true,
+						),
+						'reset_period'  => array(
+							'type'    => 'select',
+							'label'   => __( 'Périodicité', 'facture-pdf-lumia' ),
+							'default' => 'yearly',
+							'options' => array(
+								'yearly'  => __( 'Annuelle', 'facture-pdf-lumia' ),
+								'monthly' => __( 'Mensuelle', 'facture-pdf-lumia' ),
+							),
+							'depends' => array( 'reset_enabled' => true ),
+						),
+					),
+				),
+				'counters' => array(
+					'label'       => __( 'Compteurs en cours', 'facture-pdf-lumia' ),
+					'description' => __( 'État des séquences déjà utilisées. Un compteur ne peut être modifié qu\'en connaissance de cause : reprendre en dessous d\'une valeur déjà émise produirait des doublons.', 'facture-pdf-lumia' ),
+					'after'       => array( \Lumia\FacturePDF\Admin\NumberingTab::class, 'render_counters' ),
+					'fields'      => array(),
 				),
 			),
 		);

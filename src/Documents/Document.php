@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace Lumia\FacturePDF\Documents;
 
+use Lumia\FacturePDF\Numbering\NumberStore;
 use Lumia\FacturePDF\Settings\SettingsRepository;
 use WC_Order;
 
@@ -105,19 +106,62 @@ abstract class Document {
 	}
 
 	/**
+	 * Nom complet d'une meta de ce document.
+	 *
+	 * @param string $suffix Suffixe (`number`, `date`, `sequence`…).
+	 */
+	public function meta_key( string $suffix ): string {
+		return $this->meta_prefix() . $suffix;
+	}
+
+	/**
 	 * Numéro attribué, ou chaîne vide s'il n'a pas encore été émis.
 	 */
 	public function get_number(): string {
-		return (string) $this->order->get_meta( $this->meta_prefix() . 'number', true );
+		return (string) $this->order->get_meta( $this->meta_key( NumberStore::META_NUMBER ), true );
+	}
+
+	/**
+	 * Valeur brute du compteur, 0 si non émis.
+	 */
+	public function get_sequence(): int {
+		return (int) $this->order->get_meta( $this->meta_key( NumberStore::META_SEQUENCE ), true );
 	}
 
 	/**
 	 * Date d'émission, ou null.
 	 */
 	public function get_date(): ?int {
-		$timestamp = $this->order->get_meta( $this->meta_prefix() . 'date', true );
+		$timestamp = $this->order->get_meta( $this->meta_key( NumberStore::META_DATE ), true );
 
 		return $timestamp ? (int) $timestamp : null;
+	}
+
+	/**
+	 * Date d'émission formatée selon les réglages du site.
+	 */
+	public function get_formatted_date(): string {
+		$timestamp = $this->get_date();
+
+		if ( null === $timestamp ) {
+			return '';
+		}
+
+		return (string) wp_date( (string) get_option( 'date_format', 'd/m/Y' ), $timestamp );
+	}
+
+	/**
+	 * Attribue un numéro si les conditions sont réunies.
+	 *
+	 * Point d'entrée unique de la numérotation. Retourne le numéro existant
+	 * sans rien consommer si le document est déjà émis.
+	 */
+	public function assign_number(): string {
+		if ( ! $this->is_available() ) {
+			return '';
+		}
+
+		return NumberStore::assign( $this );
 	}
 
 	/**

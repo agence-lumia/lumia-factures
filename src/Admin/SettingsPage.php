@@ -171,9 +171,13 @@ final class SettingsPage {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$notice = isset( $_GET['fpl-notice'] ) ? sanitize_key( wp_unslash( $_GET['fpl-notice'] ) ) : '';
 
+		// Messages différés (erreurs de validation survenues avant redirection).
+		Notices::render();
+
 		$messages = array(
-			'saved' => __( 'Réglages enregistrés.', 'facture-pdf-lumia' ),
-			'reset' => __( 'Réglages réinitialisés.', 'facture-pdf-lumia' ),
+			'saved'    => __( 'Réglages enregistrés.', 'facture-pdf-lumia' ),
+			'reset'    => __( 'Réglages réinitialisés.', 'facture-pdf-lumia' ),
+			'sequence' => __( 'Compteur mis à jour.', 'facture-pdf-lumia' ),
 		);
 
 		if ( ! isset( $messages[ $notice ] ) ) {
@@ -270,13 +274,25 @@ final class SettingsPage {
 			printf( '<p class="fpl-panel__desc">%s</p>', esc_html( $section['description'] ) );
 		}
 
-		echo '<table class="form-table" role="presentation"><tbody>';
+		$fields = (array) ( $section['fields'] ?? array() );
 
-		foreach ( (array) ( $section['fields'] ?? array() ) as $key => $field ) {
-			$this->render_field( $key, $field, $values );
+		if ( array() !== $fields ) {
+			echo '<table class="form-table" role="presentation"><tbody>';
+
+			foreach ( $fields as $key => $field ) {
+				$this->render_field( $key, $field, $values );
+			}
+
+			echo '</tbody></table>';
 		}
 
-		echo '</tbody></table></div>';
+		// Une section peut compléter ses champs par un rendu libre : aperçu du
+		// prochain numéro, tableau des compteurs, aide contextuelle.
+		if ( isset( $section['after'] ) && is_callable( $section['after'] ) ) {
+			call_user_func( $section['after'] );
+		}
+
+		echo '</div>';
 	}
 
 	/**

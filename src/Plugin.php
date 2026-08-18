@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace Lumia\FacturePDF;
 
 use Lumia\FacturePDF\Admin\Assets;
+use Lumia\FacturePDF\Admin\NumberingTab;
 use Lumia\FacturePDF\Admin\SettingsPage;
 use Lumia\FacturePDF\Admin\ToolsTab;
 use Lumia\FacturePDF\Settings\Migrator;
@@ -100,6 +101,7 @@ final class Plugin {
 
 		if ( is_admin() ) {
 			$services['settings_page'] = new SettingsPage();
+			$services['numbering_tab'] = new NumberingTab();
 			$services['tools_tab']     = new ToolsTab();
 			$services['assets']        = new Assets();
 		}

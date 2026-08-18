@@ -110,9 +110,55 @@
 		} );
 	}
 
+	/**
+	 * Insertion d'un tag de numérotation dans le champ Format.
+	 *
+	 * Le tag s'insère à la position du curseur plutôt qu'en fin de champ :
+	 * construire `FA-{year}-{number:4}` demande sinon de retaper la fin à
+	 * chaque insertion.
+	 */
+	function initTagInsertion() {
+		function insert( element ) {
+			var input = document.getElementById( 'fpl-format' );
+
+			if ( ! input ) {
+				return;
+			}
+
+			var tag = element.textContent.trim();
+			var start = input.selectionStart !== null ? input.selectionStart : input.value.length;
+			var end = input.selectionEnd !== null ? input.selectionEnd : input.value.length;
+
+			input.value = input.value.slice( 0, start ) + tag + input.value.slice( end );
+			input.focus();
+			input.setSelectionRange( start + tag.length, start + tag.length );
+
+			// Alpine suit la valeur via x-model : sans événement natif, l'état
+			// réactif resterait sur l'ancienne saisie.
+			input.dispatchEvent( new Event( 'input', { bubbles: true } ) );
+
+			element.classList.add( 'fpl-tag--copied' );
+			window.setTimeout( function () {
+				element.classList.remove( 'fpl-tag--copied' );
+			}, 600 );
+		}
+
+		$( document ).on( 'click', '.fpl-tag', function () {
+			insert( this );
+		} );
+
+		$( document ).on( 'keydown', '.fpl-tag', function ( event ) {
+			if ( event.key === 'Enter' || event.key === ' ' ) {
+				event.preventDefault();
+				insert( this );
+			}
+		} );
+	}
+
 	$( function () {
 		initAlpineState();
 		initMediaFields();
 		initColorFields();
+		initTagInsertion();
 	} );
 } )( jQuery );
