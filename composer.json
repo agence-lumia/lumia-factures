@@ -1,0 +1,30 @@
+{
+	"name": "lumia/facture-pdf-lumia",
+	"description": "Génération de factures PDF pour WooCommerce.",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"require": {
+		"php": ">=8.1",
+		"dompdf/dompdf": "^3.0"
+	},
+	"require-dev": {
+		"squizlabs/php_codesniffer": "^3.9",
+		"wp-coding-standards/wpcs": "^3.1",
+		"phpcompatibility/phpcompatibility-wp": "^2.1"
+	},
+	"autoload": {
+		"psr-4": {
+			"Lumia\\FacturePDF\\": "src/"
+		}
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		},
+		"optimize-autoloader": true
+	},
+	"scripts": {
+		"lint": "phpcs --standard=phpcs.xml.dist",
+		"fix": "phpcbf --standard=phpcs.xml.dist"
+	}
+}
