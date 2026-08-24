@@ -319,3 +319,283 @@
 	gap: 6px;
 	margin: 0;
 }
+
+/* Navigation de sections ------------------------------------------------ */
+
+.fpl-subnav {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+	margin-bottom: 16px;
+	padding: 10px 12px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+}
+
+.fpl-subnav a {
+	padding: 4px 10px;
+	border-radius: 3px;
+	font-size: 13px;
+	text-decoration: none;
+	color: #50575e;
+}
+
+.fpl-subnav a:hover,
+.fpl-subnav a:focus {
+	background: #f0f0f1;
+	color: #2271b1;
+}
+
+/* Barre d'enregistrement ------------------------------------------------ */
+
+.fpl-actionbar {
+	position: sticky;
+	bottom: 0;
+	z-index: 20;
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	gap: 14px;
+	margin: 18px 0 0;
+	padding: 12px 16px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.fpl-actionbar__state {
+	font-size: 13px;
+	color: #996800;
+}
+
+.fpl-actionbar__state:before {
+	content: "";
+	display: inline-block;
+	width: 8px;
+	height: 8px;
+	margin-right: 7px;
+	border-radius: 50%;
+	background: #dba617;
+	vertical-align: middle;
+}
+
+/* Variations ------------------------------------------------------------ */
+
+.fpl-subhead {
+	margin: 22px 0 4px;
+	font-size: 14px;
+}
+
+.fpl-variations {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+	margin: 14px 0 8px;
+}
+
+.fpl-variation {
+	flex: 1 1 200px;
+	max-width: 260px;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	padding: 14px;
+	background: #fff;
+}
+
+.fpl-variation__swatches {
+	display: flex;
+	gap: 4px;
+	margin-bottom: 10px;
+}
+
+.fpl-variation__swatch {
+	width: 26px;
+	height: 26px;
+	border-radius: 4px;
+	border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.fpl-variation__label {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.fpl-variation__desc {
+	color: #646970;
+	font-size: 12px;
+	line-height: 1.5;
+	margin: 0 0 12px;
+	min-height: 54px;
+}
+
+/* Éditeur riche --------------------------------------------------------- */
+
+.fpl-richtext {
+	max-width: 640px;
+}
+
+.fpl-richtext .wp-editor-container {
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	overflow: hidden;
+}
+
+/* Somme des largeurs de colonnes ---------------------------------------- */
+
+.fpl-widthsum {
+	margin-top: 10px;
+	padding: 8px 12px;
+	border-radius: 4px;
+	font-size: 13px;
+	background: #f0f6fc;
+	border-left: 3px solid #2271b1;
+}
+
+.fpl-widthsum--over {
+	background: #fcf9e8;
+	border-left-color: #dba617;
+}
+
+/* Aperçu ---------------------------------------------------------------- */
+
+.fpl-preview-toolbar {
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 10px;
+	margin: 16px 0 12px;
+	padding: 12px 14px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+}
+
+.fpl-preview-toolbar label {
+	font-size: 13px;
+	color: #50575e;
+}
+
+.fpl-preview-pdfform {
+	margin: 0;
+}
+
+.fpl-preview-source {
+	margin-left: auto;
+	font-size: 12px;
+	color: #646970;
+}
+
+.fpl-preview-frame {
+	position: relative;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	overflow: hidden;
+	background: #f0f0f1;
+}
+
+.fpl-preview-frame iframe {
+	display: block;
+	width: 100%;
+	height: 860px;
+	border: 0;
+	background: #fff;
+}
+
+.fpl-preview-loading {
+	position: absolute;
+	inset: 0;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background: rgba(255, 255, 255, 0.72);
+	font-size: 13px;
+	color: #50575e;
+}
+
+/* Encart facture (fiche commande) --------------------------------------- */
+
+.fpl-metabox__number {
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.fpl-metabox__pending,
+.fpl-metabox__unavailable {
+	font-size: 12px;
+	color: #646970;
+}
+
+.fpl-metabox__cache {
+	font-size: 11px;
+	color: #8a8d91;
+	margin-top: -4px;
+}
+
+.fpl-metabox__actions form {
+	display: inline;
+}
+
+.fpl-column__link {
+	text-decoration: none;
+	font-weight: 600;
+}
+
+.fpl-column__empty {
+	color: #c3c4c7;
+}
+
+/* Répéteur (mentions légales) ------------------------------------------- */
+
+.fpl-repeater__row {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	margin-bottom: 8px;
+	background: #f6f7f7;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+}
+
+.fpl-repeater__enabled {
+	flex: 0 0 auto;
+}
+
+.fpl-repeater__title {
+	flex: 1 1 220px;
+	min-width: 160px;
+}
+
+.fpl-repeater__select {
+	flex: 0 0 auto;
+}
+
+.fpl-repeater__body {
+	flex: 1 1 100%;
+	margin-top: 4px;
+}
+
+.fpl-repeater__remove {
+	flex: 0 0 auto;
+	color: #b32d2e;
+	font-size: 12px;
+	white-space: nowrap;
+}
+
+.fpl-repeater__add {
+	margin-top: 4px;
+}
+
+/* Export / Import -------------------------------------------------------- */
+
+.fpl-export-form .fpl-checklist__item,
+.fpl-panel form .fpl-checklist__item {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin: 10px 0;
+	font-size: 13px;
+}

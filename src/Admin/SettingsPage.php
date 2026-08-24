@@ -228,7 +228,20 @@ final class SettingsPage {
 	private function render_form( string $tab_key, array $tab ): void {
 		$values = (array) SettingsRepository::instance()->get( $tab_key, array() );
 
-		echo '<form method="post" action="" class="fpl-form">';
+		// L'état Alpine est rendu directement dans le balisage, avec les
+		// valeurs réelles, plutôt que posé après coup via JavaScript.
+		// Alpine s'auto-démarre dès que son script (différé) s'exécute — ce
+		// qui arrive dès la fin du parsing du document, donc avant que
+		// jQuery ne déclenche son propre événement « document prêt ». Un
+		// `x-data` ajouté depuis un gestionnaire jQuery arrive systématiquement
+		// trop tard : Alpine a déjà parcouru le DOM sans le trouver, et
+		// n'initialise jamais la réactivité sur ce formulaire — ce qui laisse
+		// tous les champs conditionnels (`x-show`) masqués en permanence par
+		// la règle CSS `[x-cloak]`, quel que soit l'état réel des interrupteurs.
+		printf(
+			'<form method="post" action="" class="fpl-form" x-data=\'%s\'>',
+			esc_attr( (string) wp_json_encode( array( 'values' => $values, 'dirty' => false ) ) )
+		);
 
 		wp_nonce_field( 'fpl_save_settings_' . $tab_key, 'fpl_nonce' );
 
@@ -245,12 +258,18 @@ final class SettingsPage {
 			return;
 		}
 
-		foreach ( $tab['sections'] as $section ) {
-			$this->render_section( $section, $values );
+		$this->render_section_nav( $tab['sections'] );
+
+		foreach ( $tab['sections'] as $section_key => $section ) {
+			$this->render_section( $section, $values, (string) $section_key );
 		}
 
+		// Barre d'enregistrement fixe : sur l'onglet Contenu, qui compte une
+		// centaine de champs, un bouton en pied de page obligerait à faire
+		// défiler toute la page à chaque modification.
 		printf(
-			'<p class="fpl-actions"><button type="submit" name="fpl_save_settings" value="1" class="button button-primary button-large">%s</button></p>',
+			'<div class="fpl-actionbar"><span class="fpl-actionbar__state" x-show="dirty" x-cloak>%s</span><button type="submit" name="fpl_save_settings" value="1" class="button button-primary button-large">%s</button></div>',
+			esc_html__( 'Modifications non enregistrées', 'facture-pdf-lumia' ),
 			esc_html__( 'Enregistrer les réglages', 'facture-pdf-lumia' )
 		);
 
@@ -258,13 +277,47 @@ final class SettingsPage {
 	}
 
 	/**
+	 * Navigation interne entre les sections d'un onglet.
+	 *
+	 * N'apparaît qu'au-delà de trois sections : en deçà, la page tient à
+	 * l'écran et une navigation supplémentaire serait du bruit.
+	 *
+	 * @param array<string, mixed> $sections Sections de l'onglet.
+	 */
+	private function render_section_nav( array $sections ): void {
+		if ( count( $sections ) < 3 ) {
+			return;
+		}
+
+		echo '<nav class="fpl-subnav">';
+
+		foreach ( $sections as $key => $section ) {
+			if ( empty( $section['label'] ) ) {
+				continue;
+			}
+
+			printf(
+				'<a href="#fpl-section-%s">%s</a>',
+				esc_attr( sanitize_html_class( (string) $key ) ),
+				esc_html( (string) $section['label'] )
+			);
+		}
+
+		echo '</nav>';
+	}
+
+	/**
 	 * Une section de réglages.
 	 *
-	 * @param array<string, mixed> $section Définition.
-	 * @param array<string, mixed> $values  Valeurs courantes.
+	 * @param array<string, mixed> $section     Définition.
+	 * @param array<string, mixed> $values      Valeurs courantes.
+	 * @param string               $section_key Clé de section, pour l'ancre.
 	 */
-	private function render_section( array $section, array $values ): void {
-		echo '<div class="fpl-panel">';
+	private function render_section( array $section, array $values, string $section_key = '' ): void {
+		printf(
+			'<div class="fpl-panel" id="fpl-section-%s">',
+			esc_attr( sanitize_html_class( $section_key ) )
+		);
 
 		if ( ! empty( $section['label'] ) ) {
 			printf( '<h2 class="fpl-panel__title">%s</h2>', esc_html( $section['label'] ) );

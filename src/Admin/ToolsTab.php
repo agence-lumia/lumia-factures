@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace Lumia\FacturePDF\Admin;
 
 use Lumia\FacturePDF\Settings\Migrator;
+use Lumia\FacturePDF\Settings\PortManager;
 use Lumia\FacturePDF\Settings\SettingsRepository;
 use Lumia\FacturePDF\Support\Installer;
 
@@ -31,6 +32,8 @@ final class ToolsTab {
 	 */
 	public function register(): void {
 		add_action( 'admin_post_fpl_reset_settings', array( $this, 'handle_reset' ) );
+		add_action( 'admin_post_fpl_export_settings', array( $this, 'handle_export' ) );
+		add_action( 'admin_post_fpl_import_settings', array( $this, 'handle_import' ) );
 	}
 
 	/**
@@ -38,6 +41,9 @@ final class ToolsTab {
 	 */
 	public static function render(): void {
 		self::render_diagnostics();
+		self::render_export();
+		self::render_import();
+		self::render_updater();
 		self::render_maintenance();
 	}
 
@@ -142,6 +148,211 @@ final class ToolsTab {
 	}
 
 	/**
+	 * Section Export.
+	 */
+	private static function render_export(): void {
+		printf(
+			'<h2 class="fpl-panel__title fpl-panel__title--spaced">%s</h2>',
+			esc_html__( 'Export de la configuration', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<p class="fpl-panel__desc">%s</p>',
+			esc_html__( 'Télécharge un fichier JSON reprenant les réglages actuels — pratique pour configurer une charte une fois puis la déployer sur d\'autres sites clients.', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<form method="post" action="%s" class="fpl-export-form">',
+			esc_url( admin_url( 'admin-post.php' ) )
+		);
+
+		wp_nonce_field( 'fpl_export_settings', 'fpl_export_nonce' );
+
+		echo '<input type="hidden" name="action" value="fpl_export_settings">';
+
+		printf(
+			'<label class="fpl-checklist__item"><input type="checkbox" name="include_site_specific" value="1"> %s</label>',
+			esc_html__( 'Inclure les données propres à ce site (logo, SIRET, adresse, numérotation en cours)', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<p><button type="submit" class="button button-primary">%s</button></p>',
+			esc_html__( 'Télécharger l\'export', 'facture-pdf-lumia' )
+		);
+
+		echo '</form>';
+	}
+
+	/**
+	 * Traite le téléchargement de l'export.
+	 */
+	public function handle_export(): void {
+		if ( ! current_user_can( SettingsPage::CAPABILITY ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'facture-pdf-lumia' ) );
+		}
+
+		check_admin_referer( 'fpl_export_settings', 'fpl_export_nonce' );
+
+		$include_site_specific = ! empty( $_POST['include_site_specific'] );
+		$json                   = PortManager::export_json( $include_site_specific );
+
+		nocache_headers();
+
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . PortManager::export_filename() . '"' );
+		header( 'Content-Length: ' . strlen( $json ) );
+
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
+
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON, pas du HTML.
+		echo $json;
+
+		exit;
+	}
+
+	/**
+	 * Section Import.
+	 */
+	private static function render_import(): void {
+		printf(
+			'<h2 class="fpl-panel__title fpl-panel__title--spaced">%s</h2>',
+			esc_html__( 'Import d\'une configuration', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<p class="fpl-panel__desc">%s</p>',
+			esc_html__( 'Sélectionne un fichier exporté depuis ce plugin. Les réglages sont appliqués immédiatement à l\'envoi — pense à exporter la configuration actuelle avant, si tu veux pouvoir y revenir.', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<form method="post" action="%s" enctype="multipart/form-data">',
+			esc_url( admin_url( 'admin-post.php' ) )
+		);
+
+		wp_nonce_field( 'fpl_import_settings', 'fpl_import_nonce' );
+
+		echo '<input type="hidden" name="action" value="fpl_import_settings">';
+
+		echo '<p><input type="file" name="fpl_import_file" accept="application/json,.json" required></p>';
+
+		printf(
+			'<label class="fpl-checklist__item"><input type="checkbox" name="include_site_specific" value="1"> %s</label>',
+			esc_html__( 'Appliquer aussi les données propres au site présentes dans le fichier (logo, SIRET, adresse…)', 'facture-pdf-lumia' )
+		);
+
+		printf(
+			'<p><button type="submit" class="button button-secondary">%s</button></p>',
+			esc_html__( 'Importer', 'facture-pdf-lumia' )
+		);
+
+		echo '</form>';
+	}
+
+	/**
+	 * Traite l'import d'un fichier.
+	 */
+	public function handle_import(): void {
+		if ( ! current_user_can( SettingsPage::CAPABILITY ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'facture-pdf-lumia' ) );
+		}
+
+		check_admin_referer( 'fpl_import_settings', 'fpl_import_nonce' );
+
+		$file = $_FILES['fpl_import_file'] ?? null;
+
+		if ( ! is_array( $file ) || UPLOAD_ERR_OK !== ( $file['error'] ?? UPLOAD_ERR_NO_FILE ) || empty( $file['tmp_name'] ) ) {
+			Notices::add_error( __( 'Aucun fichier valide n\'a été reçu.', 'facture-pdf-lumia' ) );
+
+			self::redirect_to_tools();
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+		$json = file_get_contents( $file['tmp_name'] );
+
+		if ( false === $json ) {
+			Notices::add_error( __( 'Impossible de lire le fichier envoyé.', 'facture-pdf-lumia' ) );
+
+			self::redirect_to_tools();
+		}
+
+		$parsed = PortManager::parse( (string) $json );
+
+		if ( ! $parsed['valid'] ) {
+			Notices::add_error( $parsed['error'] );
+
+			self::redirect_to_tools();
+		}
+
+		$include_site_specific = ! empty( $_POST['include_site_specific'] );
+		$applied                = PortManager::apply( $parsed['payload'], $include_site_specific );
+
+		if ( array() === $applied ) {
+			Notices::add_error( __( 'Le fichier ne contenait aucun réglage applicable.', 'facture-pdf-lumia' ) );
+		} else {
+			Notices::add_success(
+				sprintf(
+					/* translators: %s: liste des onglets importés */
+					__( 'Configuration importée (%s).', 'facture-pdf-lumia' ),
+					implode( ', ', $applied )
+				)
+			);
+		}
+
+		self::redirect_to_tools();
+	}
+
+	/**
+	 * Redirige vers l'onglet Outils.
+	 */
+	private static function redirect_to_tools(): void {
+		wp_safe_redirect(
+			add_query_arg(
+				array(
+					'page' => SettingsPage::SLUG,
+					'tab'  => 'tools',
+				),
+				admin_url( 'admin.php' )
+			)
+		);
+
+		exit;
+	}
+
+	/**
+	 * Section Mise à jour.
+	 */
+	private static function render_updater(): void {
+		printf(
+			'<h2 class="fpl-panel__title fpl-panel__title--spaced">%s</h2>',
+			esc_html__( 'Mises à jour', 'facture-pdf-lumia' )
+		);
+
+		if ( ! defined( 'FPL_UPDATE_TOKEN' ) ) {
+			printf(
+				'<p class="fpl-panel__desc">%s</p>',
+				esc_html__( 'Aucun dépôt de mise à jour configuré. Définissez FPL_UPDATE_REPO et FPL_UPDATE_TOKEN dans wp-config.php pour activer les mises à jour automatiques depuis le dépôt privé.', 'facture-pdf-lumia' )
+			);
+
+			return;
+		}
+
+		$repo = defined( 'FPL_UPDATE_REPO' ) ? FPL_UPDATE_REPO : '';
+
+		printf(
+			'<p class="fpl-panel__desc">%s</p>',
+			esc_html(
+				sprintf(
+					/* translators: %s: dépôt configuré */
+					__( 'Dépôt configuré : %s. Les mises à jour apparaissent normalement dans Extensions → Extensions installées, comme pour un plugin du répertoire officiel.', 'facture-pdf-lumia' ),
+					'' !== $repo ? $repo : __( '(non renseigné)', 'facture-pdf-lumia' )
+				)
+			)
+		);
+	}
+
+	/**
 	 * Bloc de maintenance.
 	 */
 	private static function render_maintenance(): void {
@@ -152,7 +363,7 @@ final class ToolsTab {
 
 		printf(
 			'<p class="fpl-panel__desc">%s</p>',
-			esc_html__( 'L\'export et l\'import de configuration seront ajoutés dans une étape ultérieure.', 'facture-pdf-lumia' )
+			esc_html__( 'Remet tous les réglages à leur valeur par défaut. N\'affecte ni les factures déjà émises ni leurs numéros.', 'facture-pdf-lumia' )
 		);
 
 		printf(

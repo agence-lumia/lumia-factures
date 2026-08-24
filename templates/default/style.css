@@ -1,0 +1,494 @@
+/**
+ * Facture PDF Lumia — template « default ».
+ *
+ * Toutes les valeurs passent par des variables `var(--fpl-*)`, résolues par
+ * StyleCompiler avant l'envoi à Dompdf (qui ne comprend pas `var()`
+ * nativement). Le bloc `:root` ci-dessous ne sert qu'à documenter les valeurs
+ * par défaut pour quiconque relit ce fichier ; il est retiré à la compilation.
+ *
+ * Contraintes Dompdf respectées ici :
+ *   - ni Flexbox ni Grid : les mises en colonnes passent par des tableaux.
+ *   - `border-radius` ne s'applique pas aux cellules (`td`, `th`) : les
+ *     arrondis se limitent aux blocs de type `div`.
+ *   - `table-layout: fixed` est indispensable, sinon les largeurs de colonnes
+ *     en pourcentage sont ignorées dès que le contenu varie.
+ *   - `page-break-inside: avoid` empêche qu'une ligne produit soit coupée.
+ */
+
+:root {
+	--fpl-color-primary: #111111;
+	--fpl-color-secondary: #6b6b6b;
+	--fpl-color-text: #1a1a1a;
+	--fpl-color-muted: #6b6b6b;
+	--fpl-color-page: #ffffff;
+	--fpl-color-border: #dddddd;
+	--fpl-color-thead-bg: #111111;
+	--fpl-color-thead-text: #ffffff;
+	--fpl-color-row-alt: #fafafa;
+	--fpl-color-block-bg: #f7f7f7;
+	--fpl-font-body: 'Inter', sans-serif;
+	--fpl-font-heading: 'Inter', sans-serif;
+	--fpl-font-size: 9.5pt;
+	--fpl-font-size-sm: 8.3pt;
+	--fpl-font-size-xs: 7.4pt;
+	--fpl-font-size-lg: 10.9pt;
+	--fpl-font-size-title: 15.2pt;
+	--fpl-font-size-h3: 10pt;
+	--fpl-line-height: 1.45;
+	--fpl-heading-weight: bold;
+	--fpl-radius: 4px;
+	--fpl-radius-sm: 2px;
+	--fpl-border-width: 0.6pt;
+	--fpl-border-width-strong: 1pt;
+	--fpl-space-xs: 2pt;
+	--fpl-space-sm: 4pt;
+	--fpl-space-md: 8pt;
+	--fpl-space-lg: 14pt;
+	--fpl-space-xl: 22pt;
+	--fpl-cell-padding-y: 6pt;
+	--fpl-cell-padding-x: 7pt;
+	--fpl-logo-width: 180px;
+	--fpl-thumb-width: 46px;
+	--fpl-margin-top: 18mm;
+	--fpl-margin-bottom: 16mm;
+	--fpl-margin-sides: 16mm;
+}
+
+/* Page ------------------------------------------------------------------ */
+
+@page {
+	margin: var(--fpl-margin-top) var(--fpl-margin-sides) var(--fpl-margin-bottom);
+}
+
+/*
+ * Dompdf n'implémente PAS les boîtes de marge `@page` (`@bottom-center` et
+ * consorts) : toute règle de pagination écrite ainsi est silencieusement
+ * ignorée, sans erreur. Le pied de page utilise donc `position: fixed`, que
+ * Dompdf interprète comme « répété sur chaque page à cette position », et
+ * `counter(page)` / `counter(pages)` y sont bien résolus.
+ *
+ * Conséquence : la marge basse de la page doit réserver la hauteur du pied
+ * de page, sinon le contenu passe dessous.
+ */
+
+/* Base ----------------------------------------------------------------- */
+
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--fpl-color-page);
+	color: var(--fpl-color-text);
+	font-family: var(--fpl-font-body);
+	font-size: var(--fpl-font-size);
+	line-height: var(--fpl-line-height);
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+h1, h2, h3 {
+	font-family: var(--fpl-font-heading);
+	font-weight: var(--fpl-heading-weight);
+	color: var(--fpl-color-primary);
+	margin: 0;
+}
+
+p {
+	margin: 0;
+}
+
+/* En-tête -------------------------------------------------------------- */
+
+.fpl-header {
+	table-layout: fixed;
+	margin-bottom: var(--fpl-space-lg);
+}
+
+.fpl-header td {
+	vertical-align: top;
+	padding: 0;
+}
+
+.fpl-header__logo {
+	width: 45%;
+}
+
+.fpl-header__logo img {
+	max-width: var(--fpl-logo-width);
+	max-height: 70px;
+}
+
+.fpl-header__company {
+	width: 55%;
+	text-align: right;
+	font-size: var(--fpl-font-size-xs);
+	color: var(--fpl-color-muted);
+	line-height: 1.5;
+}
+
+.fpl-header__name {
+	display: block;
+	color: var(--fpl-color-primary);
+	font-size: var(--fpl-font-size-lg);
+	font-family: var(--fpl-font-heading);
+	font-weight: var(--fpl-heading-weight);
+	margin-bottom: var(--fpl-space-xs);
+}
+
+/* Bandeau de titre ------------------------------------------------------ */
+
+/*
+ * Le titre et le numéro partagent une bande contrastée : elle sépare
+ * visuellement l'en-tête (identité de l'émetteur) du corps (le document
+ * lui-même), et donne un point d'accroche immédiat au numéro de facture, qui
+ * est l'information la plus recherchée sur ce type de document.
+ */
+.fpl-titlebar {
+	table-layout: fixed;
+	background: var(--fpl-color-primary);
+	margin-bottom: var(--fpl-space-lg);
+}
+
+.fpl-titlebar td {
+	padding: var(--fpl-space-md) var(--fpl-cell-padding-x);
+	vertical-align: middle;
+}
+
+.fpl-titlebar__label {
+	width: 55%;
+}
+
+.fpl-titlebar__label h1 {
+	color: var(--fpl-color-thead-text);
+	font-size: var(--fpl-font-size-title);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	line-height: 1.1;
+}
+
+.fpl-titlebar__number {
+	width: 45%;
+	text-align: right;
+	color: var(--fpl-color-thead-text);
+	font-size: var(--fpl-font-size-lg);
+	font-weight: bold;
+	letter-spacing: 0.04em;
+}
+
+/* Blocs client / livraison / métadonnées -------------------------------- */
+
+.fpl-parties {
+	table-layout: fixed;
+	margin-bottom: var(--fpl-space-lg);
+}
+
+.fpl-party {
+	vertical-align: top;
+	padding: 0 var(--fpl-space-lg) 0 0;
+}
+
+.fpl-party--meta {
+	padding-right: 0;
+}
+
+.fpl-party h3 {
+	font-size: var(--fpl-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--fpl-color-muted);
+	font-weight: bold;
+	padding-bottom: var(--fpl-space-xs);
+	margin-bottom: var(--fpl-space-sm);
+	border-bottom: var(--fpl-border-width) solid var(--fpl-color-border);
+}
+
+.fpl-party address {
+	font-style: normal;
+	line-height: 1.4;
+}
+
+.fpl-party__contact {
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-sm);
+	line-height: 1.4;
+}
+
+/* Métadonnées ---------------------------------------------------------- */
+
+.fpl-meta {
+	table-layout: fixed;
+}
+
+.fpl-meta td {
+	padding: 0 0 var(--fpl-space-sm);
+	vertical-align: top;
+	font-size: var(--fpl-font-size-sm);
+	line-height: 1.3;
+}
+
+.fpl-meta__label {
+	width: 52%;
+	color: var(--fpl-color-muted);
+}
+
+.fpl-meta__value {
+	width: 48%;
+	text-align: right;
+	font-weight: bold;
+}
+
+/* Message de remerciement ---------------------------------------------- */
+
+.fpl-thankyou {
+	background: var(--fpl-color-block-bg);
+	border-radius: var(--fpl-radius);
+	padding: var(--fpl-space-md) var(--fpl-space-lg);
+	margin-bottom: var(--fpl-space-lg);
+}
+
+.fpl-thankyou h3 {
+	font-size: var(--fpl-font-size-h3);
+	margin-bottom: var(--fpl-space-xs);
+}
+
+.fpl-thankyou p {
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-sm);
+}
+
+/* Tableau produits ------------------------------------------------------ */
+
+.fpl-items {
+	table-layout: fixed;
+	margin-bottom: var(--fpl-space-lg);
+}
+
+.fpl-items thead th {
+	background: var(--fpl-color-thead-bg);
+	color: var(--fpl-color-thead-text);
+	text-align: left;
+	font-size: var(--fpl-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding: var(--fpl-space-sm) var(--fpl-cell-padding-x);
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+}
+
+.fpl-items tbody td {
+	padding: var(--fpl-cell-padding-y) var(--fpl-cell-padding-x);
+	border-bottom: var(--fpl-border-width) solid var(--fpl-color-border);
+	vertical-align: top;
+	page-break-inside: avoid;
+	word-wrap: break-word;
+	overflow-wrap: break-word;
+	line-height: 1.3;
+}
+
+.fpl-items tbody tr.fpl-row-alt td {
+	background: var(--fpl-color-row-alt);
+}
+
+.fpl-col-center {
+	text-align: center;
+}
+
+.fpl-col-right {
+	text-align: right;
+}
+
+.fpl-item__image img {
+	width: var(--fpl-thumb-width);
+	border-radius: var(--fpl-radius-sm);
+}
+
+.fpl-item__name {
+	font-weight: bold;
+	line-height: 1.3;
+}
+
+.fpl-item__meta {
+	margin-top: var(--fpl-space-xs);
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-xs);
+	line-height: 1.3;
+}
+
+.fpl-item__sku {
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-xs);
+}
+
+.fpl-item__description {
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-sm);
+}
+
+.fpl-item__discount-badge {
+	display: inline-block;
+	margin-top: var(--fpl-space-xs);
+	padding: 1pt 4pt;
+	background: var(--fpl-color-block-bg);
+	color: var(--fpl-color-secondary);
+	font-size: var(--fpl-font-size-xs);
+	font-weight: normal;
+}
+
+/* Totaux ---------------------------------------------------------------- */
+
+.fpl-totals-wrap {
+	table-layout: fixed;
+	margin-bottom: var(--fpl-space-md);
+	page-break-inside: avoid;
+}
+
+.fpl-totals-wrap > tr > td {
+	padding: 0;
+	vertical-align: top;
+	width: 55%;
+}
+
+.fpl-totals-cell {
+	width: 45%;
+}
+
+.fpl-totals {
+	table-layout: fixed;
+	background: var(--fpl-color-block-bg);
+	border-radius: var(--fpl-radius);
+}
+
+.fpl-totals td {
+	padding: var(--fpl-space-sm) var(--fpl-space-lg);
+	font-size: var(--fpl-font-size-sm);
+}
+
+.fpl-totals__label {
+	width: 55%;
+	color: var(--fpl-color-muted);
+}
+
+.fpl-totals__value {
+	width: 45%;
+	text-align: right;
+	font-weight: bold;
+}
+
+.fpl-totals tr.fpl-grand-total td {
+	background: var(--fpl-color-primary);
+	color: var(--fpl-color-thead-text);
+	font-size: var(--fpl-font-size-lg);
+	font-weight: bold;
+	padding-top: var(--fpl-space-md);
+	padding-bottom: var(--fpl-space-md);
+}
+
+.fpl-totals tr.fpl-grand-total .fpl-totals__label {
+	color: var(--fpl-color-thead-text);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	font-size: var(--fpl-font-size-sm);
+}
+
+/* Notes ----------------------------------------------------------------- */
+
+.fpl-notes {
+	margin-bottom: var(--fpl-space-md);
+	page-break-inside: avoid;
+}
+
+.fpl-notes__block {
+	border-left: 2pt solid var(--fpl-color-border);
+	padding-left: var(--fpl-space-md);
+	margin-bottom: var(--fpl-space-sm);
+}
+
+.fpl-notes__block h3 {
+	font-size: var(--fpl-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--fpl-color-muted);
+	margin-bottom: var(--fpl-space-xs);
+}
+
+.fpl-notes__block p {
+	font-size: var(--fpl-font-size-sm);
+}
+
+/* Pied de page ---------------------------------------------------------- */
+
+.fpl-footer {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: calc(var(--fpl-margin-bottom) * -1 + 6mm);
+	padding-top: var(--fpl-space-sm);
+	border-top: var(--fpl-border-width) solid var(--fpl-color-border);
+	text-align: center;
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-xs);
+	line-height: 1.5;
+}
+
+.fpl-footer__pagination {
+	display: block;
+	margin-top: var(--fpl-space-xs);
+	color: var(--fpl-color-muted);
+	font-size: var(--fpl-font-size-xs);
+}
+
+.fpl-footer__pagination .fpl-page:before {
+	content: counter(page);
+}
+
+.fpl-footer__pagination .fpl-pages:before {
+	content: counter(pages);
+}
+
+.fpl-footer__text {
+	margin-bottom: var(--fpl-space-xs);
+	color: var(--fpl-color-text);
+	font-size: var(--fpl-font-size-sm);
+}
+
+.fpl-footer__line:after {
+	content: "  •  ";
+	color: var(--fpl-color-border);
+}
+
+.fpl-footer__line:last-child:after {
+	content: "";
+}
+
+/* Mentions légales -------------------------------------------------------- */
+
+.fpl-legal {
+	font-size: var(--fpl-font-size-xs);
+	color: var(--fpl-color-muted);
+	line-height: 1.5;
+}
+
+.fpl-legal--totals {
+	margin-top: var(--fpl-space-sm);
+	margin-bottom: var(--fpl-space-md);
+}
+
+.fpl-legal--block {
+	margin-bottom: var(--fpl-space-lg);
+	padding-top: var(--fpl-space-sm);
+	border-top: var(--fpl-border-width) solid var(--fpl-color-border);
+}
+
+.fpl-legal--footer {
+	margin-top: var(--fpl-space-xs);
+}
+
+.fpl-legal__item {
+	margin: 0 0 2pt;
+}
+
+.fpl-legal--block .fpl-legal__title {
+	color: var(--fpl-color-text);
+}

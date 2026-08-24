@@ -10,11 +10,20 @@ declare( strict_types=1 );
 namespace Lumia\FacturePDF;
 
 use Lumia\FacturePDF\Admin\Assets;
+use Lumia\FacturePDF\Admin\DesignTab;
+use Lumia\FacturePDF\Admin\OrderMetabox;
+use Lumia\FacturePDF\Admin\PreviewController;
 use Lumia\FacturePDF\Admin\NumberingTab;
 use Lumia\FacturePDF\Admin\SettingsPage;
 use Lumia\FacturePDF\Admin\ToolsTab;
+use Lumia\FacturePDF\Emails\Attacher;
+use Lumia\FacturePDF\Frontend\DownloadHandler;
+use Lumia\FacturePDF\Frontend\DynamicTag;
+use Lumia\FacturePDF\Frontend\Shortcode;
 use Lumia\FacturePDF\Settings\Migrator;
+use Lumia\FacturePDF\Storage\Cleaner;
 use Lumia\FacturePDF\Support\Installer;
+use Lumia\FacturePDF\Updater\GitUpdater;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -74,6 +83,8 @@ final class Plugin {
 
 		$this->load_textdomain();
 
+		require_once FPL_PLUGIN_DIR . 'src/functions.php';
+
 		Installer::maybe_upgrade();
 		Migrator::run();
 
@@ -97,13 +108,27 @@ final class Plugin {
 	 * Instancie et enregistre les services.
 	 */
 	private function register_services(): void {
-		$services = array();
+		$services = array(
+			// Le téléchargement, la purge, les pièces jointes d'email, le
+			// shortcode et le dynamic tag Bricks tournent dans tous les
+			// contextes : front pour la plupart, cron pour la purge, envoi
+			// d'email côté serveur pour les pièces jointes.
+			'download'    => new DownloadHandler(),
+			'cleaner'     => new Cleaner(),
+			'attacher'    => new Attacher(),
+			'shortcode'   => new Shortcode(),
+			'dynamic_tag' => new DynamicTag(),
+			'updater'     => new GitUpdater(),
+		);
 
 		if ( is_admin() ) {
 			$services['settings_page'] = new SettingsPage();
 			$services['numbering_tab'] = new NumberingTab();
+			$services['design_tab']    = new DesignTab();
+			$services['preview']       = new PreviewController();
 			$services['tools_tab']     = new ToolsTab();
 			$services['assets']        = new Assets();
+			$services['order_metabox'] = new OrderMetabox();
 		}
 
 		/**

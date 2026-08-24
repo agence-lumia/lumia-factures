@@ -224,9 +224,18 @@ final class SettingsRepository {
 				$type = $field['type'] ?? 'text';
 
 				// Une case non cochée n'est pas envoyée par le navigateur :
-				// son absence vaut « false », pas « inchangé ».
+				// son absence vaut « false », pas « inchangé ». Un répéteur
+				// vidé de toutes ses lignes n'envoie pas non plus sa clé :
+				// son absence doit vider le réglage, pas laisser les
+				// anciennes lignes inchangées.
 				if ( 'checkbox' === $type ) {
 					$clean[ $key ] = ! empty( $input[ $key ] );
+
+					continue;
+				}
+
+				if ( 'repeater' === $type && ! array_key_exists( $key, $input ) ) {
+					$clean[ $key ] = array();
 
 					continue;
 				}
@@ -317,10 +326,73 @@ final class SettingsRepository {
 
 				return array_values( array_map( 'sanitize_text_field', $value ) );
 
+			case 'repeater':
+				return $this->sanitize_repeater( $value, $field );
+
 			case 'text':
 			default:
 				return sanitize_text_field( (string) $value );
 		}
+	}
+
+	/**
+	 * Nettoie un champ répéteur : un tableau de lignes, chacune conforme au
+	 * sous-schéma `row_fields` déclaré par le champ.
+	 *
+	 * Chaque sous-champ passe par le même nettoyage typé que n'importe quel
+	 * champ de premier niveau — un texte d'une ligne de mention légale n'a
+	 * pas moins besoin d'être nettoyé qu'un texte ailleurs dans le
+	 * formulaire.
+	 *
+	 * @param mixed                $value Valeur brute : tableau de lignes.
+	 * @param array<string, mixed> $field Définition du champ répéteur.
+	 *
+	 * @return array<int, array<string, mixed>>
+	 */
+	private function sanitize_repeater( $value, array $field ): array {
+		if ( ! is_array( $value ) ) {
+			return array();
+		}
+
+		$row_fields = (array) ( $field['row_fields'] ?? array() );
+
+		if ( array() === $row_fields ) {
+			return array();
+		}
+
+		// Plafond arbitraire mais généreux : une bibliothèque de mentions
+		// légales compte rarement plus d'une trentaine d'entrées, et la
+		// limite protège contre une requête forgée qui tenterait d'en
+		// soumettre des milliers.
+		$rows = array_slice( array_values( $value ), 0, 100 );
+		$clean = array();
+
+		foreach ( $rows as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$clean_row = array();
+
+			foreach ( $row_fields as $sub_key => $sub_field ) {
+				$sub_type = $sub_field['type'] ?? 'text';
+
+				// Une case à cocher non cochée n'envoie rien : sans repli
+				// explicite, la ligne perdrait silencieusement son état
+				// plutôt que de repasser à faux.
+				if ( 'checkbox' === $sub_type && ! array_key_exists( $sub_key, $row ) ) {
+					$clean_row[ $sub_key ] = false;
+
+					continue;
+				}
+
+				$clean_row[ $sub_key ] = $this->sanitize_value( $row[ $sub_key ] ?? '', $sub_field );
+			}
+
+			$clean[] = $clean_row;
+		}
+
+		return $clean;
 	}
 
 	/**

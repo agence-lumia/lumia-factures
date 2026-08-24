@@ -9,8 +9,6 @@ declare( strict_types=1 );
 
 namespace Lumia\FacturePDF\Admin;
 
-use Lumia\FacturePDF\Settings\SettingsRepository;
-
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
@@ -72,9 +70,18 @@ final class Assets {
 			'fpl-admin',
 			'fplAdmin',
 			array(
-				'tab'    => $tab,
-				'values' => (array) SettingsRepository::instance()->get( $tab, array() ),
-				'i18n'   => array(
+				// Consommé par l'aperçu en direct pour cibler le bon onglet.
+				// L'état des champs, lui, est désormais rendu directement
+				// dans l'attribut `x-data` du formulaire (voir SettingsPage) :
+				// le poser ici puis le transférer en JS après coup créait une
+				// course avec le démarrage automatique d'Alpine.
+				'tab'     => $tab,
+				'preview' => array(
+					'url'    => admin_url( 'admin-ajax.php' ),
+					'action' => PreviewController::AJAX_ACTION,
+					'nonce'  => wp_create_nonce( 'fpl_preview' ),
+				),
+				'i18n'    => array(
 					'selectImage' => __( 'Sélectionner une image', 'facture-pdf-lumia' ),
 					'useImage'    => __( 'Utiliser cette image', 'facture-pdf-lumia' ),
 				),

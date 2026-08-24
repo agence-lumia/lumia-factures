@@ -234,10 +234,35 @@ final class NumberGenerator {
 	}
 
 	/**
-	 * Rend un aperçu du format sans consommer de numéro.
+	 * Numéro que porterait le prochain document, sans rien réserver.
+	 *
+	 * Destiné à l'aperçu et à l'administration. Lit le compteur en lecture
+	 * seule : appeler cette méthode cent fois ne consomme aucun numéro, à la
+	 * différence de `NumberStore::assign()`.
+	 *
+	 * @param \Lumia\FacturePDF\Documents\Document $document Document concerné.
+	 */
+	public static function preview_next( $document ): string {
+		$settings = \Lumia\FacturePDF\Settings\SettingsRepository::instance();
+
+		$format = (string) $settings->get( 'numbering.format', 'FA-{year}-{number:4}' );
+		$start  = (int) $settings->get( 'numbering.start_number', 1 );
+
+		$key     = \Lumia\FacturePDF\Numbering\NumberStore::sequence_key( $document );
+		$current = \Lumia\FacturePDF\Numbering\Sequence::current( $key );
+
+		// Une séquence jamais entamée démarre à la valeur configurée ; sinon
+		// le prochain numéro est la valeur courante augmentée de un.
+		$next = 0 === $current ? max( 1, $start ) : $current + 1;
+
+		return self::build( $format, $next, $document->get_order() );
+	}
+
+	/**
+	 * Aperçu d'un format, avec un numéro de séquence arbitraire.
 	 *
 	 * @param string $format   Format à prévisualiser.
-	 * @param int    $sequence Valeur de séquence simulée.
+	 * @param int    $sequence Numéro de séquence simulé.
 	 */
 	public static function preview( string $format, int $sequence ): string {
 		$time = self::now();

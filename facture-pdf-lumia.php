@@ -3,7 +3,7 @@
  * Plugin Name:       Facture PDF Lumia
  * Plugin URI:        https://lumia.fr
  * Description:       Génération de factures PDF pour WooCommerce, entièrement personnalisable.
- * Version:           0.2.0
+ * Version:           1.0.1
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Lumia
@@ -33,7 +33,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 |--------------------------------------------------------------------------
 */
 
-define( 'FPL_VERSION', '0.2.0' );
+define( 'FPL_VERSION', '1.0.1' );
 define( 'FPL_PLUGIN_FILE', __FILE__ );
 define( 'FPL_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'FPL_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -120,13 +120,45 @@ add_action(
 add_action(
 	'plugins_loaded',
 	static function (): void {
-		if ( ! Support\Requirements::met() ) {
+		// À ce stade WooCommerce, s'il est actif, a déjà été chargé. On le
+		// vérifie donc aussi ici afin de ne jamais démarrer les services du
+		// plugin dans un environnement où leurs fonctions/classes manquent.
+		if ( ! Support\Requirements::met( true ) ) {
 			add_action( 'admin_notices', array( Support\Requirements::class, 'render_notice' ) );
 
 			return;
 		}
 
-		Plugin::instance()->boot();
+		try {
+			Plugin::instance()->boot();
+		} catch ( \Throwable $e ) {
+			// Un défaut de démarrage de cette extension ne doit pas rendre tout
+			// le site inaccessible. Le détail reste dans le journal PHP et une
+			// notice exploitable est affichée aux administrateurs.
+			error_log(
+				sprintf(
+					'[Facture PDF Lumia] Échec du démarrage : %s dans %s:%d',
+					$e->getMessage(),
+					$e->getFile(),
+					$e->getLine()
+				)
+			);
+
+			add_action(
+				'admin_notices',
+				static function (): void {
+					if ( ! current_user_can( 'activate_plugins' ) ) {
+						return;
+					}
+
+					echo '<div class="notice notice-error"><p><strong>'
+						. esc_html__( 'Facture PDF Lumia n’a pas pu démarrer.', 'facture-pdf-lumia' )
+						. '</strong> '
+						. esc_html__( 'Consultez le journal d’erreurs PHP / WordPress pour le détail.', 'facture-pdf-lumia' )
+						. '</p></div>';
+				}
+			);
+		}
 	},
 	5
 );

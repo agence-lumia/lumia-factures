@@ -9,6 +9,7 @@ declare( strict_types=1 );
 
 namespace Lumia\FacturePDF\Documents;
 
+use Lumia\FacturePDF\Numbering\NumberGenerator;
 use Lumia\FacturePDF\Numbering\NumberStore;
 use Lumia\FacturePDF\Settings\SettingsRepository;
 use WC_Order;
@@ -36,6 +37,18 @@ abstract class Document {
 	 * Dépôt de réglages.
 	 */
 	protected SettingsRepository $settings;
+
+	/**
+	 * Mode aperçu.
+	 *
+	 * Un document en aperçu se comporte comme un document réel pour le rendu,
+	 * mais ne touche jamais à la numérotation : il n'attribue pas de numéro et
+	 * n'en consomme pas dans la séquence. Sans cette garantie, chaque
+	 * rafraîchissement de l'aperçu — il y en a un par modification de réglage —
+	 * brûlerait un numéro de facture, ce qui créerait des trous dans une suite
+	 * qui doit rester continue.
+	 */
+	protected bool $preview = false;
 
 	/**
 	 * Constructeur.
@@ -70,12 +83,36 @@ abstract class Document {
 	}
 
 	/**
+	 * Bascule le document en mode aperçu.
+	 *
+	 * @param bool $preview Actif ou non.
+	 */
+	public function set_preview( bool $preview = true ): self {
+		$this->preview = $preview;
+
+		return $this;
+	}
+
+	/**
+	 * Le document est-il en mode aperçu ?
+	 */
+	public function is_preview(): bool {
+		return $this->preview;
+	}
+
+	/**
 	 * Le document peut-il être généré pour cette commande ?
 	 *
 	 * Un document déjà numéroté reste toujours accessible, même si la commande
 	 * change de statut par la suite : une facture émise ne se rétracte pas.
 	 */
 	public function is_available(): bool {
+		// Un aperçu doit pouvoir être rendu quel que soit le statut de la
+		// commande servant de support, y compris un panier abandonné.
+		if ( $this->preview ) {
+			return true;
+		}
+
 		if ( '' !== $this->get_number() ) {
 			return true;
 		}
@@ -118,7 +155,15 @@ abstract class Document {
 	 * Numéro attribué, ou chaîne vide s'il n'a pas encore été émis.
 	 */
 	public function get_number(): string {
-		return (string) $this->order->get_meta( $this->meta_key( NumberStore::META_NUMBER ), true );
+		$number = (string) $this->order->get_meta( $this->meta_key( NumberStore::META_NUMBER ), true );
+
+		// En aperçu, on montre à quoi ressemblera le prochain numéro sans le
+		// réserver : `preview()` lit le compteur sans l'incrémenter.
+		if ( '' === $number && $this->preview ) {
+			return NumberGenerator::preview_next( $this );
+		}
+
+		return $number;
 	}
 
 	/**
