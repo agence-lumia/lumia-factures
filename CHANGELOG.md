@@ -1,3 +1,43 @@
+## [1.0.4] — 2026-08-24
+
+### Correctif des images produit dans les PDF
+
+#### Corrigé
+- Les vignettes produit redimensionnées sont désormais encodées avec le type MIME du fichier réellement lu. Auparavant, une image JPG redimensionnée était sauvegardée temporairement en PNG mais déclarée `image/jpeg` dans la data-URI, ce qui pouvait conduire Dompdf à ignorer silencieusement l'image.
+- Le même mécanisme fiabilise les images WebP lorsqu'elles sont converties en PNG par l'éditeur d'images WordPress.
+
+#### Vérifié
+- Une image JPEG redimensionnée en PNG produit maintenant une data-URI `data:image/png;base64,...` cohérente avec ses octets.
+- Une image PNG redimensionnée reste correctement déclarée en PNG.
+- Le contrôle de syntaxe PHP passe sur l'ensemble du plugin.
+
+## [1.0.3] — 2026-08-24
+
+### Correctif Bricks / page « Voir la commande »
+
+#### Corrigé
+- Le dynamic tag Bricks ne confond plus la page « Mon compte » avec une commande. Sur un endpoint WooCommerce tel que `/mon-compte/voir-commande/18324/`, le plugin teste d'abord l'objet transmis par Bricks puis se replie correctement sur l'identifiant de commande de l'endpoint.
+- Compatibilité Bricks 2.4 : `bricks/dynamic_data/render_tag` peut transmettre une valeur non textuelle. Le plugin l'ignore désormais proprement au lieu de provoquer `Warning: Array to string conversion`.
+- Le shortcode `[facture_pdf_lumia]` utilise le même résolveur de contexte robuste que les dynamic tags, avec prise en charge des endpoints WooCommerce personnalisés.
+- L'accès invité sur la page de confirmation transmet désormais la clé de commande au contrôle d'accès avant d'afficher le lien de facture.
+
+#### Vérifié
+- Un `WP_Post` représentant la page Mon compte ne bloque plus la résolution de la commande portée par `view-order`.
+- Le chemin personnalisé `voir-commande/18324/` est reconnu si les query vars WooCommerce ne sont pas disponibles dans le contexte Bricks.
+- Une valeur tableau transmise au filtre Bricks est retournée telle quelle sans conversion ni warning.
+
+## [1.0.2] — 2026-08-24
+
+### Documentation utilisateur
+
+#### Ajouté
+- Nouvel onglet **Documentation**, placé en dernière position dans les réglages de Facture PDF Lumia.
+- Guide de mise en route en 6 étapes orienté gestionnaire de boutique : statuts facturables, informations d’entreprise, numérotation, contenu, design et aperçu.
+- Explication du fonctionnement quotidien depuis WooCommerce → Commandes : générer, télécharger et régénérer une facture.
+- Aide sur les pièces jointes des e-mails WooCommerce, l’accès client via le shortcode `[facture_pdf_lumia]` et l’intégration optionnelle avec Bricks Builder.
+- Section de dépannage utilisateur avec liens directs vers les onglets concernés et le diagnostic.
+- Mise en garde explicite avant la première émission réelle concernant la numérotation définitive des factures.
+
 # Journal des modifications
 
 Toutes les évolutions notables de Facture PDF Lumia.

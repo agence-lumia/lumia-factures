@@ -154,8 +154,22 @@ final class ImageEncoder {
 			return '';
 		}
 
-		// Le type réel peut différer après redimensionnement.
-		$final_mime = 'image/webp' === $mime ? 'image/png' : $mime;
+		/*
+		 * Le type réel peut différer après préparation. `resize()` enregistre
+		 * volontairement son fichier temporaire en PNG, quelle que soit
+		 * l'extension de l'image d'origine. Utiliser ici le MIME d'origine
+		 * produisait donc par exemple `data:image/jpeg` contenant en réalité
+		 * des octets PNG : les navigateurs sont parfois tolérants, Dompdf ne
+		 * l'est pas et omettait alors silencieusement les vignettes produit.
+		 *
+		 * On détecte donc le type du fichier effectivement lu. Cela corrige
+		 * aussi le cas WebP lorsque l'éditeur WordPress l'a converti en PNG.
+		 */
+		$final_mime = self::detect_mime( $source );
+
+		if ( '' === $final_mime ) {
+			return '';
+		}
 
 		return 'data:' . $final_mime . ';base64,' . base64_encode( $binary );
 	}

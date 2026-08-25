@@ -599,3 +599,215 @@
 	margin: 10px 0;
 	font-size: 13px;
 }
+
+/* Documentation --------------------------------------------------------- */
+
+.fpl-docs {
+	max-width: 980px;
+}
+
+.fpl-docs__hero {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 24px;
+	padding: 24px;
+	margin-bottom: 18px;
+	background: linear-gradient(135deg, #f0f6fc 0%, #fff 70%);
+	border: 1px solid #c5d9ed;
+	border-radius: 8px;
+}
+
+.fpl-docs__hero h2 {
+	margin: 5px 0 8px;
+	font-size: 23px;
+	line-height: 1.25;
+}
+
+.fpl-docs__hero p {
+	max-width: 70ch;
+	margin: 0;
+	color: #50575e;
+	font-size: 14px;
+	line-height: 1.65;
+}
+
+.fpl-docs__eyebrow {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	color: #2271b1;
+}
+
+.fpl-docs__hero-badge {
+	flex: 0 0 auto;
+	padding: 7px 12px;
+	border-radius: 20px;
+	background: #fff;
+	border: 1px solid #c5d9ed;
+	color: #2271b1;
+	font-size: 12px;
+	font-weight: 600;
+	white-space: nowrap;
+}
+
+.fpl-docs__section {
+	padding: 20px 22px;
+	margin-bottom: 18px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+}
+
+.fpl-docs__section > h2 {
+	margin: 0 0 8px;
+	font-size: 18px;
+}
+
+.fpl-docs__section > h3 {
+	margin: 22px 0 8px;
+	font-size: 14px;
+}
+
+.fpl-docs__section > p {
+	max-width: 78ch;
+	line-height: 1.65;
+}
+
+.fpl-docs__lead {
+	color: #646970;
+}
+
+.fpl-docs__steps {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 12px;
+	margin-top: 18px;
+}
+
+.fpl-docs__step {
+	display: flex;
+	gap: 14px;
+	padding: 16px;
+	border: 1px solid #e2e4e7;
+	border-radius: 7px;
+	background: #fbfbfc;
+}
+
+.fpl-docs__step-number {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	flex: 0 0 30px;
+	width: 30px;
+	height: 30px;
+	border-radius: 50%;
+	background: #2271b1;
+	color: #fff;
+	font-weight: 600;
+}
+
+.fpl-docs__step h3 {
+	margin: 2px 0 6px;
+	font-size: 14px;
+}
+
+.fpl-docs__step p {
+	margin: 0 0 9px;
+	color: #50575e;
+	line-height: 1.55;
+}
+
+.fpl-docs__step a {
+	font-size: 12px;
+	font-weight: 600;
+	text-decoration: none;
+}
+
+.fpl-docs__ordered {
+	max-width: 78ch;
+	margin: 16px 0 20px 22px;
+}
+
+.fpl-docs__ordered li {
+	padding: 4px 0 8px 5px;
+	line-height: 1.55;
+}
+
+.fpl-docs__notice {
+	max-width: 78ch;
+	padding: 13px 15px;
+	margin: 16px 0;
+	border-left: 4px solid #2271b1;
+	border-radius: 4px;
+	background: #f0f6fc;
+}
+
+.fpl-docs__notice--warning {
+	border-left-color: #dba617;
+	background: #fcf9e8;
+}
+
+.fpl-docs__notice strong {
+	display: block;
+	margin-bottom: 4px;
+}
+
+.fpl-docs__notice p {
+	margin: 0;
+	line-height: 1.55;
+}
+
+.fpl-docs__code {
+	display: inline-block;
+	max-width: 100%;
+	padding: 10px 12px;
+	background: #1d2327;
+	border-radius: 5px;
+}
+
+.fpl-docs__code code {
+	padding: 0;
+	background: transparent;
+	color: #f0f0f1;
+	font-size: 13px;
+	white-space: normal;
+	word-break: break-word;
+}
+
+.fpl-docs__details {
+	max-width: 78ch;
+	margin: 9px 0;
+	border: 1px solid #dcdcde;
+	border-radius: 5px;
+	background: #fff;
+}
+
+.fpl-docs__details summary {
+	padding: 11px 13px;
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.fpl-docs__details > p,
+.fpl-docs__details > ul {
+	margin: 0;
+	padding: 0 14px 14px 34px;
+	line-height: 1.6;
+}
+
+.fpl-docs__details > p {
+	padding-left: 14px;
+}
+
+@media screen and (max-width: 782px) {
+	.fpl-docs__hero {
+		align-items: flex-start;
+		flex-direction: column;
+	}
+
+	.fpl-docs__steps {
+		grid-template-columns: 1fr;
+	}
+}

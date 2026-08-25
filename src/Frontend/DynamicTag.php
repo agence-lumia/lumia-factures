@@ -82,7 +82,14 @@ final class DynamicTag {
 	 * @param string           $context Contexte de rendu (« text », « media »…).
 	 */
 	public function render_tag( $tag, $post, string $context = 'text' ) {
-		$name = trim( (string) $tag, '{}' );
+		// Bricks 2.4 peut faire passer des valeurs structurées par ce filtre
+		// lorsqu'il résout certains contrôles. Elles ne nous appartiennent pas :
+		// les convertir en chaîne déclenche « Array to string conversion ».
+		if ( ! is_string( $tag ) ) {
+			return $tag;
+		}
+
+		$name = trim( $tag, '{}' );
 
 		if ( ! array_key_exists( $name, self::tags() ) ) {
 			return $tag;
@@ -131,7 +138,7 @@ final class DynamicTag {
 
 		switch ( $name ) {
 			case 'fpl_invoice_url':
-				if ( ! $document->is_available() || ! AccessGuard::can_access( $document ) ) {
+				if ( ! $document->is_available() || ! AccessGuard::can_access( $document, OrderContext::current_order_key() ) ) {
 					return '';
 				}
 
@@ -162,39 +169,6 @@ final class DynamicTag {
 	 * @param WP_Post|WC_Order|int|mixed $post Objet courant.
 	 */
 	private function resolve_order( $post ): ?WC_Order {
-		if ( $post instanceof WC_Order ) {
-			return $post;
-		}
-
-		$id = 0;
-
-		if ( $post instanceof WP_Post ) {
-			$id = $post->ID;
-		} elseif ( is_numeric( $post ) ) {
-			$id = (int) $post;
-		} elseif ( is_object( $post ) && isset( $post->ID ) ) {
-			$id = (int) $post->ID;
-		}
-
-		if ( $id <= 0 ) {
-			// Repli sur la commande de la page courante (confirmation de
-			// commande, « Voir la commande »), pour un tag posé sans boucle
-			// de données explicite.
-			global $wp;
-
-			if ( function_exists( 'is_order_received_page' ) && is_order_received_page() && isset( $wp->query_vars['order-received'] ) ) {
-				$id = absint( $wp->query_vars['order-received'] );
-			} elseif ( isset( $wp->query_vars['view-order'] ) ) {
-				$id = absint( $wp->query_vars['view-order'] );
-			}
-		}
-
-		if ( $id <= 0 ) {
-			return null;
-		}
-
-		$order = wc_get_order( $id );
-
-		return $order instanceof WC_Order ? $order : null;
+		return OrderContext::resolve( $post );
 	}
 }

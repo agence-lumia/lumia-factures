@@ -64,6 +64,7 @@ final class Schema {
 			'design'    => self::design(),
 			'preview'   => self::preview(),
 			'tools'     => self::tools(),
+			'documentation' => self::documentation(),
 		);
 
 		/**
@@ -1035,6 +1036,23 @@ final class Schema {
 			'label'    => __( 'Outils', 'facture-pdf-lumia' ),
 			'priority' => 90,
 			'render'   => array( \Lumia\FacturePDF\Admin\ToolsTab::class, 'render' ),
+			'sections' => array(),
+		);
+	}
+
+	/**
+	 * Onglet Documentation.
+	 *
+	 * Guide pratique destiné aux utilisateurs de la boutique. Placé après
+	 * l'onglet Outils afin de rester le dernier onglet de navigation.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private static function documentation(): array {
+		return array(
+			'label'    => __( 'Documentation', 'facture-pdf-lumia' ),
+			'priority' => 100,
+			'render'   => array( \Lumia\FacturePDF\Admin\DocumentationTab::class, 'render' ),
 			'sections' => array(),
 		);
 	}

@@ -77,7 +77,7 @@ final class Shortcode {
 			return '';
 		}
 
-		if ( ! AccessGuard::can_access( $document ) ) {
+		if ( ! AccessGuard::can_access( $document, OrderContext::current_order_key() ) ) {
 			return '';
 		}
 
@@ -99,16 +99,6 @@ final class Shortcode {
 	 * page « Voir la commande » dans le compte client.
 	 */
 	private static function detect_order_id_from_context(): int {
-		global $wp;
-
-		if ( is_order_received_page() && isset( $wp->query_vars['order-received'] ) ) {
-			return absint( $wp->query_vars['order-received'] );
-		}
-
-		if ( isset( $wp->query_vars['view-order'] ) ) {
-			return absint( $wp->query_vars['view-order'] );
-		}
-
-		return 0;
+		return OrderContext::current_order_id();
 	}
 }
