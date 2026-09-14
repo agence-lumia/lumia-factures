@@ -399,7 +399,8 @@ final class ContextBuilder {
 	 * @return array<int, array<string, mixed>>
 	 */
 	private function items(): array {
-		$items = array();
+		$items        = array();
+		$coupon_codes = implode( ', ', $this->order->get_coupon_codes() );
 
 		foreach ( $this->order->get_items() as $item_id => $item ) {
 			if ( ! $item instanceof WC_Order_Item_Product ) {
@@ -429,6 +430,7 @@ final class ContextBuilder {
 				'total'       => $this->price( $line_total ),
 				'meta'        => $this->item_meta( $item ),
 				'discounted'  => $subtotal > $total,
+				'coupon_code' => $coupon_codes,
 				'raw'         => $item,
 			);
 
@@ -670,6 +672,13 @@ final class ContextBuilder {
 
 		if ( $discount > 0.0 ) {
 			$add( 'discount', 'total_discount_enabled', __( 'Remise', 'facture-pdf-lumia' ), '-' . $this->price( $discount ) );
+		}
+
+		// Code promo.
+		$coupon_codes = implode( ', ', $this->order->get_coupon_codes() );
+
+		if ( '' !== $coupon_codes ) {
+			$add( 'discount_code', 'total_discount_code_enabled', __( 'Code promo', 'facture-pdf-lumia' ), $coupon_codes );
 		}
 
 		// Livraison.

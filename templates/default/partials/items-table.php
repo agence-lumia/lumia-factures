@@ -12,6 +12,10 @@
  *
  * @var array<int, array{key: string, label: string, width: int, align: string}> $columns
  * @var array<int, array<string, mixed>> $items
+ *
+ * `$items[n]['coupon_code']` contient les codes promo de la commande (chaîne
+ * vide si aucun), affichés à la place du badge « Remise » sur les lignes
+ * concernées.
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
@@ -55,7 +59,7 @@ if ( array() === $columns || array() === $items ) {
 								?>
 								<span class="fpl-item__name"><?php echo esc_html( $item['name'] ); ?></span>
 								<?php if ( $item['discounted'] ) : ?>
-									<span class="fpl-item__discount-badge"><?php esc_html_e( 'Remise', 'facture-pdf-lumia' ); ?></span>
+									<span class="fpl-item__discount-badge"><?php echo esc_html( '' !== $item['coupon_code'] ? $item['coupon_code'] : __( 'Remise', 'facture-pdf-lumia' ) ); ?></span>
 								<?php endif; ?>
 								<?php if ( array() !== $item['meta'] ) : ?>
 									<div class="fpl-item__meta">

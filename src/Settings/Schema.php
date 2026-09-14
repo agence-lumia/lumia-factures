@@ -489,6 +489,13 @@ final class Schema {
 							'default' => true,
 							'inline'  => true,
 						),
+						'total_discount_code_enabled' => array(
+							'type'        => 'checkbox',
+							'label'       => __( 'Code promo', 'facture-pdf-lumia' ),
+							'description' => __( 'N\'apparaît que si un code promo a été utilisé sur la commande.', 'facture-pdf-lumia' ),
+							'default'     => true,
+							'inline'      => true,
+						),
 						'total_shipping_enabled' => array(
 							'type'    => 'checkbox',
 							'label'   => __( 'Livraison', 'facture-pdf-lumia' ),

@@ -10,6 +10,7 @@ declare( strict_types=1 );
 namespace Lumia\FacturePDF\Admin;
 
 use WC_Order;
+use WC_Order_Item_Coupon;
 use WC_Order_Item_Fee;
 use WC_Order_Item_Product;
 use WC_Order_Item_Shipping;
@@ -147,6 +148,12 @@ final class DemoOrder {
 		$fee->set_total( '3.00' );
 		$fee->set_taxes( array( 'total' => array( 0 => '0.60' ) ) );
 		$order->add_item( $fee );
+
+		$coupon = new WC_Order_Item_Coupon();
+		$coupon->set_code( 'BIENVENUE10' );
+		$coupon->set_discount( '4.00' );
+		$coupon->set_discount_tax( '0.80' );
+		$order->add_item( $coupon );
 
 		$order->set_discount_total( '4.00' );
 		$order->set_discount_tax( '0.80' );
