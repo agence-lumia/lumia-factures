@@ -27,6 +27,10 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( defined( 'FPL_VERSION' ) ) {
+	return;
+}
+
 /*
 |--------------------------------------------------------------------------
 | Constantes
