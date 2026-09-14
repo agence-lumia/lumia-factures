@@ -161,36 +161,40 @@ final class OrderMetabox {
 	/**
 	 * Bouton de régénération.
 	 *
+	 * Rendu comme lien et non comme formulaire : l'encart est imbriqué dans le
+	 * formulaire d'édition de la commande, et un `<form>` dans un `<form>` est
+	 * supprimé par le navigateur — le bouton soumettrait alors la commande.
+	 *
 	 * @param WC_Order $order Commande concernée.
 	 * @param string   $label Libellé du bouton.
 	 */
 	private function render_regenerate_button( WC_Order $order, string $label = '' ): void {
 		$label = '' !== $label ? $label : __( 'Régénérer', 'facture-pdf-lumia' );
 
-		printf(
-			'<form method="post" action="%s" style="display:inline;">',
-			esc_url( admin_url( 'admin-post.php' ) )
+		$url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'action'   => 'fpl_regenerate_invoice',
+					'order_id' => $order->get_id(),
+				),
+				admin_url( 'admin-post.php' )
+			),
+			'fpl_regenerate_' . $order->get_id(),
+			'fpl_regenerate_nonce'
 		);
 
-		wp_nonce_field( 'fpl_regenerate_' . $order->get_id(), 'fpl_regenerate_nonce' );
-
-		echo '<input type="hidden" name="action" value="fpl_regenerate_invoice">';
-
-		printf( '<input type="hidden" name="order_id" value="%d">', (int) $order->get_id() );
-
 		printf(
-			'<button type="submit" class="button">%s</button>',
+			'<a href="%s" class="button">%s</a>',
+			esc_url( $url ),
 			esc_html( $label )
 		);
-
-		echo '</form>';
 	}
 
 	/**
 	 * Traite la demande de (re)génération.
 	 */
 	public function handle_regenerate(): void {
-		$order_id = isset( $_POST['order_id'] ) ? absint( wp_unslash( $_POST['order_id'] ) ) : 0;
+		$order_id = isset( $_GET['order_id'] ) ? absint( wp_unslash( $_GET['order_id'] ) ) : 0;
 
 		if ( ! current_user_can( 'edit_shop_orders' ) && ! current_user_can( SettingsPage::CAPABILITY ) ) {
 			wp_die( esc_html__( 'Permissions insuffisantes.', 'facture-pdf-lumia' ) );
@@ -256,16 +260,17 @@ final class OrderMetabox {
 	/**
 	 * Rend le contenu de la colonne.
 	 *
-	 * @param string     $column       Identifiant de colonne.
-	 * @param int|\WP_Post $post_or_id Identifiant ou objet selon l'écran.
+	 * @param string                  $column     Identifiant de colonne.
+	 * @param int|\WP_Post|WC_Order   $post_or_id Identifiant ou objet selon l'écran.
 	 */
 	public function render_column( $column, $post_or_id ): void {
 		if ( 'fpl_invoice' !== $column ) {
 			return;
 		}
 
-		$order_id = is_object( $post_or_id ) ? (int) $post_or_id->ID : (int) $post_or_id;
-		$order    = wc_get_order( $order_id );
+		// L'écran HPOS passe directement la commande : lire `->ID` dessus
+		// déclencherait l'avertissement WooCommerce sur l'accès aux propriétés.
+		$order = $post_or_id instanceof WC_Order ? $post_or_id : wc_get_order( $post_or_id );
 
 		if ( ! $order instanceof WC_Order ) {
 			echo '&#8212;';
