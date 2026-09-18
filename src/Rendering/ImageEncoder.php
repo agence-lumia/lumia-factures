@@ -59,15 +59,16 @@ final class ImageEncoder {
 	 * @param int    $attachment_id Identifiant de l'attachement.
 	 * @param int    $max_width     Largeur maximale en pixels, 0 pour ne pas redimensionner.
 	 * @param string $context       Libellé court pour les journaux (ex. « logo », « produit #12 »).
+	 * @param bool   $flatten       Aplatit la transparence sur un fond blanc (vignettes produit).
 	 *
 	 * @return string Data-URI, ou chaîne vide en cas d'échec.
 	 */
-	public static function for_attachment( int $attachment_id, int $max_width = 0, string $context = '' ): string {
+	public static function for_attachment( int $attachment_id, int $max_width = 0, string $context = '', bool $flatten = false ): string {
 		if ( $attachment_id <= 0 ) {
 			return '';
 		}
 
-		$cache_key = 'a' . $attachment_id . '|' . $max_width;
+		$cache_key = 'a' . $attachment_id . '|' . $max_width . '|' . (int) $flatten;
 
 		if ( isset( self::$cache[ $cache_key ] ) ) {
 			return self::$cache[ $cache_key ];
@@ -79,7 +80,7 @@ final class ImageEncoder {
 		$path  = get_attached_file( $attachment_id );
 
 		if ( $path && is_readable( $path ) ) {
-			$result = self::encode( $path, $max_width );
+			$result = self::encode( $path, $max_width, $flatten );
 
 			if ( '' !== $result ) {
 				self::$cache[ $cache_key ] = $result;
@@ -98,7 +99,7 @@ final class ImageEncoder {
 			);
 		}
 
-		$result = self::encode_remote( $attachment_id, $max_width );
+		$result = self::encode_remote( $attachment_id, $max_width, $flatten );
 
 		if ( '' === $result ) {
 			Logger::warning(
@@ -117,10 +118,11 @@ final class ImageEncoder {
 	 *
 	 * @param string $path      Chemin absolu du fichier.
 	 * @param int    $max_width Largeur maximale en pixels, 0 pour ne pas redimensionner.
+	 * @param bool   $flatten   Aplatit la transparence sur un fond blanc.
 	 *
 	 * @return string Data-URI, ou chaîne vide en cas d'échec.
 	 */
-	public static function encode( string $path, int $max_width = 0 ): string {
+	public static function encode( string $path, int $max_width = 0, bool $flatten = false ): string {
 		if ( ! is_readable( $path ) ) {
 			return '';
 		}
@@ -137,15 +139,17 @@ final class ImageEncoder {
 		 * l'hébergement, et un format plus récent (AVIF) n'est pas reconnu du
 		 * tout : dans ces cas Dompdf dessine sa vignette « image cassée » à la
 		 * place du produit. Tout ce qui n'est pas déjà JPEG ou PNG est donc
-		 * converti ici, où l'échec reste rattrapable et journalisé.
+		 * converti ici, où l'échec reste rattrapable et journalisé. Le
+		 * décodage de l'AVIF dépend lui aussi de GD ou d'Imagick : sans eux,
+		 * la vignette est simplement omise.
 		 */
 		$needs_conversion = ! in_array( $mime, array( 'image/jpeg', 'image/png' ), true );
 
 		$source = $path;
 		$temp   = '';
 
-		if ( $max_width > 0 || $needs_conversion ) {
-			$prepared = self::to_png( $path, $max_width );
+		if ( $max_width > 0 || $needs_conversion || $flatten ) {
+			$prepared = self::to_png( $path, $max_width, $flatten );
 
 			if ( '' !== $prepared ) {
 				$source = $prepared;
@@ -168,7 +172,8 @@ final class ImageEncoder {
 
 		/*
 		 * Le type réel peut différer après préparation : `to_png()` enregistre
-		 * son fichier temporaire en PNG, quelle que soit l'extension d'origine.
+		 * son fichier temporaire en PNG (en JPEG une fois aplati), quelle que
+		 * soit l'extension d'origine.
 		 * Annoncer ici le MIME de la source produirait par exemple
 		 * `data:image/jpeg` contenant en réalité des octets PNG — les
 		 * navigateurs sont parfois tolérants, Dompdf ne l'est pas.
@@ -193,11 +198,12 @@ final class ImageEncoder {
 	 * `isRemoteEnabled` mal réglé ouvrirait est ici structurellement absent.
 	 *
 	 * @param int $attachment_id Identifiant de l'attachement.
-	 * @param int $max_width     Largeur maximale en pixels.
+	 * @param int  $max_width     Largeur maximale en pixels.
+	 * @param bool $flatten       Aplatit la transparence sur un fond blanc.
 	 *
 	 * @return string Data-URI, ou chaîne vide en cas d'échec.
 	 */
-	private static function encode_remote( int $attachment_id, int $max_width ): string {
+	private static function encode_remote( int $attachment_id, int $max_width, bool $flatten ): string {
 		$url = wp_get_attachment_url( $attachment_id );
 
 		if ( ! $url ) {
@@ -233,7 +239,7 @@ final class ImageEncoder {
 			return '';
 		}
 
-		$result = self::encode( $temp_path, $max_width );
+		$result = self::encode( $temp_path, $max_width, $flatten );
 
 		wp_delete_file( $temp_path );
 
@@ -256,6 +262,7 @@ final class ImageEncoder {
 			'image/png'  => '.png',
 			'image/gif'  => '.gif',
 			'image/webp' => '.webp',
+			'image/avif' => '.avif',
 		);
 
 		$content_type = strtolower( trim( explode( ';', $content_type )[0] ?? '' ) );
@@ -266,7 +273,7 @@ final class ImageEncoder {
 
 		$path_extension = strtolower( (string) pathinfo( wp_parse_url( $url, PHP_URL_PATH ) ?? '', PATHINFO_EXTENSION ) );
 
-		return in_array( $path_extension, array( 'jpg', 'jpeg', 'png', 'gif', 'webp' ), true ) ? '.' . $path_extension : '.jpg';
+		return in_array( $path_extension, array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif' ), true ) ? '.' . $path_extension : '.jpg';
 	}
 
 	/**
@@ -288,7 +295,7 @@ final class ImageEncoder {
 			return '';
 		}
 
-		if ( ! in_array( $mime, array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp' ), true ) ) {
+		if ( ! in_array( $mime, array( 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ), true ) ) {
 			return '';
 		}
 
@@ -301,10 +308,11 @@ final class ImageEncoder {
 	 *
 	 * @param string $path      Chemin source.
 	 * @param int    $max_width Largeur cible, 0 pour conserver la taille.
+	 * @param bool   $flatten   Aplatit la transparence sur un fond blanc (sortie JPEG).
 	 *
 	 * @return string Chemin du fichier temporaire, ou chaîne vide.
 	 */
-	private static function to_png( string $path, int $max_width ): string {
+	private static function to_png( string $path, int $max_width, bool $flatten = false ): string {
 		$editor = wp_get_image_editor( $path );
 
 		if ( is_wp_error( $editor ) ) {
@@ -340,7 +348,61 @@ final class ImageEncoder {
 			return '';
 		}
 
-		return (string) $saved['path'];
+		$png = (string) $saved['path'];
+
+		if ( ! $flatten ) {
+			return $png;
+		}
+
+		$flat = self::flatten_to_jpeg( $png );
+
+		if ( '' === $flat ) {
+			// Sans GD, le PNG transparent reste une vignette lisible : mieux
+			// vaut un fond incertain qu'une ligne sans image.
+			return $png;
+		}
+
+		wp_delete_file( $png );
+
+		return $flat;
+	}
+
+	/**
+	 * Aplatit une image PNG sur un fond blanc et l'enregistre en JPEG.
+	 *
+	 * Les visuels produit détourés (PNG, WebP, AVIF) ont un fond transparent.
+	 * Dès qu'un maillon de la chaîne ignore le canal alpha (compression JPEG,
+	 * visionneuse PDF, impression), ce fond devient noir. Le composer
+	 * explicitement sur du blanc lève toute ambiguïté, et le JPEG obtenu est
+	 * au passage bien plus léger qu'un PNG avec alpha.
+	 *
+	 * @param string $png_path Chemin du PNG source.
+	 *
+	 * @return string Chemin du JPEG temporaire, ou chaîne vide en cas d'échec.
+	 */
+	private static function flatten_to_jpeg( string $png_path ): string {
+		if ( ! function_exists( 'imagecreatefrompng' ) || ! function_exists( 'imagejpeg' ) ) {
+			return '';
+		}
+
+		$source = @imagecreatefrompng( $png_path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+
+		if ( false === $source ) {
+			return '';
+		}
+
+		$width  = imagesx( $source );
+		$height = imagesy( $source );
+		$canvas = imagecreatetruecolor( $width, $height );
+
+		imagefill( $canvas, 0, 0, (int) imagecolorallocate( $canvas, 255, 255, 255 ) );
+		imagealphablending( $canvas, true );
+		imagecopy( $canvas, $source, 0, 0, 0, 0, $width, $height );
+
+		$jpeg_path = trailingslashit( get_temp_dir() ) . 'fpl-' . wp_generate_password( 12, false ) . '.jpg';
+		$written   = imagejpeg( $canvas, $jpeg_path, 90 );
+
+		return $written ? $jpeg_path : '';
 	}
 
 	/**

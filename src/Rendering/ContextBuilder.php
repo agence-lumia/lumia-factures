@@ -480,7 +480,8 @@ final class ContextBuilder {
 		return ImageEncoder::for_attachment(
 			$attachment_id,
 			$width,
-			method_exists( $product, 'get_id' ) ? ( 'produit #' . $product->get_id() ) : ''
+			method_exists( $product, 'get_id' ) ? ( 'produit #' . $product->get_id() ) : '',
+			true
 		);
 	}
 

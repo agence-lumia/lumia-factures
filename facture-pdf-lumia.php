@@ -1,13 +1,13 @@
 <?php
 /**
  * Plugin Name:       Facture PDF Lumia
- * Plugin URI:        https://lumia.fr
+ * Plugin URI:        https://agence-lumia.com
  * Description:       Génération de factures PDF pour WooCommerce, entièrement personnalisable.
  * Version:           1.0.4
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Author:            Lumia
- * Author URI:        https://lumia.fr
+ * Author URI:        https://agence-lumia.com
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       facture-pdf-lumia
