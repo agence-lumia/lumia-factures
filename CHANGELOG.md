@@ -1,3 +1,24 @@
+## [1.1.0] — 2026-09-18
+
+### Codes promo, formats d'image et corrections d'administration
+
+#### Ajouté
+- Nouvelle ligne « Code promo » dans le bloc des totaux, qui liste les codes utilisés sur la commande. Elle n'apparaît que si un code a été appliqué et se désactive dans l'onglet Contenu (`total_discount_code_enabled`, activée par défaut).
+- Le badge des lignes remisées affiche le code promo de la commande à la place du libellé générique « Remise ». Les modèles personnalisés peuvent l'utiliser via `$item['coupon_code']`.
+- La commande de démonstration de l'aperçu contient un code promo (`BIENVENUE10`).
+- Prise en charge des images AVIF. Tout format autre que JPEG ou PNG (GIF, WebP, AVIF) est converti avant d'être transmis à Dompdf, et une image impossible à convertir est omise au lieu d'apparaître comme une image cassée.
+
+#### Corrigé
+- Les vignettes produit transparentes sont aplaties sur un fond blanc (JPEG), ce qui évite un fond noir dans certaines visionneuses PDF ou à l'impression.
+- Un plugin d'optimisation qui impose WebP ou AVIF à toutes les sauvegardes d'images n'empêche plus la conversion en PNG des vignettes.
+- Le bouton « Régénérer » de l'encart de commande est un lien et non plus un formulaire imbriqué dans le formulaire d'édition. Il ne soumet plus la commande à la place de la régénération.
+- La colonne « Facture » de la liste des commandes HPOS ne déclenche plus l'avertissement WooCommerce sur l'accès direct aux propriétés de la commande.
+- Le plugin ne se charge plus deux fois lorsqu'une seconde copie est présente (garde sur `FPL_VERSION`).
+- Les URI du plugin et de l'auteur pointent vers https://agence-lumia.com.
+
+#### Vérifié
+- Le contrôle de syntaxe PHP passe sur l'ensemble du plugin.
+
 ## [1.0.4] — 2026-08-24
 
 ### Correctif des images produit dans les PDF
