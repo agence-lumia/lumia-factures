@@ -131,15 +131,27 @@ final class ImageEncoder {
 			return '';
 		}
 
+		/*
+		 * Dompdf n'embarque nativement que le JPEG et le PNG. Le GIF et le
+		 * WebP passent par une conversion GD qui dépend du support compilé sur
+		 * l'hébergement, et un format plus récent (AVIF) n'est pas reconnu du
+		 * tout : dans ces cas Dompdf dessine sa vignette « image cassée » à la
+		 * place du produit. Tout ce qui n'est pas déjà JPEG ou PNG est donc
+		 * converti ici, où l'échec reste rattrapable et journalisé.
+		 */
+		$needs_conversion = ! in_array( $mime, array( 'image/jpeg', 'image/png' ), true );
+
 		$source = $path;
 		$temp   = '';
 
-		if ( $max_width > 0 ) {
-			$resized = self::resize( $path, $max_width );
+		if ( $max_width > 0 || $needs_conversion ) {
+			$prepared = self::to_png( $path, $max_width );
 
-			if ( '' !== $resized ) {
-				$source = $resized;
-				$temp   = $resized;
+			if ( '' !== $prepared ) {
+				$source = $prepared;
+				$temp   = $prepared;
+			} elseif ( $needs_conversion ) {
+				return '';
 			}
 		}
 
@@ -155,15 +167,11 @@ final class ImageEncoder {
 		}
 
 		/*
-		 * Le type réel peut différer après préparation. `resize()` enregistre
-		 * volontairement son fichier temporaire en PNG, quelle que soit
-		 * l'extension de l'image d'origine. Utiliser ici le MIME d'origine
-		 * produisait donc par exemple `data:image/jpeg` contenant en réalité
-		 * des octets PNG : les navigateurs sont parfois tolérants, Dompdf ne
-		 * l'est pas et omettait alors silencieusement les vignettes produit.
-		 *
-		 * On détecte donc le type du fichier effectivement lu. Cela corrige
-		 * aussi le cas WebP lorsque l'éditeur WordPress l'a converti en PNG.
+		 * Le type réel peut différer après préparation : `to_png()` enregistre
+		 * son fichier temporaire en PNG, quelle que soit l'extension d'origine.
+		 * Annoncer ici le MIME de la source produirait par exemple
+		 * `data:image/jpeg` contenant en réalité des octets PNG — les
+		 * navigateurs sont parfois tolérants, Dompdf ne l'est pas.
 		 */
 		$final_mime = self::detect_mime( $source );
 
@@ -288,14 +296,15 @@ final class ImageEncoder {
 	}
 
 	/**
-	 * Redimensionne une image dans un fichier temporaire.
+	 * Écrit une copie PNG de l'image dans un fichier temporaire, réduite à la
+	 * largeur demandée si elle la dépasse.
 	 *
 	 * @param string $path      Chemin source.
-	 * @param int    $max_width Largeur cible.
+	 * @param int    $max_width Largeur cible, 0 pour conserver la taille.
 	 *
 	 * @return string Chemin du fichier temporaire, ou chaîne vide.
 	 */
-	private static function resize( string $path, int $max_width ): string {
+	private static function to_png( string $path, int $max_width ): string {
 		$editor = wp_get_image_editor( $path );
 
 		if ( is_wp_error( $editor ) ) {
@@ -304,17 +313,28 @@ final class ImageEncoder {
 
 		$size = $editor->get_size();
 
-		if ( isset( $size['width'] ) && (int) $size['width'] <= $max_width ) {
-			return '';
+		if ( $max_width > 0 && ( ! isset( $size['width'] ) || (int) $size['width'] > $max_width ) ) {
+			$resized = $editor->resize( $max_width, null, false );
+
+			if ( is_wp_error( $resized ) ) {
+				return '';
+			}
 		}
 
-		$resized = $editor->resize( $max_width, null, false );
+		// Un plugin d'optimisation d'images peut brancher ce filtre pour
+		// imposer WebP ou AVIF à toute sauvegarde du site. L'extension `.png`
+		// demandée ne suffit alors pas : WordPress renomme le fichier et écrit
+		// le format imposé, que Dompdf ne sait pas rendre. Le filtre est donc
+		// neutralisé le temps de cet enregistrement.
+		$keep_png = static function (): array {
+			return array();
+		};
 
-		if ( is_wp_error( $resized ) ) {
-			return '';
-		}
+		add_filter( 'image_editor_output_format', $keep_png, PHP_INT_MAX );
 
-		$saved = $editor->save( trailingslashit( get_temp_dir() ) . 'fpl-' . wp_generate_password( 12, false ) . '.png' );
+		$saved = $editor->save( trailingslashit( get_temp_dir() ) . 'fpl-' . wp_generate_password( 12, false ) . '.png', 'image/png' );
+
+		remove_filter( 'image_editor_output_format', $keep_png, PHP_INT_MAX );
 
 		if ( is_wp_error( $saved ) || empty( $saved['path'] ) ) {
 			return '';
