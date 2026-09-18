@@ -1,0 +1,34 @@
+# Systèmes d'exploitation
+.DS_Store
+._*
+Thumbs.db
+desktop.ini
+
+# Éditeurs / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Outils IA / environnement local (ne doivent pas être publiés)
+.claude/
+CLAUDE.md
+.mcp.json
+.env
+.env.*
+
+# Dépendances de développement (vendor/ est versionné, mais seulement
+# les dépendances d'exécution : voir `composer install --no-dev`)
+vendor/bin/
+vendor/squizlabs/
+vendor/wp-coding-standards/
+vendor/phpcsstandards/
+vendor/phpcompatibility/
+vendor/dealerdirect/
+node_modules/
+
+# Artefacts de build / logs
+/build/
+*.zip
+*.log
+.phpcs-cache

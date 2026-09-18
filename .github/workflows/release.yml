@@ -1,0 +1,64 @@
+# Publie une release GitHub à chaque tag `vX.Y.Z` poussé.
+#
+# Le ZIP joint contient un dossier racine `facture-pdf-lumia/` : c'est lui que
+# `GitUpdater` télécharge en priorité, et WordPress installe le plugin dans le
+# dossier portant ce nom (l'archive automatique du tag, suffixée d'un hash,
+# casserait le chemin du plugin).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: none
+
+      - name: Vérifier la cohérence des versions
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          HEADER=$(grep -oP '^\s*\*\s*Version:\s*\K[0-9.]+' facture-pdf-lumia.php)
+          CONST=$(grep -oP "define\(\s*'FPL_VERSION',\s*'\K[0-9.]+" facture-pdf-lumia.php)
+          echo "Tag: $TAG — En-tête: $HEADER — FPL_VERSION: $CONST"
+          if [ "$TAG" != "$HEADER" ] || [ "$TAG" != "$CONST" ]; then
+            echo "::error::La version du tag ne correspond pas à facture-pdf-lumia.php"
+            exit 1
+          fi
+          grep -q "^## \[$TAG\]" CHANGELOG.md || { echo "::error::Aucune entrée [$TAG] dans CHANGELOG.md"; exit 1; }
+
+      - name: Contrôle de syntaxe PHP
+        run: |
+          find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: Construire le ZIP
+        run: |
+          git archive --format=zip --prefix=facture-pdf-lumia/ -o facture-pdf-lumia.zip HEAD
+
+      - name: Extraire les notes de version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          awk -v v="$TAG" '
+            $0 ~ "^## \\[" v "\\]" { on = 1; next }
+            on && /^## \[/ { exit }
+            on { print }
+          ' CHANGELOG.md > release-notes.md
+
+      - name: Publier la release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" facture-pdf-lumia.zip \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --latest
