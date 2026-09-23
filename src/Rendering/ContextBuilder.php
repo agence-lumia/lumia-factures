@@ -410,11 +410,16 @@ final class ContextBuilder {
 			$product  = $item->get_product();
 			$quantity = (int) $item->get_quantity();
 
-			$subtotal = (float) $item->get_subtotal();
-			$total    = (float) $item->get_total();
-			$tax      = (float) $item->get_total_tax();
+			$subtotal     = (float) $item->get_subtotal();
+			$subtotal_tax = (float) $item->get_subtotal_tax();
+			$total        = (float) $item->get_total();
 
-			$line_total = $this->incl_tax ? $total + $tax : $total;
+			// La ligne affiche le prix *avant* remise, comme le sous-total :
+			// afficher le prix remisé ici ferait déduire la remise deux fois à
+			// la lecture (lignes remisées puis ligne « Remise »), et le prix
+			// unitaire ne correspondrait plus au prix de la boutique.
+			$line_tax   = $this->incl_tax ? $subtotal_tax : 0.0;
+			$line_total = $subtotal + $line_tax;
 			$unit_price = $quantity > 0 ? $line_total / $quantity : $line_total;
 
 			$data = array(
@@ -426,7 +431,7 @@ final class ContextBuilder {
 				'quantity'    => $quantity,
 				'unit_price'  => $this->price( $unit_price ),
 				'tax_rate'    => $this->item_tax_rate( $item ),
-				'tax_amount'  => $this->price( $tax ),
+				'tax_amount'  => $this->price( $subtotal_tax ),
 				'total'       => $this->price( $line_total ),
 				'meta'        => $this->item_meta( $item ),
 				'discounted'  => $subtotal > $total,
@@ -659,7 +664,7 @@ final class ContextBuilder {
 		$subtotal = (float) $this->order->get_subtotal();
 
 		if ( $this->incl_tax ) {
-			$subtotal += (float) $this->order->get_total_tax() - (float) $this->order->get_shipping_tax();
+			$subtotal += $this->items_subtotal_tax();
 		}
 
 		$add( 'subtotal', 'total_subtotal_enabled', __( 'Sous-total', 'facture-pdf-lumia' ), $this->price( $subtotal ) );
@@ -738,6 +743,29 @@ final class ContextBuilder {
 		 * @param WC_Order                         $order Commande.
 		 */
 		return (array) apply_filters( 'fpl_invoice_totals', $rows, $this->order );
+	}
+
+	/**
+	 * TVA des lignes de produits avant remise.
+	 *
+	 * `get_total_tax()` renvoie la TVA après remise et englobe la livraison et
+	 * les frais : l'utiliser pour le sous-total TTC mélange une base HT d'avant
+	 * remise avec une TVA d'après remise, et le bloc des totaux ne retombe plus
+	 * sur le total de la commande. Seule la TVA de sous-total des lignes est
+	 * cohérente avec `get_subtotal()`.
+	 */
+	private function items_subtotal_tax(): float {
+		$tax = 0.0;
+
+		foreach ( $this->order->get_items() as $item ) {
+			if ( ! $item instanceof WC_Order_Item_Product ) {
+				continue;
+			}
+
+			$tax += (float) $item->get_subtotal_tax();
+		}
+
+		return $tax;
 	}
 
 	/**

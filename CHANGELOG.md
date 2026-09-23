@@ -1,3 +1,16 @@
+## [1.1.1] — 2026-09-23
+
+### Montants des commandes remisées
+
+#### Corrigé
+- Les lignes de produits affichent le prix **avant remise**, comme le sous-total. Une commande avec code promo déduisait la remise deux fois à la lecture : le prix unitaire et le total de la ligne étaient déjà remisés, puis la ligne « Remise » retirait le même montant du sous-total. Le prix unitaire correspond de nouveau au prix de la boutique et la somme des lignes est égale au sous-total.
+- Le sous-total TTC ne mélange plus une base HT d'avant remise avec une TVA d'après remise. Il utilise la TVA de sous-total des lignes de produits, au lieu de la TVA totale de la commande, qui englobait aussi la livraison et les frais. Sur une commande remisée, le bloc des totaux ne retombait pas sur le total de la commande.
+- Les montants de la commande de démonstration de l'aperçu étaient incohérents (même TVA déclarée avant et après remise, total annoncé supérieur à la somme des lignes) et masquaient l'écart des totaux.
+
+#### Vérifié
+- Le contrôle de syntaxe PHP passe sur l'ensemble du plugin.
+- Blocs de totaux recalculés sur des commandes réelles avec remise, sans remise, à plusieurs taux de TVA, ainsi que sur l'aperçu de démonstration : la somme des lignes, la remise, la livraison et les frais retombent sur le total WooCommerce.
+
 ## [1.1.0] — 2026-09-18
 
 ### Codes promo, formats d'image et corrections d'administration

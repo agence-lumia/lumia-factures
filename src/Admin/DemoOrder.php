@@ -91,6 +91,7 @@ final class DemoOrder {
 				'subtotal' => 39.80,
 				'total'    => 35.80,
 				'tax'      => 7.16,
+				'tax_sub'  => 7.96,
 				'meta'     => array( __( 'Contenance', 'facture-pdf-lumia' ) => '220 g' ),
 			),
 			array(
@@ -99,6 +100,7 @@ final class DemoOrder {
 				'subtotal' => 28.00,
 				'total'    => 28.00,
 				'tax'      => 5.60,
+				'tax_sub'  => 5.60,
 				'meta'     => array(),
 			),
 			array(
@@ -107,6 +109,7 @@ final class DemoOrder {
 				'subtotal' => 24.00,
 				'total'    => 24.00,
 				'tax'      => 1.32,
+				'tax_sub'  => 1.32,
 				'meta'     => array(),
 			),
 		);
@@ -126,7 +129,7 @@ final class DemoOrder {
 			$item->set_taxes(
 				array(
 					'total'    => array( 0 => (string) $line['tax'] ),
-					'subtotal' => array( 0 => (string) $line['tax'] ),
+					'subtotal' => array( 0 => (string) $line['tax_sub'] ),
 				)
 			);
 
@@ -160,7 +163,7 @@ final class DemoOrder {
 		$order->set_shipping_total( '5.90' );
 		$order->set_shipping_tax( '1.18' );
 		$order->set_cart_tax( '14.08' );
-		$order->set_total( '132.86' );
+		$order->set_total( '112.56' );
 	}
 
 	/**
@@ -178,7 +181,7 @@ final class DemoOrder {
 
 		$normal->rate     = 20.0;
 		$normal->label    = __( 'TVA 20 %', 'facture-pdf-lumia' );
-		$normal->amount   = 12.76;
+		$normal->amount   = 14.54;
 		$normal->rate_id  = 0;
 		$normal->is_compound = false;
 		$normal->formatted_amount = '';
