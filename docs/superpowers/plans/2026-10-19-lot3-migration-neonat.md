@@ -313,7 +313,10 @@ This is not a code task. The controller runs it with the user's go-ahead. The st
 
 - [ ] **Step 1:** export the production database read-only, by streaming `wp db export -` over ssh to a local file in the scratchpad, never to a file on the server. Copy `uploads/facture-pdf-lumia/` the same way (`tar` over ssh).
 - [ ] **Step 2:** import the copy into the wp-env **development** instance (not tests). Install the legacy 1.1.1 ZIP and the branch build of lumia-factures. Set `home`/`siteurl` to localhost, and disable outgoing email with a mu-plugin that short-circuits `pre_wp_mail`.
-- [ ] **Step 3:** run `wp lumia-factures migrate --dry-run`, review the report with the user, then deactivate the legacy plugins and let the activation import run. Compare the counts:
+- [ ] **Step 3:**
+  1. With the legacy plugin active, run `wp lumia-factures migrate --dry-run` (allowed in that state since the final review fixes) and review the report with the user.
+  2. Deactivate the legacy plugins.
+  3. Load one manager admin page, which runs the import. Activation alone only marks it as pending. Compare the counts:
   - 153 or more invoices;
   - the files copied match the files present on disk;
   - the counter equals the highest legacy sequence;
@@ -331,5 +334,10 @@ This is not a code task. The controller runs it with the user's go-ahead. The st
   - take a production backup (database + uploads);
   - add the Nginx deny rule for both upload folders (the config lives in the site's infrastructure repository; check with `nginx -t` and a request to a guard file that must return 403);
   - check that the cron container mounts the same uploads volume.
-- [ ] **Step 3:** install `lumia-factures` 2.0.0, run `wp lumia-factures migrate --dry-run` and review the report with the user. Then deactivate `facture-pdf-lumia` and `facture-pdf-lumia-main`, and confirm `migration-status` reads `done`.
+- [ ] **Step 3:**
+  1. Install `lumia-factures` 2.0.0 while the legacy plugin is still active.
+  2. Run `wp lumia-factures migrate --dry-run` and review the report with the user.
+  3. At a quiet moment, deactivate `facture-pdf-lumia` and `facture-pdf-lumia-main`.
+  4. Load one manager admin page, which runs the import.
+  5. Confirm `migration-status` reads `done` and that the `invoice_2026` counter equals the highest legacy `_fpl_invoice_sequence`.
 - [ ] **Step 4:** run the checks from Task 7 step 4 against production (with no test order in production: watch the next real order instead). Then delete the two legacy plugin folders. Their data stays.
