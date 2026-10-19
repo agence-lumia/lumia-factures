@@ -51,7 +51,11 @@ final class Download {
 	}
 
 	/**
-	 * Absolute path of the order's archived invoice. A missing or damaged archive is rebuilt first.
+	 * Absolute path of the order's archived invoice.
+	 *
+	 * An archive never built (rendering or storage failed at issue time) is built first. A recorded
+	 * archive that is missing or damaged is never rebuilt here: the 404 points the admin to the
+	 * explicit "Rebuild missing PDF" button of the order's invoice box.
 	 *
 	 * @param int $order_id Order id.
 	 * @return string Path; ends the request with a 403 or a 404 otherwise.
@@ -67,6 +71,14 @@ final class Download {
 		}
 
 		if ( ! Archive::verify( $doc ) ) {
+			if ( null !== $doc->file ) {
+				wp_die(
+					esc_html__( 'The archived PDF of this invoice is missing or damaged. Use "Rebuild missing PDF" in the invoice box of the order.', 'lumia-factures' ),
+					'',
+					[ 'response' => 404 ]
+				);
+			}
+
 			$order = wc_get_order( $order_id );
 			if ( $order instanceof WC_Order ) {
 				Issuer::restore( $doc, $order );
@@ -98,6 +110,11 @@ final class Download {
 		$doc  = Register::find( Issuer::TYPE, $order_id );
 		$name = sanitize_file_name( (string) ( $doc->number ?? 'invoice' ) ) . '.pdf';
 		$size = filesize( $path );
+
+		// Anything buffered so far (a notice, a stray space from another plugin) would corrupt the PDF.
+		while ( ob_get_level() > 0 ) {
+			ob_end_clean();
+		}
 
 		nocache_headers();
 		header( 'Content-Type: application/pdf' );

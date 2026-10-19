@@ -77,21 +77,49 @@ class OrderToolsTest extends TestCase {
 		}
 	}
 
-	public function test_file_for_rebuilds_missing_archive(): void {
+	public function test_file_for_builds_a_never_built_archive(): void {
+		$fail = static function (): array {
+			throw new RuntimeException( 'Render broken.' );
+		};
+		add_filter( 'lumia_factures_dompdf_options', $fail );
+		$log = (string) tempnam( sys_get_temp_dir(), 'lf-log' );
+		$old = (string) ini_get( 'error_log' );
+		ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
 		$order = $this->issued_order();
-		$doc   = Register::find( 'invoice', $order->get_id() );
-		$old   = (string) Archive::path( $doc );
-		wp_delete_file( $old );
-		$this->assertFalse( Archive::verify( $doc ) );
+		ini_set( 'error_log', $old ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
+		wp_delete_file( $log );
+		remove_filter( 'lumia_factures_dompdf_options', $fail );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertNull( $doc->file );
 
 		$path = Download::file_for( $order->get_id() );
 		$new  = Register::find( 'invoice', $order->get_id() );
 		$this->track( $new );
 
-		$this->assertNotSame( $old, $path );
+		$this->assertSame( Archive::path( $new ), $path );
 		$this->assertTrue( Archive::verify( $new ) );
 		$this->assertSame( $doc->number, $new->number );
 		$this->assertSame( $doc->issued_at, $new->issued_at );
+	}
+
+	public function test_file_for_missing_recorded_archive_is_404_and_points_to_rebuild(): void {
+		$order = $this->issued_order();
+		$doc   = Register::find( 'invoice', $order->get_id() );
+		wp_delete_file( (string) Archive::path( $doc ) );
+
+		try {
+			Download::file_for( $order->get_id() );
+			$this->fail( 'Expected wp_die.' );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( 404, $e->getCode() );
+			$this->assertStringContainsString( 'Rebuild missing PDF', $e->getMessage() );
+		}
+
+		// Nothing was rebuilt behind the admin's back.
+		$after = Register::find( 'invoice', $order->get_id() );
+		$this->assertSame( $doc->file, $after->file );
+		$this->assertSame( $doc->checksum, $after->checksum );
 	}
 
 	public function test_issue_action_issues_invoice(): void {
@@ -202,11 +230,23 @@ class OrderToolsTest extends TestCase {
 		unset( $_GET['order_id'], $_GET['_wpnonce'] );
 	}
 
-	public function test_damaged_archive_that_cannot_be_restored_is_never_served(): void {
+	public function test_damaged_archive_is_never_served_nor_rebuilt(): void {
 		$order = $this->issued_order();
 		$doc   = Register::find( 'invoice', $order->get_id() );
 		file_put_contents( (string) Archive::path( $doc ), 'damaged' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test corrupts the archive.
 
+		try {
+			Download::file_for( $order->get_id() );
+			$this->fail( 'Expected wp_die.' );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( 404, $e->getCode() );
+			$this->assertStringContainsString( 'Rebuild missing PDF', $e->getMessage() );
+		}
+
+		$this->assertSame( $doc->file, Register::find( 'invoice', $order->get_id() )->file );
+	}
+
+	public function test_never_built_archive_that_cannot_be_built_is_404(): void {
 		$fail = static function (): array {
 			throw new RuntimeException( 'Render broken.' );
 		};
@@ -216,6 +256,7 @@ class OrderToolsTest extends TestCase {
 		ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
 
 		try {
+			$order = $this->issued_order();
 			Download::file_for( $order->get_id() );
 			$this->fail( 'Expected wp_die.' );
 		} catch ( WPDieException $e ) {
@@ -260,6 +301,9 @@ class OrderToolsTest extends TestCase {
 		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_download', [ Download::class, 'handle' ] ) );
 		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_issue', [ OrderTools::class, 'handle_issue' ] ) );
 		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_restore', [ OrderTools::class, 'handle_restore' ] ) );
+		// lumia-tools moves `admin_notices` into its drawer: the action result is printed on `all_admin_notices`.
+		$this->assertSame( 10, has_action( 'all_admin_notices', [ OrderTools::class, 'render_notice' ] ) );
+		$this->assertFalse( has_action( 'admin_notices', [ OrderTools::class, 'render_notice' ] ) );
 	}
 
 	/**

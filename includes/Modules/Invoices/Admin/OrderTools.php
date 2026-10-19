@@ -40,7 +40,7 @@ final class OrderTools {
 		add_action( 'add_meta_boxes', [ self::class, 'add_meta_box' ] );
 		add_action( 'admin_post_' . self::ACTION_ISSUE, [ self::class, 'handle_issue' ] );
 		add_action( 'admin_post_' . self::ACTION_RESTORE, [ self::class, 'handle_restore' ] );
-		add_action( 'admin_notices', [ self::class, 'render_notice' ] );
+		add_action( 'all_admin_notices', [ self::class, 'render_notice' ] );
 
 		add_filter( 'manage_woocommerce_page_wc-orders_columns', [ self::class, 'add_column' ] );
 		add_filter( 'manage_edit-shop_order_columns', [ self::class, 'add_column' ] );

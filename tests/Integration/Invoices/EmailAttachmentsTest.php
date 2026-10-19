@@ -108,7 +108,28 @@ class EmailAttachmentsTest extends TestCase {
 		$this->assertSame( $before + 1, Sequences::current( $key ) );
 	}
 
-	public function test_missing_archive_is_restored_before_attaching(): void {
+	public function test_never_built_archive_is_built_before_attaching(): void {
+		$fail = static function (): array {
+			throw new RuntimeException( 'Render broken.' );
+		};
+		add_filter( 'lumia_factures_dompdf_options', $fail );
+		$order = $this->order();
+		$order->update_status( 'processing' );
+		remove_filter( 'lumia_factures_dompdf_options', $fail );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertNull( $doc->file );
+
+		$result = $this->email( 'customer_completed_order', wc_get_order( $order->get_id() ) );
+
+		$built = Register::find( 'invoice', $order->get_id() );
+		$this->track( $built );
+		$this->assertSame( $doc->number, $built->number );
+		$this->assertTrue( Archive::verify( $built ) );
+		$this->assertSame( [ Archive::path( $built ) ], $result );
+	}
+
+	public function test_missing_recorded_archive_is_neither_rebuilt_nor_attached(): void {
 		$order = $this->order();
 		$order->update_status( 'processing' );
 
@@ -116,30 +137,28 @@ class EmailAttachmentsTest extends TestCase {
 		$this->track( $doc );
 		wp_delete_file( (string) Archive::path( $doc ) );
 
-		$result = $this->email( 'customer_completed_order', wc_get_order( $order->get_id() ) );
+		$result = $this->email( 'customer_completed_order', wc_get_order( $order->get_id() ), [ '/tmp/other.pdf' ] );
 
-		$restored = Register::find( 'invoice', $order->get_id() );
-		$this->track( $restored );
-		$this->assertSame( $doc->number, $restored->number );
-		$this->assertSame( [ Archive::path( $restored ) ], $result );
-		$this->assertTrue( Archive::verify( $restored ) );
+		$this->assertSame( [ '/tmp/other.pdf' ], $result );
+		$after = Register::find( 'invoice', $order->get_id() );
+		$this->assertSame( $doc->file, $after->file );
+		$this->assertSame( $doc->checksum, $after->checksum );
+		$this->assertStringContainsString( 'is missing or damaged', (string) file_get_contents( $this->log_file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 	}
 
-	public function test_damaged_archive_that_cannot_be_restored_is_not_attached(): void {
+	public function test_damaged_archive_is_neither_rebuilt_nor_attached(): void {
 		$order = $this->order();
 		$order->update_status( 'processing' );
 		$doc = Register::find( 'invoice', $order->get_id() );
 		$this->track( $doc );
 		file_put_contents( (string) Archive::path( $doc ), 'damaged' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test corrupts the archive.
 
-		$fail = static function (): array {
-			throw new RuntimeException( 'Render broken.' );
-		};
-		add_filter( 'lumia_factures_dompdf_options', $fail );
 		$result = $this->email( 'customer_completed_order', wc_get_order( $order->get_id() ), [ '/tmp/other.pdf' ] );
-		remove_filter( 'lumia_factures_dompdf_options', $fail );
 
 		$this->assertSame( [ '/tmp/other.pdf' ], $result );
+		$after = Register::find( 'invoice', $order->get_id() );
+		$this->assertSame( $doc->file, $after->file );
+		$this->assertSame( 'damaged', file_get_contents( (string) Archive::path( $after ) ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 	}
 
 	public function test_exception_does_not_block_email(): void {

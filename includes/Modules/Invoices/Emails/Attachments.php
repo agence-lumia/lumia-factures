@@ -56,6 +56,14 @@ class Attachments {
 			}
 
 			if ( ! Archive::verify( $doc ) ) {
+				if ( null !== $doc->file ) {
+					// A recorded archive that went missing or was altered is never rebuilt behind the
+					// admin's back: the meta box "Rebuild missing PDF" button is the explicit way.
+					error_log( '[lumia-factures] The archived PDF of invoice ' . $doc->number . ' (' . $doc->file . ') is missing or damaged; it is not attached to the ' . $email_id . ' email. Rebuild it from the order screen.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Operational log, the project convention.
+					return $attachments;
+				}
+
+				// Never built (rendering or storage failed at issue time): built now, once.
 				Issuer::restore( $doc, $subject );
 				$doc = Register::find( Issuer::TYPE, $subject->get_id() );
 				// A file that still fails verification is never attached.
