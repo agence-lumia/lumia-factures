@@ -1,20 +1,53 @@
 # Invoices module
 
-Core module (`includes/Modules/Invoices/`, locked: always active, cannot be deactivated). In lot 1 it is an empty skeleton; numbering, documents, rendering, storage and emails arrive in lot 2, and this page then documents the pitfalls and decisions of each part.
+Core module (`includes/Modules/Invoices/`, locked: always active, cannot be deactivated). It numbers, renders, archives and e-mails PDF invoices for WooCommerce orders (lot 2). The Bricks dynamic tags and the credit notes are planned for later lots.
 
-## Invariants (the whole 2.x)
+## Architecture
 
-- An issued invoice never changes: number, date, archived PDF.
-- Numbering is continuous and unique per document type. A used number is never reissued.
-- The amounts on the PDF add up exactly to the WooCommerce total.
-- No upgrade may lose an issued invoice or change its number.
-- PHP >= 8.1 (tested on 8.3 and 8.5), WP >= 6.9, WooCommerce >= 9.0; HPOS and legacy storage.
+One responsibility per folder under `includes/Modules/Invoices/`:
+
+| Folder | Role |
+|---|---|
+| `Database/Installer` | Creates and upgrades the two tables (`lumia_factures_sequences`, `lumia_factures_documents`) with `dbDelta`, versioned in an option. |
+| `Numbering/` | `Sequences` (atomic counters, one row per sequence key), `NumberFormat` (format tags, reset policy validation, preview). |
+| `Documents/` | `Register` (the documents table: one row per order and type), `Issuer` (the issue flow), `IssuedDocument` (value object). |
+| `Amounts/` | `StatementBuilder` turns an order into lines and total rows in integer cents (`Money`, `Line`, `TotalRow`, `Statement`). |
+| `Rendering/` | `Context` (data for the templates), `Placeholders`, `Renderer` (HTML), `PdfEngine` (Dompdf), `Images` (logo), `Styles`. Templates live in `templates/pdf/`. |
+| `Storage/Archive` | Write-once PDF files under `uploads/lumia-factures/Y/m/`. |
+| `Emails/Attachments` | Attaches the archived PDF to the WooCommerce e-mails chosen in the settings. |
+| `Settings/Schema` | Single definition of the settings (defaults, sanitizing, bounds). |
+| `Admin/` | Settings screen helpers (`Fields`, `Counters`), order screen (`OrderTools`), `Download`, live `Preview`. |
+
+Data flows one way: `Issuer` -> `Register` / `Sequences` (numbers) -> `Renderer` (HTML from `Context` + `StatementBuilder`) -> `PdfEngine` (bytes) -> `Archive` (file) -> `Register::attach_file()`.
+
+## Invariants (the whole 2.x) and the tests that pin them
+
+- An issued invoice never changes: number, date, archived PDF. `IssuerTest::test_issue_is_idempotent`, `IssuerTest::test_archived_pdf_never_changes`, `RegisterTest::test_attach_file_cannot_repoint_an_issued_invoice`, `ArchiveTest::test_archive_refuses_overwrite`.
+- Numbering is continuous and unique per document type. A used number is never reissued. `SequencesTest::test_next_reads_value_not_insert_id`, `SequencesTest::test_raise_never_lowers`, `RegisterTest::test_assign_refuses_duplicate_number`, `IssuerTest::test_issue_when_reserved_by_other_call_does_not_number_twice`.
+- The amounts on the PDF add up exactly to the WooCommerce total. `StatementTest::test_rounding_row_absorbs_real_drift`, `StatementTest::test_incl_discount_is_the_balancing_figure_without_rounding_row`, `StatementTest::test_zero_total_order`, `RenderingTest::test_summed_rows_always_print_and_toggles_hide_only_outside_the_sum`.
+- No upgrade may lose an issued invoice or change its number. `DatabaseTest::test_install_is_idempotent`, `DatabaseTest::test_maybe_upgrade_does_nothing_when_up_to_date`; `uninstall.php` deletes nothing without the constant (its meta purge is covered by `UninstallerTest`).
+- PHP >= 8.1 (tested on 8.3 and 8.5), WP >= 6.9, WooCommerce >= 9.0; HPOS and legacy storage: the whole suite runs on both (`npm test`, `npm run test:legacy`; `StorageModeTest`).
 
 ## Rules for this module
 
 - Every change under `includes/Modules/Invoices/` ships with PHPUnit integration tests (`npm test`, wp-env). See [CLAUDE.md](../../CLAUDE.md#deviations-from-lumia-tools).
-- The old plugin's code is reachable with `git show v1.1.1:<path>`; lot 2 ports it from there.
+- The old plugin's code is reachable with `git show v1.1.1:<path>`; lot 2 ported it from there, never copying it as is.
 - Storage under `wp-content/uploads/lumia-factures/` must stay unreachable from the web (see "Issuing and archive" below and the Nginx rule in the [README](../../README.md#invoice-storage-protection)).
+
+## Pitfalls
+
+What broke (or would have), and why the solution is the one in the code.
+
+- **C1: `$wpdb->insert_id` after an UPDATE.** 1.x read `insert_id` after an `UPDATE` to get the new counter. An `UPDATE` does not set it, so two invoices could share a number. `Sequences::next()` runs one atomic `UPDATE ... SET current_value = LAST_INSERT_ID(current_value + 1)` and reads `SELECT LAST_INSERT_ID()` (per connection). The number is never computed in PHP from a `SELECT`. Pinned by `SequencesTest::test_next_reads_value_not_insert_id`.
+- **C2: the stale `WC_Order`.** The status hook hands over an order object loaded before the number meta exists; rendering from it printed invoices without their number. `Issuer` saves the meta, then renders from a fresh `wc_get_order()`. Pinned by `IssuerTest::test_rendered_pdf_contains_number`.
+- **`get_formatted_meta_data( '_', $hide )`.** The first argument hides meta keys starting with `_`; the second (`$include_all`) must be the parent-name flag: with the parent name printed, the attributes already in the variation name would disappear; without it WooCommerce hides them so they are not printed twice (`StatementBuilder`). For a deleted product WooCommerce cannot map the attribute slug to its label, so the slug is humanised.
+- **Atomicity without transactions.** The WordPress test suite wraps each test in a transaction; `START TRANSACTION` in the code would commit it and leak data between tests. Atomicity comes from the unique key on the documents table (one row per order and type: `Register::reserve()` is the lock), the single-statement counter update and guarded updates (`assign()` only updates a `reserved` row, `attach_file()` only fills an empty file, `release_stale()` only deletes an unnumbered row).
+- **Temporary tables in tests.** Inside a test case `CREATE TABLE` becomes `CREATE TEMPORARY TABLE`, which the next connection cannot see. `tests/bootstrap.php` therefore runs `Installer::install()` on `setup_theme`, before the first test, so the real tables exist.
+- **The `rounding` row.** WooCommerce rounds per line and per tax rate, so the printed rows can drift from the order total by a few cents. `StatementBuilder` appends a `rounding` row for the difference instead of absorbing it into another row, so the sum is always exact. Exception (incl. VAT display): a coupon split over two rates reads 4.99 once re-added, and the customer was really given 5.00, so the discount becomes the balancing figure (`balance_discount()`, gap of at most 5 minor units) and no rounding row remains.
+- **The archive is never deleted.** PDFs are the legal record (10 years). No code path deletes a file: `Archive::store()` opens with `xb` (write-once), a rebuilt PDF is a **new** file, the damaged one stays, and uninstall never removes `uploads/lumia-factures/`, even with `LUMIA_FACTURES_REMOVE_ALL_DATA`.
+- **The Nginx rule.** `.htaccess` protects Apache and LiteSpeed only; on Nginx the archive is public unless the server block contains `location ^~ /wp-content/uploads/lumia-factures/ { deny all; }` (README). File names carry 16 random hex characters as a second barrier.
+- **Dompdf font cache.** Dompdf writes its font metrics under `uploads/lumia-factures/fonts/`, created with the same guards as the archive root before the first render (`Archive::ensure_root()`). `Archive::path()` refuses anything outside `Y/m/*.pdf`, so the cache is never served as an invoice.
+- **HPOS order meta on uninstall.** `delete_post_meta_by_key()` only reaches `wp_postmeta`; `Core\Uninstaller::delete_order_meta()` also purges `{prefix}wc_orders_meta`.
 
 ## Issuing and archive
 
