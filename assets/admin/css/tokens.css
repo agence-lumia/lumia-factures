@@ -1,0 +1,70 @@
+/*
+ * Lümia Factures - Design tokens
+ *
+ * ONLY custom properties on :root. No selector, no rule that paints anything.
+ * It is the only CSS file of the plugin that can be loaded on a native
+ * WordPress page (media, editor...) without breaking anything.
+ */
+
+:root {
+  /* Neutrals */
+  --lumia-white: oklch(1 0 0);
+  --lumia-black: oklch(0 0 0);
+  --lumia-n50: oklch(0.985 0 0);
+  --lumia-n100: oklch(0.97 0 0);
+  --lumia-n200: oklch(0.922 0 0);
+  --lumia-n300: oklch(0.87 0 0);
+  --lumia-n400: oklch(0.708 0 0);
+  --lumia-n500: oklch(0.556 0 0);
+  --lumia-n600: oklch(0.439 0 0);
+  --lumia-n700: oklch(0.371 0 0);
+  --lumia-n800: oklch(0.269 0 0);
+  --lumia-n900: oklch(0.205 0 0);
+  --lumia-n950: oklch(0.145 0 0);
+
+  /* Accent */
+  --lumia-accent: oklch(0.585 0.233 277.117);
+  /* --lumia-accent: var(--lumia-n900); */
+  --lumia-accent-hover: oklch(0.511 0.262 276.966);
+  --lumia-accent-light: oklch(0.962 0.018 272.314);
+
+  /* Semantic */
+  --lumia-success: oklch(0.696 0.17 162.48);
+  --lumia-success-bg: oklch(0.979 0.021 166.113);
+  --lumia-danger: oklch(0.637 0.237 25.331);
+  --lumia-danger-bg: oklch(0.971 0.013 17.38);
+  --lumia-warning: oklch(0.769 0.188 70.08);
+  --lumia-warning-bg: oklch(0.987 0.022 95.277);
+
+  /* Surfaces */
+  --lumia-surface: var(--lumia-white);
+  --lumia-surface-raised: var(--lumia-white);
+  --lumia-surface-overlay: var(--lumia-white);
+  --lumia-bg: var(--lumia-n100);
+
+  /* Borders */
+  --lumia-border: var(--lumia-n200);
+  --lumia-border-strong: var(--lumia-n300);
+
+  /* Text */
+  --lumia-text: var(--lumia-n900);
+  --lumia-text-secondary: var(--lumia-n500);
+  --lumia-text-muted: var(--lumia-n500);
+
+  /* Shadows */
+  --lumia-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --lumia-shadow: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+  --lumia-shadow-md:
+    0 4px 6px oklch(0 0 0 / 0.04), 0 2px 4px oklch(0 0 0 / 0.03);
+
+  /* Radius */
+  --lumia-radius: 12px;
+  --lumia-radius-sm: 8px;
+  --lumia-radius-xs: 4px;
+
+  /* Transitions */
+  --lumia-transition: all 0.15s ease;
+
+  /* Layout */
+  --lumia-sidebar-width: 260px;
+}

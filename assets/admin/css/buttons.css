@@ -1,0 +1,103 @@
+/*
+ * Buttons
+ */
+
+.lumia-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: var(--lumia-radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--lumia-border);
+  cursor: pointer;
+  transition: var(--lumia-transition);
+  text-decoration: none;
+  line-height: 1.5;
+  font-family: inherit;
+  white-space: nowrap;
+  min-height: 42px;
+  background: var(--lumia-white);
+  color: var(--lumia-text);
+}
+
+.lumia-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lumia-btn--sm {
+  padding: 7px 14px;
+  font-size: 13px;
+  min-height: 34px;
+}
+
+.lumia-btn--primary {
+  background: var(--lumia-accent);
+  color: var(--lumia-white);
+  border-color: var(--lumia-accent);
+}
+
+.lumia-btn--primary:hover:not(:disabled) {
+  background: var(--lumia-accent-hover);
+  border-color: var(--lumia-accent-hover);
+}
+
+.lumia-btn--secondary {
+  background: var(--lumia-white);
+  color: var(--lumia-text);
+  border-color: var(--lumia-border);
+}
+
+.lumia-btn--secondary:hover:not(:disabled) {
+  background: var(--lumia-n50);
+  border-color: var(--lumia-border-strong);
+}
+
+.lumia-btn--danger {
+  background: var(--lumia-danger-bg);
+  color: var(--lumia-danger);
+  border-color: var(--lumia-danger);
+}
+
+.lumia-btn--danger:hover:not(:disabled) {
+  background: var(--lumia-danger);
+  color: var(--lumia-white);
+  border-color: var(--lumia-danger);
+}
+
+/*
+ * Link buttons: wp-admin colors `a:hover`/`a:focus` blue, and this rule wins
+ * over the color set by `.lumia-btn--*` (the state adds a pseudo-class). Each
+ * state must therefore redeclare the color, otherwise an
+ * `<a class="lumia-btn">` turns blue on hover.
+ */
+a.lumia-btn:hover,
+a.lumia-btn:focus,
+a.lumia-btn:active {
+  color: var(--lumia-text);
+  box-shadow: none;
+}
+
+a.lumia-btn--primary:hover,
+a.lumia-btn--primary:focus,
+a.lumia-btn--primary:active {
+  color: var(--lumia-white);
+}
+
+a.lumia-btn--secondary:hover,
+a.lumia-btn--secondary:focus,
+a.lumia-btn--secondary:active {
+  color: var(--lumia-text);
+}
+
+a.lumia-btn--danger:hover,
+a.lumia-btn--danger:active {
+  color: var(--lumia-white);
+}
+
+a.lumia-btn--danger:focus {
+  color: var(--lumia-danger);
+}

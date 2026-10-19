@@ -1,0 +1,1070 @@
+/*
+ * Components
+ */
+
+.lumia-icon,
+.lumia-admin-wrap .lumia-icon {
+  width: 20px !important;
+  height: 20px !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--lumia-text-muted);
+}
+
+.lumia-icon--sm,
+.lumia-admin-wrap .lumia-icon--sm {
+  width: 18px;
+  height: 18px;
+}
+
+.lumia-icon--md,
+.lumia-admin-wrap .lumia-icon--md {
+  width: 20px;
+  height: 20px;
+}
+
+.lumia-icon--lg,
+.lumia-admin-wrap .lumia-icon--lg {
+  width: 22px;
+  height: 22px;
+}
+
+.lumia-icon--xl,
+.lumia-admin-wrap .lumia-icon--xl {
+  width: 48px;
+  height: 48px;
+}
+
+.lumia-admin-wrap .lumia-icon {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.lumia-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.lumia-option + .lumia-option {
+  border-top: 1px solid var(--lumia-n100);
+}
+
+.lumia-option__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lumia-text);
+  line-height: 1.4;
+}
+
+.lumia-option__desc {
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.lumia-option__control {
+  flex-shrink: 0;
+}
+
+.lumia-option--full .lumia-option__control {
+  width: 100%;
+}
+
+.lumia-option--full .lumia-option__content {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lumia-toggle {
+  position: relative;
+  display: inline-block;
+  width: 40px;
+  height: 24px;
+  /* In a flex row, a long label would squash the toggle: its width is
+     fixed, it must never serve as an adjustment variable. */
+  flex-shrink: 0;
+}
+
+.lumia-toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.lumia-toggle__slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--lumia-n300);
+  transition: var(--lumia-transition);
+  border-radius: 24px;
+}
+
+.lumia-toggle__slider::before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background-color: var(--lumia-white);
+  transition: var(--lumia-transition);
+  border-radius: 50%;
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.15);
+}
+
+.lumia-toggle input:checked + .lumia-toggle__slider {
+  background-color: var(--lumia-accent);
+}
+
+.lumia-toggle input:checked + .lumia-toggle__slider::before {
+  transform: translateX(16px);
+}
+
+.lumia-toggle input:focus-visible + .lumia-toggle__slider {
+  box-shadow: 0 0 0 3px oklch(0.7 0.15 275 / 0.25);
+}
+
+.lumia-toggle input:disabled + .lumia-toggle__slider {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.lumia-input,
+input[type="text"].lumia-input,
+input[type="number"].lumia-input,
+input[type="email"].lumia-input,
+input[type="password"].lumia-input,
+input[type="date"].lumia-input,
+textarea.lumia-input {
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  font-size: 14px;
+  color: var(--lumia-text);
+  background: var(--lumia-white);
+  transition: var(--lumia-transition);
+  font-family: inherit;
+  line-height: 1.5;
+  min-height: 42px;
+  box-shadow: none;
+}
+
+.lumia-input:focus,
+input[type="text"].lumia-input:focus,
+input[type="number"].lumia-input:focus,
+input[type="email"].lumia-input:focus,
+input[type="password"].lumia-input:focus,
+input[type="date"].lumia-input:focus,
+textarea.lumia-input:focus {
+  outline: none;
+  border-color: var(--lumia-accent);
+  box-shadow: 0 0 0 3px oklch(0.7 0.15 275 / 0.12);
+}
+
+/* Chromium's native sub-fields inflate the height (≈ 50px): pin it. */
+input[type="date"].lumia-input {
+  height: 42px;
+}
+
+/* Lucide "calendar" icon in place of the native indicator (Chromium, Safari). */
+input[type="date"].lumia-input::-webkit-calendar-picker-indicator {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  padding: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23646970' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v3'/%3E%3Cpath d='M16 2v3'/%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18'/%3E%3C/svg%3E") no-repeat center / 16px;
+  cursor: pointer;
+}
+
+input[type="date"].lumia-input::-webkit-datetime-edit {
+  padding: 0;
+}
+
+.lumia-input::placeholder {
+  color: var(--lumia-text-muted);
+}
+
+.lumia-input--sm {
+  width: auto;
+  max-width: 140px;
+}
+
+.lumia-input--xs {
+  width: auto;
+  max-width: 100px;
+}
+
+.lumia-admin-wrap select.lumia-select,
+#wpcontent .lumia-admin-wrap select.lumia-select {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  font-size: 14px;
+  color: var(--lumia-text);
+  background: var(--lumia-white);
+  transition: var(--lumia-transition);
+  font-family: inherit;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none' stroke='%23646970' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 18px;
+  cursor: pointer;
+  line-height: 1.5;
+  min-height: 42px;
+  box-shadow: none;
+}
+
+.lumia-admin-wrap select.lumia-select:focus,
+#wpcontent .lumia-admin-wrap select.lumia-select:focus {
+  outline: none;
+  border-color: var(--lumia-accent);
+  box-shadow: 0 0 0 3px oklch(0.7 0.15 275 / 0.12);
+}
+
+.lumia-admin-wrap select.lumia-select--sm,
+#wpcontent .lumia-admin-wrap select.lumia-select--sm {
+  width: auto;
+  max-width: 200px;
+}
+
+.lumia-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.lumia-badge--success {
+  background: var(--lumia-success-bg);
+  color: var(--lumia-success);
+}
+
+.lumia-badge--inactive {
+  background: var(--lumia-n100);
+  color: var(--lumia-text-muted);
+}
+
+.lumia-badge--danger {
+  background: var(--lumia-danger-bg);
+  color: var(--lumia-danger);
+}
+
+.lumia-badge--neutral {
+  background: var(--lumia-n100);
+  color: var(--lumia-text-secondary);
+}
+
+.lumia-badge--warning {
+  background: var(--lumia-warning-bg);
+  color: var(--lumia-warning);
+}
+
+.lumia-badge--info {
+  background: var(--lumia-accent-light);
+  color: var(--lumia-accent);
+}
+
+.lumia-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+  padding: 20px 28px 0;
+}
+
+.lumia-card {
+  background: var(--lumia-surface-raised);
+  border-radius: var(--lumia-radius);
+  border: 1px solid var(--lumia-border);
+  box-shadow: var(--lumia-shadow-sm);
+  overflow: hidden;
+}
+
+.lumia-card--stat {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+}
+
+.lumia-card__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-n50);
+  color: var(--lumia-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.lumia-card__icon .lumia-icon,
+.lumia-card__icon .lumia-icon {
+  color: currentColor;
+}
+
+.lumia-card__icon--success {
+  /* background: var(--lumia-success-bg); */
+  color: var(--lumia-success);
+}
+
+.lumia-card__icon--info {
+  /* background: var(--lumia-warning-bg); */
+  color: var(--lumia-warning);
+}
+
+.lumia-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lumia-card__value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--lumia-text);
+  line-height: 1;
+}
+
+.lumia-card__label {
+  font-size: 13px;
+  color: var(--lumia-text-secondary);
+}
+
+/* The flex column stretches its children: a badge would keep the full width. */
+.lumia-card__content .lumia-badge {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
+.lumia-card__header {
+  padding: 20px 20px 0;
+}
+
+.lumia-card__title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.lumia-card__desc {
+  font-size: 13px;
+  color: var(--lumia-text-secondary);
+}
+
+.lumia-card__body {
+  padding: 20px;
+}
+
+.lumia-module-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.lumia-module-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.lumia-module-card {
+  background: var(--lumia-surface-raised);
+  border-radius: var(--lumia-radius);
+  border: 1px solid var(--lumia-border);
+  box-shadow: var(--lumia-shadow-sm);
+  padding: 20px;
+  transition: var(--lumia-transition);
+}
+
+.lumia-module-card:hover {
+  box-shadow: var(--lumia-shadow);
+}
+
+.lumia-module-card--active {
+  border-color: oklch(0.8 0.08 150 / 0.3);
+}
+
+.lumia-module-card__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.lumia-module-card__header .lumia-icon,
+.lumia-module-card__header .lumia-icon {
+  color: var(--lumia-accent);
+}
+
+.lumia-module-card__title {
+  font-size: 14px;
+  font-weight: 600;
+  flex: 1;
+}
+
+.lumia-module-card__desc {
+  font-size: 13px;
+  color: var(--lumia-text-secondary);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.lumia-module-card__actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.lumia-server-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.lumia-server-status__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+  background: var(--lumia-n50);
+  border-radius: var(--lumia-radius-sm);
+  border: 1px solid var(--lumia-border);
+}
+
+.lumia-server-status__label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lumia-text-secondary);
+}
+
+.lumia-form__row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.lumia-form__row .lumia-form__group {
+  flex: 1;
+  min-width: 120px;
+  max-width: 200px;
+}
+
+.lumia-form__group {
+  margin-bottom: 16px;
+}
+
+.lumia-form__group:last-child {
+  margin-bottom: 0;
+}
+
+.lumia-form__group--toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.lumia-form__toggle-label {
+  flex: 1;
+}
+
+.lumia-form__label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  color: var(--lumia-text);
+}
+
+.lumia-form__help {
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.lumia-inline {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.lumia-inline--center {
+  align-items: center;
+}
+
+/* ================================================================
+ * DANGER LABEL VARIANT
+ * ================================================================ */
+
+.lumia-form__label--danger {
+  color: #dc2626;
+}
+
+/* ================================================================
+ * CONFIGURATION CARDS
+ * ================================================================ */
+
+.lumia-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.lumia-config-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-n50);
+  overflow: hidden;
+}
+
+.lumia-config-card__body {
+  flex: 1;
+  padding: 16px 16px 12px;
+}
+
+.lumia-config-card__title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--lumia-text);
+  margin-bottom: 4px;
+}
+
+.lumia-config-card__title--danger {
+  color: var(--lumia-danger);
+}
+
+.lumia-config-card__desc {
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+  line-height: 1.5;
+}
+
+.lumia-config-card__footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--lumia-border);
+  background: var(--lumia-surface);
+}
+
+.lumia-config-card__footer .lumia-btn,
+.lumia-config-card__footer button {
+  width: 100%;
+}
+
+.lumia-config-card__footer .lumia-import-row {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.lumia-config-card__footer .lumia-import-row .lumia-btn {
+  width: 100%;
+}
+
+@media screen and (max-width: 782px) {
+  .lumia-config-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ================================================================
+ * IMPORT ROW
+ * ================================================================ */
+
+.lumia-import-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.lumia-file-input {
+  font-size: 13px;
+  color: var(--lumia-text);
+  cursor: pointer;
+}
+
+.lumia-file-input::file-selector-button {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-xs);
+  background: var(--lumia-surface);
+  color: var(--lumia-text);
+  cursor: pointer;
+  transition: background 0.15s;
+  margin-right: 8px;
+}
+
+.lumia-file-input::file-selector-button:hover {
+  background: var(--lumia-n100);
+}
+
+/* ================================================================
+ * COLLAPSIBLE SECTION (details/summary)
+ * ================================================================ */
+
+.lumia-section--collapsible {
+  border: none;
+  padding: 0;
+}
+
+.lumia-section__header--summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  user-select: none;
+  padding-bottom: 20px;
+}
+
+.lumia-section__header--summary::-webkit-details-marker {
+  display: none;
+}
+
+.lumia-section__chevron {
+  flex-shrink: 0;
+  margin-top: 4px;
+  color: var(--lumia-text-muted);
+  transition: transform 0.2s ease;
+}
+
+details[open] .lumia-section__chevron {
+  transform: rotate(180deg);
+}
+
+/* ================================================================
+ * SERVER INFORMATION TABLE
+ * ================================================================ */
+
+.lumia-server-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.lumia-server-table tbody tr {
+  border-bottom: 1px solid var(--lumia-border);
+}
+
+.lumia-server-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.lumia-server-table td {
+  padding: 10px 0;
+  vertical-align: middle;
+}
+
+.lumia-server-table__label {
+  font-weight: 500;
+  color: var(--lumia-text);
+  width: 50%;
+  padding-right: 16px;
+}
+
+.lumia-form__actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+/* ================================================================
+ * MODAL
+ * ================================================================ */
+
+.lumia-modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 999998;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  align-items: center;
+  justify-content: center;
+  animation: lumia-modal-fade 0.18s ease;
+}
+
+.lumia-modal-overlay.is-open {
+  display: flex;
+}
+
+@keyframes lumia-modal-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.lumia-modal {
+  background: var(--lumia-surface);
+  border-radius: var(--lumia-radius);
+  border: 1px solid var(--lumia-border);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+  width: 100%;
+  max-width: 420px;
+  margin: 20px;
+  animation: lumia-modal-slide 0.18s ease;
+  overflow: hidden;
+}
+
+/* Wide modal + scrolling body (long forms). */
+.lumia-modal--lg {
+  max-width: 560px;
+}
+.lumia-modal--lg .lumia-modal__body {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+@keyframes lumia-modal-slide {
+  from {
+    transform: translateY(-8px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+.lumia-modal__header {
+  padding: 20px 20px 0;
+}
+
+.lumia-modal__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--lumia-text);
+  margin: 0;
+}
+
+.lumia-modal__body {
+  padding: 12px 20px 20px;
+}
+
+.lumia-modal__message {
+  font-size: 13px;
+  color: var(--lumia-text-secondary);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.lumia-modal__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--lumia-border);
+  background: var(--lumia-n50);
+}
+
+.lumia-notice {
+  padding: 12px 16px;
+  border-radius: var(--lumia-radius-xs);
+  margin-bottom: 20px;
+  font-size: 13px;
+}
+
+.lumia-notice--success {
+  background: var(--lumia-success-bg);
+  color: var(--lumia-success);
+  border: 1px solid oklch(0.8 0.08 150 / 0.2);
+}
+
+.lumia-notice--error {
+  background: var(--lumia-danger-bg);
+  color: var(--lumia-danger);
+  border: 1px solid oklch(0.8 0.08 20 / 0.2);
+}
+
+/* Body text stays dark: the amber of --lumia-warning is too light to read a
+   whole sentence on the cream background (badges only hold a word). */
+.lumia-notice--warning {
+  background: var(--lumia-warning-bg);
+  color: var(--lumia-text);
+  border: 1px solid oklch(0.8 0.12 80 / 0.45);
+}
+
+.lumia-empty {
+  text-align: center;
+  padding: 48px 20px;
+  color: var(--lumia-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.lumia-empty .lumia-icon,
+.lumia-empty .lumia-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: 12px;
+  color: var(--lumia-text-muted);
+}
+
+.lumia-empty p {
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+
+/* ================================================================
+ * SEARCH — reusable search field (wrapper + icon).
+ * Neutralizes the native WordPress styles of <input> for a consistent
+ * rendering in all the modules. Structure:
+ *   <div class="lumia-search"><svg…/><input class="lumia-search__input"></div>
+ * Modifier: --sm (compact).
+ * ================================================================ */
+.lumia-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-height: 34px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-surface);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.lumia-search--sm {
+  min-height: 30px;
+  padding: 0 8px;
+}
+
+.lumia-search:focus-within {
+  border-color: var(--lumia-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--lumia-accent) 15%, transparent);
+}
+
+.lumia-search > svg {
+  color: var(--lumia-n400);
+  flex-shrink: 0;
+}
+
+.lumia-admin-wrap .lumia-search__input,
+.lumia-search__input {
+  flex: 1 !important;
+  min-width: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--lumia-text) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+}
+
+@media screen and (max-width: 782px) {
+  .lumia-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .lumia-module-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ================================================================
+   TOOLTIPS
+   ----------------------------------------------------------------
+   Singleton positioned as `fixed` by admin.js (translate3d, like
+   Popper): the element is out of the flow, so never clipped by an
+   `overflow:hidden` parent — the case of all our scrollable columns.
+   The container carries the position, the box the animation, so that
+   one does not overwrite the other.
+   ================================================================ */
+
+.lumia-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000000;
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.lumia-tooltip.is-visible {
+  visibility: visible;
+}
+
+.lumia-tooltip__box {
+  position: relative;
+  /* The singleton lives in <body>, outside the reach of the plugin reset:
+     without this line, max-width would not count the padding. */
+  box-sizing: border-box;
+  max-width: 260px;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  color: #fff;
+  background: var(--lumia-n900, #111827);
+  border-radius: var(--lumia-radius-sm, 6px);
+  box-shadow: var(--lumia-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+}
+
+.lumia-tooltip.is-visible .lumia-tooltip__box {
+  opacity: 1;
+  transform: none;
+}
+
+/* Animation origin point: the box must seem to come out of the hovered
+   element, not shrink towards its own center. */
+.lumia-tooltip[data-placement="top"] .lumia-tooltip__box    { transform-origin: bottom center; }
+.lumia-tooltip[data-placement="bottom"] .lumia-tooltip__box { transform-origin: top center; }
+.lumia-tooltip[data-placement="left"] .lumia-tooltip__box   { transform-origin: right center; }
+.lumia-tooltip[data-placement="right"] .lumia-tooltip__box  { transform-origin: left center; }
+
+.lumia-tooltip__arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.lumia-tooltip[data-placement="top"] .lumia-tooltip__arrow    { bottom: -3px; margin-left: -4px; }
+.lumia-tooltip[data-placement="bottom"] .lumia-tooltip__arrow { top: -3px;    margin-left: -4px; }
+.lumia-tooltip[data-placement="left"] .lumia-tooltip__arrow   { right: -3px;  margin-top: -4px; }
+.lumia-tooltip[data-placement="right"] .lumia-tooltip__arrow  { left: -3px;   margin-top: -4px; }
+
+/*
+ * Help marker: Lucide `info` icon carrying a clarification in a tooltip.
+ * Neither a dot drawn in CSS nor a dotted underline under the label: the
+ * former fakes an icon, the latter dirties the line and does not read as a
+ * control. A real pictogram, discreet, keyboard-clickable.
+ */
+.lumia-tip-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 5px;
+  vertical-align: -3px;
+  color: var(--lumia-n400);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: help;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+
+.lumia-tip-info__i {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.lumia-tip-info:hover,
+.lumia-tip-info:focus-visible {
+  color: var(--lumia-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumia-tooltip__box {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ================================================================
+ * TABS (sub-tabs of a screen) — see admin.js initTabs()
+ * ================================================================ */
+
+.lumia-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 0 28px;
+  /* Inner-shadow rule rather than a border: the active tab's underline paints
+     over it without a negative margin, which would make a vertical scrollbar
+     appear with overflow-x (the y axis then also switches to auto). */
+  box-shadow: inset 0 -1px 0 var(--lumia-border);
+  overflow-x: auto;
+}
+
+.lumia-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--lumia-text-secondary);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color var(--lumia-transition), border-color var(--lumia-transition);
+}
+
+.lumia-tabs__tab:hover {
+  color: var(--lumia-text);
+}
+
+.lumia-tabs__tab:focus-visible {
+  outline: 2px solid var(--lumia-accent);
+  outline-offset: -2px;
+}
+
+.lumia-tabs__tab.is-active {
+  font-weight: 500;
+  color: var(--lumia-accent);
+  border-bottom-color: var(--lumia-accent);
+}
+
+.lumia-tabs__panel[hidden] {
+  display: none;
+}

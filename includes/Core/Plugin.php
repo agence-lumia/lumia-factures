@@ -9,6 +9,8 @@ namespace Lumia\Factures\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Admin\Admin;
+
 /**
  * Main plugin class.
  * Singleton pattern to guarantee a single instance.
@@ -31,6 +33,11 @@ class Plugin {
 	private Settings $settings;
 
 	/**
+	 * Admin interface.
+	 */
+	private Admin $admin;
+
+	/**
 	 * Blocking errors found by the last boot (reason => message).
 	 *
 	 * @var array<string, string>
@@ -43,6 +50,9 @@ class Plugin {
 	private function __construct() {
 		$this->settings = new Settings();
 		$this->modules  = new Modules( $this->settings );
+		// Built whatever the requirements: the page must explain why the modules
+		// did not start. Its constructor only registers admin hooks.
+		$this->admin = new Admin( $this );
 
 		$this->init();
 	}
@@ -69,6 +79,13 @@ class Plugin {
 	 */
 	public function settings(): Settings {
 		return $this->settings;
+	}
+
+	/**
+	 * Admin interface.
+	 */
+	public function admin(): Admin {
+		return $this->admin;
 	}
 
 	/**

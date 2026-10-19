@@ -58,6 +58,15 @@
 		<exclude-pattern>*/uninstall.php</exclude-pattern>
 	</rule>
 
+	<!-- WooCommerce capability used by the whole plugin (registered by WooCommerce). -->
+	<rule ref="WordPress.WP.Capabilities">
+		<properties>
+			<property name="custom_capabilities" type="array">
+				<element value="manage_woocommerce"/>
+			</property>
+		</properties>
+	</rule>
+
 	<!-- Text domain -->
 	<rule ref="WordPress.WP.I18n">
 		<properties>

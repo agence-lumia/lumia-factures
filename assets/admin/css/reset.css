@@ -1,0 +1,77 @@
+/*
+ * Lümia Factures - Reset
+ *
+ * Copy of lumia-tools' reset.css, every selector prefixed with
+ * .lumia-factures-admin (wrapper: .lumia-admin-wrap.lumia-factures-admin):
+ * this file must NEVER paint outside the plugin page, nor reach a lumia-tools
+ * page when both plugins are active. The tokens live in tokens.css, the
+ * overrides of the WordPress chrome in layout.css.
+ */
+
+.lumia-factures-admin.lumia-admin-wrap {
+  margin: 0 0 0 -20px;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--lumia-text);
+  background: var(--lumia-bg);
+  height: calc(100vh - 32px);
+  overflow: hidden;
+}
+
+.lumia-factures-admin *,
+.lumia-factures-admin *::before,
+.lumia-factures-admin *::after {
+  box-sizing: border-box;
+}
+
+.lumia-factures-admin ul,
+.lumia-factures-admin ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.lumia-factures-admin h1,
+.lumia-factures-admin h2,
+.lumia-factures-admin h3,
+.lumia-factures-admin h4,
+.lumia-factures-admin h5,
+.lumia-factures-admin h6 {
+  margin: 0;
+  font-weight: 600;
+  color: var(--lumia-text);
+}
+
+.lumia-factures-admin p {
+  margin: 0;
+}
+
+.lumia-factures-admin a {
+  text-decoration: none;
+}
+
+.lumia-factures-admin a:hover,
+.lumia-factures-admin a:focus {
+  border-radius: var(--lumia-radius-sm);
+  box-shadow: none;
+  outline: none;
+}
+
+.lumia-factures-admin img {
+  max-width: 100%;
+  height: auto;
+  border: 0;
+}
+
+.lumia-factures-admin input,
+.lumia-factures-admin select,
+.lumia-factures-admin textarea,
+.lumia-factures-admin button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
