@@ -271,6 +271,33 @@ class ImporterTest extends TestCase {
 		$this->assertSame( 29241, Sequences::current( $key ) );
 	}
 
+	public function test_legacy_number_written_during_the_import_raises_the_counter(): void {
+		$key   = 'invoice_' . wp_date( 'Y' );
+		$early = $this->order();
+		$this->legacy->invoice( $this->order(), 'FA-0004', 4, $key, (int) strtotime( '-1 day' ), null );
+
+		// The legacy plugin, still serving a request, invoices an order the cursor already passed
+		// after the counters-first pass: only the final pass can see its number.
+		$written = false;
+		$late    = function () use ( &$written, $early, $key ): void {
+			if ( ! $written ) {
+				$written = true;
+				$this->legacy->invoice( wc_get_order( $early->get_id() ), 'FA-0009', 9, $key, time(), null );
+			}
+		};
+		add_action( 'lumia_factures_legacy_import_batch_done', $late );
+		try {
+			$report = Importer::run( false )->to_array();
+		} finally {
+			remove_action( 'lumia_factures_legacy_import_batch_done', $late );
+		}
+
+		$this->assertTrue( $written );
+		$this->assertSame( 1, $report['invoices_imported'] );
+		$this->assertSame( 9, Sequences::current( $key ) );
+		$this->assertSame( [ $key => 9 ], $report['sequences'] );
+	}
+
 	public function test_unloadable_order_still_counts_toward_the_counter(): void {
 		[ $orders, $key ] = $this->neonat();
 

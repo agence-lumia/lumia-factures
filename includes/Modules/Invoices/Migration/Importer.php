@@ -91,7 +91,7 @@ final class Importer {
 		 */
 		$size = max( 1, (int) apply_filters( 'lumia_factures_legacy_import_batch_size', self::BATCH ) );
 
-		// Highest legacy counter value seen per key: the final pass below is only a safety net.
+		// Highest legacy counter value seen per key, merged with a fresh read of the meta at the end.
 		$highest = [];
 		$seen    = [];
 		$after   = 0;
@@ -126,6 +126,13 @@ final class Importer {
 				do_action( 'lumia_factures_legacy_import_batch_done', $report, $after, $dry_run );
 			}
 		} while ( [] !== $batch );
+
+		// The legacy plugin may still number orders while the import runs (an in-flight request when
+		// it is deactivated): its meta is read again, so a number written behind the cursor after
+		// the first pass still raises the counter.
+		foreach ( LegacySource::max_sequences() as $key => $value ) {
+			$highest[ $key ] = max( $highest[ $key ] ?? 0, $value );
+		}
 
 		self::sequences( $highest, $dry_run, $report );
 		self::bricks( $dry_run, $report );
