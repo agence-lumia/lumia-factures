@@ -105,6 +105,55 @@ final class Register {
 	}
 
 	/**
+	 * Records an invoice issued elsewhere (the legacy plugin) directly as issued.
+	 *
+	 * @param string $type         Document type.
+	 * @param int    $order_id     Order id.
+	 * @param string $number       Printed number.
+	 * @param string $sequence_key Counter key ('' when unknown).
+	 * @param int    $sequence     Counter value (0 when unknown).
+	 * @param int    $issued_at    UTC timestamp.
+	 * @return int|null Row id, or null when the order already has a row or the number is taken (nothing inserted).
+	 */
+	public static function import( string $type, int $order_id, string $number, string $sequence_key, int $sequence, int $issued_at ): ?int {
+		global $wpdb;
+
+		if ( '' === $number || $order_id <= 0 ) {
+			return null;
+		}
+
+		// One INSERT: the unique keys (type, order) and (type, number) refuse a duplicate at the database.
+		$suppressed = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- register write.
+		$result = $wpdb->insert(
+			Installer::documents_table(),
+			[
+				'type'         => $type,
+				'order_id'     => $order_id,
+				'status'       => 'issued',
+				'number'       => $number,
+				'sequence_key' => '' === $sequence_key ? null : $sequence_key,
+				'sequence'     => $sequence > 0 ? $sequence : null,
+				'issued_at'    => gmdate( 'Y-m-d H:i:s', $issued_at ),
+				'created_at'   => gmdate( 'Y-m-d H:i:s' ),
+			],
+			[ '%s', '%d', '%s', '%s', '%s', '%d', '%s', '%s' ]
+		);
+		$error  = (string) $wpdb->last_error;
+		$wpdb->suppress_errors( $suppressed );
+
+		if ( 1 === $result ) {
+			return (int) $wpdb->insert_id;
+		}
+
+		if ( false === stripos( $error, 'duplicate' ) ) {
+			error_log( '[lumia-factures] Could not import ' . $type . ' ' . $number . ' of order ' . $order_id . ': ' . $error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+		}
+
+		return null;
+	}
+
+	/**
 	 * Gives a reserved row its number and marks it issued.
 	 *
 	 * @param int    $id        Row id.

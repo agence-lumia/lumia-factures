@@ -141,4 +141,43 @@ class RegisterTest extends TestCase {
 		Register::release( $issued );
 		$this->assertNotNull( Register::find( 'invoice', 510 ) );
 	}
+
+	public function test_import_inserts_an_issued_row(): void {
+		$time = (int) strtotime( '2026-10-02 09:30:00 UTC' );
+		$id   = Register::import( 'invoice', 520, '202610029241', 'invoice_2026', 29241, $time );
+
+		$this->assertIsInt( $id );
+		$doc = Register::find( 'invoice', 520 );
+		$this->assertSame( $id, $doc->id );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertSame( '202610029241', $doc->number );
+		$this->assertSame( 'invoice_2026', $doc->sequence_key );
+		$this->assertSame( 29241, $doc->sequence );
+		$this->assertSame( $time, $doc->issued_at );
+		$this->assertNull( $doc->file );
+
+		// The file is recorded once, like an invoice issued here.
+		$this->assertTrue( Register::attach_file( $id, '2026/10/a.pdf', str_repeat( 'a', 64 ) ) );
+		$this->assertFalse( Register::attach_file( $id, '2026/10/b.pdf', str_repeat( 'b', 64 ) ) );
+	}
+
+	public function test_import_refuses_duplicates_without_inserting(): void {
+		$this->assertIsInt( Register::import( 'invoice', 521, 'FA-IMP-1', 'invoice_2026', 1, time() ) );
+
+		// Same order, other number.
+		$this->assertNull( Register::import( 'invoice', 521, 'FA-IMP-2', 'invoice_2026', 2, time() ) );
+		$this->assertSame( 'FA-IMP-1', Register::find( 'invoice', 521 )->number );
+		$this->assertFalse( Register::number_exists( 'invoice', 'FA-IMP-2' ) );
+
+		// Same number, other order.
+		$this->assertNull( Register::import( 'invoice', 522, 'FA-IMP-1', 'invoice_2026', 1, time() ) );
+		$this->assertNull( Register::find( 'invoice', 522 ) );
+
+		// An order with a reservation in progress.
+		Register::reserve( 'invoice', 523 );
+		$this->assertNull( Register::import( 'invoice', 523, 'FA-IMP-3', 'invoice_2026', 3, time() ) );
+		$this->assertSame( 'reserved', Register::find( 'invoice', 523 )->status );
+
+		$this->assertNull( Register::import( 'invoice', 524, '', 'invoice_2026', 4, time() ) );
+	}
 }

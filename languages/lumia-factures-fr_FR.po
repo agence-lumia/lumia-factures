@@ -621,6 +621,30 @@ msgstr[1] "%1$s contenait %2$d mentions : saisissez-les à nouveau dans « Texte
 msgid "%s was set and is no longer supported: it was not imported."
 msgstr "%s était renseigné et n'est plus pris en charge : il n'a pas été importé."
 
+msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
+msgstr "La facture %1$s de la commande %2$d n'avait pas de date de facture : la date de génération de son PDF a été utilisée."
+
+msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
+msgstr "La facture %1$s de la commande %2$d n'avait pas de date de facture : la date de création de la commande a été utilisée."
+
+msgid "Invoice %s imported from Facture PDF Lumia."
+msgstr "Facture %s importée depuis Facture PDF Lumia."
+
+msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
+msgstr "L'ancien PDF de la facture %1$s (commande %2$d, %3$s) n'est pas un PDF lisible de l'ancien dossier : il n'a pas été importé, le PDF sera généré au premier besoin."
+
+msgid "Order %d: part of the import could not be written (see the PHP error log)."
+msgstr "Commande %d : une partie de l'import n'a pas pu être enregistrée (voir le journal d'erreurs PHP)."
+
+msgid "The number is already used by another invoice."
+msgstr "Ce numéro est déjà utilisé par une autre facture."
+
+msgid "An invoice is being issued for this order."
+msgstr "Une facture est en cours d'émission pour cette commande."
+
+msgid "The order already has invoice %s."
+msgstr "La commande a déjà la facture %s."
+
 msgid "You are not allowed to download invoices."
 msgstr "Vous n'êtes pas autorisé à télécharger les factures."
 

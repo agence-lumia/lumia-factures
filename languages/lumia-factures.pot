@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T18:44:40+00:00\n"
+"POT-Creation-Date: 2026-10-19T19:07:29+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -361,6 +361,50 @@ msgstr ""
 #: includes/Modules/Invoices/Documents/Issuer.php:378
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
+msgstr ""
+
+#. translators: 1: invoice number, 2: order id
+#: includes/Modules/Invoices/Migration/Importer.php:181
+#, php-format
+msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
+msgstr ""
+
+#. translators: 1: invoice number, 2: order id
+#: includes/Modules/Invoices/Migration/Importer.php:188
+#, php-format
+msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
+msgstr ""
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Migration/Importer.php:209
+#, php-format
+msgid "Invoice %s imported from Facture PDF Lumia."
+msgstr ""
+
+#. translators: 1: invoice number, 2: order id, 3: file path
+#: includes/Modules/Invoices/Migration/Importer.php:272
+#, php-format
+msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
+msgstr ""
+
+#. translators: %d: order id
+#: includes/Modules/Invoices/Migration/Importer.php:356
+#, php-format
+msgid "Order %d: part of the import could not be written (see the PHP error log)."
+msgstr ""
+
+#: includes/Modules/Invoices/Migration/Importer.php:366
+msgid "The number is already used by another invoice."
+msgstr ""
+
+#: includes/Modules/Invoices/Migration/Importer.php:376
+msgid "An invoice is being issued for this order."
+msgstr ""
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Migration/Importer.php:380
+#, php-format
+msgid "The order already has invoice %s."
 msgstr ""
 
 #. translators: 1: setting name, e.g. design.font_body, 2: legacy font name
