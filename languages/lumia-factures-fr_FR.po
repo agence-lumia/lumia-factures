@@ -460,3 +460,107 @@ msgstr "Total"
 #, php-format
 msgid "VAT %s"
 msgstr "TVA %s"
+
+#: includes/Modules/Invoices/Rendering/Context.php:173
+msgid "Invoice"
+msgstr "Facture"
+
+#: includes/Modules/Invoices/Rendering/Context.php:195
+#: includes/Modules/Invoices/Rendering/Context.php:454
+msgid "Tel"
+msgstr "Tél"
+
+#: includes/Modules/Invoices/Rendering/Context.php:196
+#: includes/Modules/Invoices/Rendering/Context.php:455
+msgid "Mob"
+msgstr "Mob"
+
+#: includes/Modules/Invoices/Rendering/Context.php:223
+msgid "Bill to"
+msgstr "Facturer à"
+
+#: includes/Modules/Invoices/Rendering/Context.php:238
+msgid "Ship to"
+msgstr "Livrer à"
+
+#: includes/Modules/Invoices/Rendering/Context.php:277
+msgid "Invoice no."
+msgstr "N° de facture"
+
+#: includes/Modules/Invoices/Rendering/Context.php:278
+msgid "Invoice date"
+msgstr "Date de facture"
+
+#: includes/Modules/Invoices/Rendering/Context.php:279
+msgid "Order no."
+msgstr "N° de commande"
+
+#: includes/Modules/Invoices/Rendering/Context.php:280
+msgid "Order date"
+msgstr "Date de commande"
+
+#: includes/Modules/Invoices/Rendering/Context.php:281
+msgid "Payment method"
+msgstr "Mode de paiement"
+
+#: includes/Modules/Invoices/Rendering/Context.php:329
+msgid "Product"
+msgstr "Produit"
+
+#: includes/Modules/Invoices/Rendering/Context.php:330
+msgid "Description"
+msgstr "Description"
+
+#: includes/Modules/Invoices/Rendering/Context.php:331
+msgid "SKU"
+msgstr "Référence"
+
+#: includes/Modules/Invoices/Rendering/Context.php:332
+msgid "Qty"
+msgstr "Qté"
+
+#: includes/Modules/Invoices/Rendering/Context.php:333
+msgid "Unit price"
+msgstr "Prix unitaire"
+
+#: includes/Modules/Invoices/Rendering/Context.php:334
+msgid "VAT"
+msgstr "TVA"
+
+#: includes/Modules/Invoices/Rendering/Context.php:441
+msgid "Customer note"
+msgstr "Note du client"
+
+#: includes/Modules/Invoices/Rendering/Context.php:458
+msgid "SIRET"
+msgstr "SIRET"
+
+#: includes/Modules/Invoices/Rendering/Context.php:459
+msgid "RCS"
+msgstr "RCS"
+
+#: includes/Modules/Invoices/Rendering/Context.php:460
+msgid "VAT no."
+msgstr "N° de TVA"
+
+#: includes/Modules/Invoices/Rendering/Context.php:461
+msgid "Share capital"
+msgstr "Capital social"
+
+#: includes/Modules/Invoices/Rendering/Context.php:462
+msgid "APE"
+msgstr "APE"
+
+#: includes/Modules/Invoices/Rendering/Context.php:463
+msgid "IBAN"
+msgstr "IBAN"
+
+#: includes/Modules/Invoices/Rendering/Context.php:464
+msgid "BIC"
+msgstr "BIC"
+
+#. translators: 1: current page number, 2: page count
+#: includes/Modules/Invoices/Rendering/PdfEngine.php:112
+#, php-format
+msgid "Page %1$s / %2$s"
+msgstr "Page %1$s / %2$s"

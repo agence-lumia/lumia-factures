@@ -1,0 +1,143 @@
+<?php
+/**
+ * Placeholders of the free texts.
+ *
+ * @package Lumia\Factures
+ */
+
+namespace Lumia\Factures\Modules\Invoices\Rendering;
+
+defined( 'ABSPATH' ) || exit;
+
+use Lumia\Factures\Modules\Invoices\Amounts\Money;
+use Lumia\Factures\Modules\Invoices\Module;
+use WC_Order;
+
+/**
+ * Replaces `{tag}` markers of the message, footer and legal texts.
+ *
+ * The result is plain text: it is NOT escaped here, the templates escape every value. An unknown
+ * tag is kept as typed. A company field switched off in the settings resolves to an empty string,
+ * exactly as it is absent from the rest of the document.
+ */
+final class Placeholders {
+
+	/**
+	 * Resolves the tags of a text.
+	 *
+	 * @param string                    $text     Text with `{tag}` markers.
+	 * @param WC_Order                  $order    Order.
+	 * @param DocumentData              $doc      Document.
+	 * @param array<string, mixed>|null $settings Invoice settings, `Module::settings()` when null.
+	 * @return string Plain text.
+	 */
+	public static function resolve( string $text, WC_Order $order, DocumentData $doc, ?array $settings = null ): string {
+		if ( ! str_contains( $text, '{' ) ) {
+			return $text;
+		}
+
+		$values = self::values( $order, $doc, $settings ?? Module::settings() );
+
+		return (string) preg_replace_callback(
+			'/\{([a-z0-9_]+)\}/i',
+			static fn( array $matches ): string => array_key_exists( $matches[1], $values ) ? $values[ $matches[1] ] : $matches[0],
+			$text
+		);
+	}
+
+	/**
+	 * A company field, '' when its toggle is off.
+	 *
+	 * @param array<string, mixed> $settings Invoice settings.
+	 * @param string               $key      Company key (`siret`, `address`...).
+	 */
+	public static function company_value( array $settings, string $key ): string {
+		$company = isset( $settings['company'] ) && is_array( $settings['company'] ) ? $settings['company'] : [];
+
+		if ( array_key_exists( $key . '_enabled', $company ) && empty( $company[ $key . '_enabled' ] ) ) {
+			return '';
+		}
+
+		return isset( $company[ $key ] ) && is_scalar( $company[ $key ] ) ? trim( (string) $company[ $key ] ) : '';
+	}
+
+	/**
+	 * A date as text in the shop date format.
+	 *
+	 * @param int $timestamp Unix timestamp, 0 for none.
+	 */
+	public static function format_date( int $timestamp ): string {
+		return $timestamp > 0 ? (string) wp_date( (string) get_option( 'date_format', 'Y-m-d' ), $timestamp ) : '';
+	}
+
+	/**
+	 * Tag values.
+	 *
+	 * @param WC_Order             $order    Order.
+	 * @param DocumentData         $doc      Document.
+	 * @param array<string, mixed> $settings Invoice settings.
+	 * @return array<string, string>
+	 */
+	private static function values( WC_Order $order, DocumentData $doc, array $settings ): array {
+		$created = $order->get_date_created();
+		$items   = 0;
+		foreach ( $order->get_items() as $item ) {
+			$items += (int) $item->get_quantity();
+		}
+
+		$shipping_method = '';
+		foreach ( $order->get_shipping_methods() as $method ) {
+			$shipping_method = $method->get_method_title();
+			break;
+		}
+
+		$first = $order->get_billing_first_name();
+		$last  = $order->get_billing_last_name();
+
+		$values = [
+			'order_number'        => (string) $order->get_order_number(),
+			'order_date'          => $created ? self::format_date( $created->getTimestamp() ) : '',
+			'order_total'         => Money::format( Money::to_minor( $order->get_total() ), $order->get_currency() ),
+			'payment_method'      => (string) $order->get_payment_method_title(),
+			'shipping_method'     => $shipping_method,
+			'order_items_count'   => (string) $items,
+			'invoice_number'      => $doc->number,
+			'invoice_date'        => self::format_date( $doc->date ),
+			'due_date'            => '',
+			'customer_first_name' => $first,
+			'customer_last_name'  => $last,
+			'customer_full_name'  => trim( $first . ' ' . $last ),
+			'customer_company'    => $order->get_billing_company(),
+			'customer_email'      => $order->get_billing_email(),
+			'customer_phone'      => $order->get_billing_phone(),
+			'billing_first_name'  => $first,
+			'billing_last_name'   => $last,
+			'billing_company'     => $order->get_billing_company(),
+			'billing_email'       => $order->get_billing_email(),
+			'billing_phone'       => $order->get_billing_phone(),
+			'shop_name'           => self::company_value( $settings, 'display_name' ),
+			'shop_legal_name'     => self::company_value( $settings, 'legal_name' ),
+			'shop_manager'        => self::company_value( $settings, 'manager' ),
+			'shop_address'        => self::company_value( $settings, 'address' ),
+			'shop_phone'          => self::company_value( $settings, 'phone' ),
+			'shop_mobile'         => self::company_value( $settings, 'mobile' ),
+			'shop_email'          => self::company_value( $settings, 'email' ),
+			'shop_website'        => self::company_value( $settings, 'website' ),
+			'shop_siret'          => self::company_value( $settings, 'siret' ),
+			'shop_vat'            => self::company_value( $settings, 'vat_number' ),
+			'current_date'        => self::format_date( time() ),
+			'current_year'        => wp_date( 'Y' ),
+		];
+
+		/**
+		 * Filters the placeholder values. Values must be plain text: the templates escape them.
+		 *
+		 * @param array<string, mixed> $values Tag => value.
+		 * @param WC_Order              $order  Order.
+		 * @param DocumentData          $doc    Document.
+		 */
+		$filtered = apply_filters( 'lumia_factures_placeholders', $values, $order, $doc );
+
+		return is_array( $filtered ) ? array_map( static fn( $value ): string => is_scalar( $value ) ? (string) $value : '', $filtered ) : $values;
+	}
+}

@@ -1,0 +1,372 @@
+/*
+ * Invoice stylesheet.
+ *
+ * Every value goes through a custom property named lf-<name> (double dash prefix), substituted by
+ * Styles before the sheet reaches Dompdf, which does not understand them. The variables come from
+ * the design settings.
+ *
+ * Dompdf constraints followed here:
+ *   - no flexbox, no grid, no computed lengths: columns are tables;
+ *   - border-radius does not apply to table cells: rounded corners only on div blocks;
+ *   - table-layout: fixed, otherwise percentage column widths are ignored once the content varies;
+ *   - page-break-inside: avoid keeps a product row in one piece.
+ */
+
+@page {
+	margin: var(--lf-margin-top) var(--lf-margin-sides) var(--lf-margin-bottom);
+}
+
+body {
+	margin: 0;
+	padding: 0;
+	background: var(--lf-color-page);
+	color: var(--lf-color-text);
+	font-family: var(--lf-font-body);
+	font-size: var(--lf-font-size);
+	line-height: var(--lf-line-height);
+}
+
+table {
+	border-collapse: collapse;
+	width: 100%;
+}
+
+h1, h2, h3 {
+	font-family: var(--lf-font-heading);
+	font-weight: var(--lf-heading-weight);
+	color: var(--lf-color-primary);
+	margin: 0;
+}
+
+p {
+	margin: 0;
+}
+
+/* Header ------------------------------------------------------------- */
+.lf-header {
+	table-layout: fixed;
+	margin-bottom: var(--lf-space-lg);
+}
+
+.lf-header td {
+	vertical-align: top;
+	padding: 0;
+}
+
+.lf-header__logo {
+	width: 45%;
+}
+
+.lf-header__company {
+	width: 55%;
+	text-align: right;
+	font-size: var(--lf-font-size-xs);
+	color: var(--lf-color-muted);
+	line-height: 1.5;
+}
+
+.lf-header__name {
+	display: block;
+	color: var(--lf-color-primary);
+	font-size: var(--lf-font-size-lg);
+	font-family: var(--lf-font-heading);
+	font-weight: var(--lf-heading-weight);
+	margin-bottom: var(--lf-space-xs);
+}
+
+/* Title band --------------------------------------------------------- */
+.lf-titlebar {
+	table-layout: fixed;
+	background: var(--lf-color-primary);
+	margin-bottom: var(--lf-space-lg);
+}
+
+.lf-titlebar td {
+	padding: var(--lf-space-md) var(--lf-cell-padding-x);
+	vertical-align: middle;
+}
+
+.lf-titlebar__label {
+	width: 55%;
+}
+
+.lf-titlebar__label h1 {
+	color: var(--lf-color-thead-text);
+	font-size: var(--lf-font-size-title);
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	line-height: 1.1;
+}
+
+.lf-titlebar__number {
+	width: 45%;
+	text-align: right;
+	color: var(--lf-color-thead-text);
+	font-size: var(--lf-font-size-lg);
+	font-weight: bold;
+	letter-spacing: 0.04em;
+}
+
+/* Parties and details ------------------------------------------------ */
+.lf-parties {
+	table-layout: fixed;
+	margin-bottom: var(--lf-space-lg);
+}
+
+.lf-party {
+	vertical-align: top;
+	padding: 0 var(--lf-space-lg) 0 0;
+}
+
+.lf-party--meta {
+	padding-right: 0;
+}
+
+.lf-party h3 {
+	font-size: var(--lf-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--lf-color-muted);
+	font-weight: bold;
+	padding-bottom: var(--lf-space-xs);
+	margin-bottom: var(--lf-space-sm);
+	border-bottom: var(--lf-border-width) solid var(--lf-color-border);
+}
+
+.lf-party address {
+	font-style: normal;
+	line-height: 1.4;
+}
+
+.lf-party__contact {
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-sm);
+	line-height: 1.4;
+}
+
+.lf-meta {
+	table-layout: fixed;
+}
+
+.lf-meta td {
+	padding: 0 0 var(--lf-space-sm);
+	vertical-align: top;
+	font-size: var(--lf-font-size-sm);
+	line-height: 1.3;
+}
+
+.lf-meta__label {
+	width: 52%;
+	color: var(--lf-color-muted);
+}
+
+.lf-meta__value {
+	width: 48%;
+	text-align: right;
+	font-weight: bold;
+}
+
+/* Message ------------------------------------------------------------ */
+.lf-message {
+	background: var(--lf-color-block-bg);
+	border-radius: var(--lf-radius);
+	padding: var(--lf-space-md) var(--lf-space-lg);
+	margin-bottom: var(--lf-space-lg);
+}
+
+.lf-message h3 {
+	font-size: var(--lf-font-size-h3);
+	margin-bottom: var(--lf-space-xs);
+}
+
+.lf-message p {
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-sm);
+}
+
+/* Products table ----------------------------------------------------- */
+.lf-items {
+	table-layout: fixed;
+	margin-bottom: var(--lf-space-lg);
+}
+
+.lf-items thead th {
+	background: var(--lf-color-thead-bg);
+	color: var(--lf-color-thead-text);
+	text-align: left;
+	font-size: var(--lf-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	padding: var(--lf-space-sm) var(--lf-cell-padding-x);
+	word-wrap: break-word;
+}
+
+.lf-items tbody td {
+	padding: var(--lf-cell-padding-y) var(--lf-cell-padding-x);
+	border-bottom: var(--lf-border-width) solid var(--lf-color-border);
+	vertical-align: top;
+	page-break-inside: avoid;
+	word-wrap: break-word;
+	line-height: 1.3;
+}
+
+.lf-items tbody tr.lf-row-alt td {
+	background: var(--lf-color-row-alt);
+}
+
+.lf-items th.lf-col-center,
+.lf-items td.lf-col-center {
+	text-align: center;
+}
+
+.lf-items th.lf-col-right,
+.lf-items td.lf-col-right {
+	text-align: right;
+}
+
+.lf-item__image img {
+	width: var(--lf-thumb-width);
+}
+
+.lf-item__name {
+	font-weight: bold;
+}
+
+.lf-item__attribute {
+	margin-top: var(--lf-space-xs);
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-xs);
+	line-height: 1.3;
+}
+
+.lf-item__sku {
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-xs);
+}
+
+.lf-item__description {
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-sm);
+}
+
+/* Totals ------------------------------------------------------------- */
+.lf-totals-wrap {
+	table-layout: fixed;
+	margin-bottom: var(--lf-space-md);
+	page-break-inside: avoid;
+}
+
+.lf-totals-wrap td {
+	padding: 0;
+	vertical-align: top;
+}
+
+.lf-totals-wrap__space {
+	width: 55%;
+}
+
+.lf-totals-wrap__cell {
+	width: 45%;
+}
+
+.lf-totals {
+	table-layout: fixed;
+	background: var(--lf-color-block-bg);
+	border-radius: var(--lf-radius);
+}
+
+.lf-totals td {
+	padding: var(--lf-space-sm) var(--lf-space-lg);
+	font-size: var(--lf-font-size-sm);
+}
+
+.lf-totals__label {
+	width: 55%;
+	color: var(--lf-color-muted);
+}
+
+.lf-totals__value {
+	width: 45%;
+	text-align: right;
+	font-weight: bold;
+}
+
+.lf-total-row--muted td,
+.lf-total-row--muted .lf-totals__label,
+.lf-total-row--muted .lf-totals__value {
+	color: var(--lf-color-muted);
+	font-weight: normal;
+	font-size: var(--lf-font-size-xs);
+}
+
+.lf-total-row--grand td {
+	background: var(--lf-color-primary);
+	color: var(--lf-color-thead-text);
+	font-size: var(--lf-font-size-lg);
+	font-weight: bold;
+	padding-top: var(--lf-space-md);
+	padding-bottom: var(--lf-space-md);
+}
+
+.lf-total-row--grand .lf-totals__label {
+	color: var(--lf-color-thead-text);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	font-size: var(--lf-font-size-sm);
+}
+
+.lf-legal-text {
+	margin-top: var(--lf-space-sm);
+	margin-bottom: var(--lf-space-md);
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-xs);
+	line-height: 1.5;
+}
+
+/* Notes -------------------------------------------------------------- */
+.lf-notes {
+	margin-bottom: var(--lf-space-md);
+	page-break-inside: avoid;
+}
+
+.lf-notes__block {
+	border-left: 2pt solid var(--lf-color-border);
+	padding-left: var(--lf-space-md);
+	margin-bottom: var(--lf-space-sm);
+}
+
+.lf-notes__block h3 {
+	font-size: var(--lf-font-size-xs);
+	text-transform: uppercase;
+	letter-spacing: 0.08em;
+	color: var(--lf-color-muted);
+	margin-bottom: var(--lf-space-xs);
+}
+
+.lf-notes__block p {
+	font-size: var(--lf-font-size-sm);
+}
+
+/* Footer ------------------------------------------------------------- */
+.lf-footer {
+	position: fixed;
+	left: 0;
+	right: 0;
+	bottom: var(--lf-footer-bottom);
+	padding-top: var(--lf-space-sm);
+	border-top: var(--lf-border-width) solid var(--lf-color-border);
+	text-align: center;
+	color: var(--lf-color-muted);
+	font-size: var(--lf-font-size-xs);
+	line-height: 1.5;
+}
+
+.lf-footer__text {
+	margin-bottom: var(--lf-space-xs);
+	color: var(--lf-color-text);
+	font-size: var(--lf-font-size-sm);
+}
+
+.lf-footer__line {
+	margin: 0 var(--lf-space-sm);
+}
