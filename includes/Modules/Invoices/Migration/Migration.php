@@ -116,12 +116,15 @@ final class Migration {
 	}
 
 	/**
-	 * On plugin activation: forgets a cached "no legacy data", plans and runs the import.
+	 * On plugin activation: forgets a cached "no legacy data" and marks the import pending.
+	 *
+	 * It never runs here: inside `activate_plugin()` the plugin has not booted (no module is
+	 * registered, so the Bricks step could not turn its module on, and the text domain is not
+	 * loaded). The next manager admin request, cron run or `wp lumia-factures migrate` runs it.
 	 */
 	public static function on_activate(): void {
 		self::forget_no_data();
 		self::prepare();
-		self::maybe_run();
 	}
 
 	/**

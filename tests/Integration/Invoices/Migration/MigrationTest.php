@@ -87,10 +87,21 @@ class MigrationTest extends TestCase {
 		parent::tear_down();
 	}
 
-	public function test_activation_with_legacy_data_runs_migration(): void {
+	public function test_activation_with_legacy_data_marks_the_import_pending(): void {
 		$order = $this->legacy_order( 'FA-0005', 5, true );
 
 		$this->activate();
+
+		// Inside activate_plugin() the plugin has not booted: the import waits for the next request.
+		$this->assertSame( 'pending', Migration::state()['status'] );
+		$this->assertTrue( Migration::blocks_issuing() );
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( 0, Sequences::current( $this->key ) );
+		$this->assertFalse( get_option( Migration::LOCK ) );
+
+		// The next manager admin request runs it.
+		set_current_screen( 'dashboard' );
+		Migration::boot();
 
 		$state = Migration::state();
 		$this->assertSame( 'done', $state['status'] );
@@ -444,7 +455,10 @@ class MigrationTest extends TestCase {
 		$order = $this->legacy_order( 'FA-0005', 5, false );
 
 		$this->activate();
+		$this->assertSame( 'pending', Migration::state()['status'] );
+		$this->assertTrue( Migration::blocks_issuing() );
 
+		Migration::maybe_run();
 		$this->assertSame( 'done', Migration::state()['status'] );
 		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
 	}

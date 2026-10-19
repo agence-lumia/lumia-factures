@@ -175,6 +175,8 @@ final class Importer {
 		}
 
 		if ( ! $dry_run && ! $modules->activate( 'bricks' ) ) {
+			// The modules are not registered when the plugin has not booted.
+			$report->notes[] = __( 'A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render.', 'lumia-factures' );
 			self::log( 'The Bricks module could not be turned on.' );
 			return;
 		}

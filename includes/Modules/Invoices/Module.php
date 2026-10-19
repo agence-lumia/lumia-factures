@@ -150,13 +150,16 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Creates the tables on activation, then imports the Facture PDF Lumia data when there is some.
+	 * Creates the tables on activation, then marks the Facture PDF Lumia import pending when there
+	 * is legacy data. The import itself runs on the next manager admin request, cron run or
+	 * `wp lumia-factures migrate` (see Migration::on_activate()).
 	 *
-	 * The import needs WooCommerce, and must never run while the legacy plugin is still active
-	 * (it would keep numbering): it waits for a request that meets the requirements.
+	 * Looking for legacy data needs WooCommerce; while a requirement fails (the legacy plugin still
+	 * active) the import is planned by the first request that meets them.
 	 */
 	public function on_activate(): void {
 		Installer::install();
+		Migration::forget_no_data();
 
 		if ( [] !== Requirements::check() ) {
 			return;
