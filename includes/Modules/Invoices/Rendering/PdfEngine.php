@@ -66,8 +66,11 @@ final class PdfEngine {
 	 * Dompdf options.
 	 */
 	public static function options(): Options {
-		$cache = trailingslashit( get_temp_dir() ) . 'lumia-factures-fonts';
-		wp_mkdir_p( $cache );
+		// In uploads, not in the system temp dir: shared hosts share /tmp between tenants.
+		$cache = trailingslashit( (string) wp_upload_dir()['basedir'] ) . 'lumia-factures/fonts';
+		if ( wp_mkdir_p( $cache ) && ! file_exists( $cache . '/index.php' ) ) {
+			file_put_contents( $cache . '/index.php', '<?php // Silence is golden.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Directory listing guard.
+		}
 
 		$options = new Options();
 		// Every image is a data URI: nothing may be fetched, which also closes the SSRF door.

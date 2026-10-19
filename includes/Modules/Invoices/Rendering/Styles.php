@@ -101,7 +101,12 @@ final class Styles {
 		];
 
 		foreach ( [ 'primary', 'secondary', 'text', 'muted', 'thead_bg', 'thead_text', 'row_alt', 'block_bg', 'border', 'page' ] as $color ) {
-			$variables[ 'color-' . str_replace( '_', '-', $color ) ] = (string) $design[ 'color_' . $color ];
+			// Re-validated here: the value ends up inside a stylesheet.
+			$value = sanitize_hex_color( (string) $design[ 'color_' . $color ] );
+			if ( empty( $value ) ) {
+				$value = (string) Schema::defaults()['design'][ 'color_' . $color ];
+			}
+			$variables[ 'color-' . str_replace( '_', '-', $color ) ] = $value;
 		}
 
 		return $variables;

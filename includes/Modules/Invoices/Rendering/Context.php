@@ -393,8 +393,7 @@ final class Context {
 	/**
 	 * Totals rows as text.
 	 *
-	 * The toggles hide only what is outside the sum: the coupon codes and, in incl. VAT mode, the
-	 * informational "excl. VAT" and VAT rows. A summed row always prints, so the rows printed add up
+	 * The toggle hides only what is outside the sum: in incl. VAT mode, the informational "excl. VAT" and VAT rows. A summed row always prints, so the rows printed add up
 	 * to the total.
 	 *
 	 * @param Statement $statement Statement.
@@ -404,10 +403,6 @@ final class Context {
 		$rows = [];
 
 		foreach ( $statement->rows as $row ) {
-			if ( 'coupons' === $row->key && ! $this->on( 'total_discount_code_enabled' ) ) {
-				continue;
-			}
-
 			if ( $statement->incl_tax && $row->informational && in_array( $row->key, [ 'total_excl', 'tax' ], true ) && ! $this->on( 'total_tax_enabled' ) ) {
 				continue;
 			}

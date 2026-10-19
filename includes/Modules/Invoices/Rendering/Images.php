@@ -32,6 +32,14 @@ final class Images {
 	private static array $cache = [];
 
 	/**
+	 * A remote fetch already failed in this request: later images are not tried remotely (each
+	 * attempt can cost the full timeout).
+	 *
+	 * @var bool
+	 */
+	private static bool $remote_failed = false;
+
+	/**
 	 * Data URI of an attachment.
 	 *
 	 * @param int $attachment_id Attachment id.
@@ -53,13 +61,12 @@ final class Images {
 
 		if ( is_string( $path ) && is_readable( $path ) ) {
 			$result = self::encode( $path, $max_width );
-			if ( '' === $result ) {
-				self::log( sprintf( 'attachment %d: unusable image file, trying its URL.', $attachment_id ) );
-			}
-		}
-
-		if ( '' === $result ) {
+		} elseif ( ! self::$remote_failed ) {
+			// Only a missing local file (offloaded media) justifies a fetch.
 			$result = self::fetch( $attachment_id, $max_width );
+			if ( '' === $result ) {
+				self::$remote_failed = true;
+			}
 		}
 
 		if ( '' === $result ) {
@@ -75,7 +82,8 @@ final class Images {
 	 * Forgets the images of the current request.
 	 */
 	public static function flush(): void {
-		self::$cache = [];
+		self::$cache         = [];
+		self::$remote_failed = false;
 	}
 
 	/**
@@ -215,12 +223,55 @@ final class Images {
 	}
 
 	/**
+	 * Flattens a PNG with transparency onto white.
+	 *
+	 * Dompdf handles an alpha channel through Imagick or GD extra passes that fail on some hosts
+	 * (an Imagick without PNG support throws), and a failed render means no invoice. An opaque PNG
+	 * goes through the plain path. The bytes are returned unchanged when GD is not available.
+	 *
+	 * @param string $binary PNG bytes.
+	 */
+	private static function flatten( string $binary ): string {
+		$type = strlen( $binary ) > 25 ? ord( $binary[25] ) : 0;
+
+		if ( ! in_array( $type, [ 4, 6 ], true ) && ! str_contains( substr( $binary, 0, 2048 ), 'tRNS' ) ) {
+			return $binary;
+		}
+
+		if ( ! function_exists( 'imagecreatefromstring' ) ) {
+			return $binary;
+		}
+
+		$source = imagecreatefromstring( $binary );
+		if ( false === $source ) {
+			return $binary;
+		}
+
+		$width  = imagesx( $source );
+		$height = imagesy( $source );
+		$canvas = imagecreatetruecolor( $width, $height );
+		imagefill( $canvas, 0, 0, (int) imagecolorallocate( $canvas, 255, 255, 255 ) );
+		imagealphablending( $canvas, true );
+		imagecopy( $canvas, $source, 0, 0, 0, 0, $width, $height );
+
+		ob_start();
+		imagepng( $canvas );
+		$flat = (string) ob_get_clean();
+
+		return '' === $flat ? $binary : $flat;
+	}
+
+	/**
 	 * Builds the data URI.
 	 *
 	 * @param string $mime   MIME type.
 	 * @param string $binary Image bytes.
 	 */
 	private static function uri( string $mime, string $binary ): string {
+		if ( 'image/png' === $mime ) {
+			$binary = self::flatten( $binary );
+		}
+
 		return 'data:' . $mime . ';base64,' . base64_encode( $binary ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Embedding an image in the PDF, not obfuscation.
 	}
 

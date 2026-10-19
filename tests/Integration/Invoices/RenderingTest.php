@@ -333,6 +333,76 @@ class RenderingTest extends TestCase {
 		$this->assertSame( 300, $size[0] );
 	}
 
+	public function test_remote_fetch_is_tried_once_per_request(): void {
+		$first  = $this->attachment( 'png' );
+		$second = $this->attachment( 'png' );
+		wp_delete_file( (string) get_attached_file( $first ) );
+		wp_delete_file( (string) get_attached_file( $second ) );
+
+		$calls = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$calls ) {
+				++$calls;
+				return new WP_Error( 'offline', 'Offline' );
+			}
+		);
+
+		$this->assertSame( '', Images::data_uri( $first, 300 ) );
+		$this->assertSame( '', Images::data_uri( $second, 300 ) );
+		$this->assertSame( 1, $calls );
+	}
+
+	public function test_unusable_local_file_does_not_trigger_a_remote_fetch(): void {
+		$logo = $this->attachment( 'png' );
+		file_put_contents( (string) get_attached_file( $logo ), 'not an image' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test.
+
+		$calls = 0;
+		add_filter(
+			'pre_http_request',
+			static function () use ( &$calls ) {
+				++$calls;
+				return new WP_Error( 'offline', 'Offline' );
+			}
+		);
+
+		$this->assertSame( '', Images::data_uri( $logo, 300 ) );
+		$this->assertSame( 0, $calls );
+	}
+
+	public function test_injected_color_falls_back_to_the_default(): void {
+		$css = Styles::css( [ 'color_primary' => 'red;}body{display:none' ] );
+
+		$this->assertStringNotContainsString( 'display:none', $css );
+		$this->assertStringContainsString( 'background: #111111', $css );
+	}
+
+	public function test_font_directory_is_in_uploads(): void {
+		$dir = trailingslashit( (string) wp_upload_dir()['basedir'] ) . 'lumia-factures/fonts';
+
+		$this->assertSame( $dir, PdfEngine::options()->getFontDir() );
+		$this->assertFileExists( $dir . '/index.php' );
+	}
+
+	public function test_transparent_png_logo_is_flattened_and_renders(): void {
+		$file  = trailingslashit( get_temp_dir() ) . 'lf-alpha-' . wp_generate_password( 8, false ) . '.png';
+		$image = imagecreatetruecolor( 300, 100 );
+		imagealphablending( $image, false );
+		imagesavealpha( $image, true );
+		imagefill( $image, 0, 0, (int) imagecolorallocatealpha( $image, 20, 120, 200, 64 ) );
+		imagepng( $image, $file );
+		$logo = (int) self::factory()->attachment->create_upload_object( $file );
+
+		$uri    = Images::data_uri( $logo, 600 );
+		$binary = (string) base64_decode( substr( $uri, strpos( $uri, ',' ) + 1 ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Test.
+
+		$this->assertSame( 2, ord( $binary[25] ), 'Colour type 2: no alpha channel left for Dompdf.' );
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$pdf   = Renderer::pdf( $order, $this->doc(), $this->settings( [ 'company' => [ 'logo_id' => $logo ] ] ) );
+		$this->assertStringStartsWith( '%PDF-', $pdf );
+	}
+
 	public function test_chroot_is_plugin_dir_only(): void {
 		$chroot = PdfEngine::options()->getChroot();
 
