@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices\Migration;
 
 defined( 'ABSPATH' ) || exit;
 
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
@@ -518,6 +519,79 @@ class MigrationTest extends TestCase {
 		$this->assertSame( '', $this->notice() );
 	}
 
+	public function test_conflict_notice_lists_the_orders_until_dismissed(): void {
+		$this->legacy_order( 'FA-0005', 5, false );
+		$second = $this->legacy_order( 'FA-0005', 5, false );
+		Migration::prepare();
+		Migration::maybe_run();
+		$this->assertSame( 'done_with_conflicts', Migration::state()['status'] );
+
+		$html = $this->conflicts_notice();
+		$this->assertStringContainsString( 'lumia-factures-conflicts-notice', $html );
+		$this->assertStringContainsString( '1 Facture PDF Lumia invoice was not imported', $html );
+		$this->assertStringContainsString( 'href="' . esc_url( OrderUtil::get_order_admin_edit_url( $second->get_id() ) ) . '"', $html );
+		$this->assertStringContainsString( 'FA-0005', $html );
+		$this->assertStringContainsString( 'value="' . MigrationNotice::DISMISS_ACTION . '"', $html );
+		$this->assertStringContainsString( 'name="_wpnonce"', $html );
+		// The blocking notice is gone: the import is finished.
+		$this->assertSame( '', $this->notice() );
+
+		// Managers only.
+		$manager = get_current_user_id();
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		$this->assertSame( '', $this->conflicts_notice() );
+
+		// Dismissal needs the capability and the nonce.
+		$this->post( wp_create_nonce( MigrationNotice::DISMISS_ACTION ), MigrationNotice::DISMISS_ACTION );
+		$this->assert_dies( 403, [ MigrationNotice::class, 'dismiss' ] );
+		wp_set_current_user( $manager );
+		$this->post( 'badnonce', MigrationNotice::DISMISS_ACTION );
+		$this->assert_dies( 403, [ MigrationNotice::class, 'dismiss' ] );
+		$this->assertNotSame( '', $this->conflicts_notice() );
+
+		// Dismissed: stored per user, until a new run reports conflicts again.
+		$this->post( wp_create_nonce( MigrationNotice::DISMISS_ACTION ), MigrationNotice::DISMISS_ACTION );
+		add_filter( 'wp_redirect', [ $this, 'throw_redirect' ] );
+		try {
+			MigrationNotice::dismiss();
+			$this->fail( 'No redirect.' );
+		} catch ( RuntimeException $e ) {
+			$this->assertStringStartsWith( 'redirect:', $e->getMessage() );
+		} finally {
+			remove_filter( 'wp_redirect', [ $this, 'throw_redirect' ] );
+		}
+		$this->assertSame( '', $this->conflicts_notice() );
+
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+		$this->assertNotSame( '', $this->conflicts_notice() );
+
+		wp_set_current_user( $manager );
+		$state                = Migration::state();
+		$state['finished_at'] = $state['finished_at'] + 60;
+		update_option( Migration::OPTION, $state );
+		$this->assertNotSame( '', $this->conflicts_notice() );
+	}
+
+	/**
+	 * Turns a redirect into an exception the test catches.
+	 *
+	 * @param string $location Location.
+	 * @throws RuntimeException Always.
+	 */
+	public function throw_redirect( $location ): void {
+		throw new RuntimeException( 'redirect:' . $location ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- caught by the test.
+	}
+
+	/**
+	 * Output of the conflicts notice.
+	 */
+	private function conflicts_notice(): string {
+		ob_start();
+		MigrationNotice::render_conflicts();
+
+		return (string) ob_get_clean();
+	}
+
 	/**
 	 * Runs the module activation without its dbDelta: dbDelta may ALTER the existing tables, and
 	 * any DDL commits the test transaction, which would leak the legacy fixtures into the next
@@ -575,12 +649,13 @@ class MigrationTest extends TestCase {
 	}
 
 	/**
-	 * Sets the retry request.
+	 * Sets an admin-post request (the retry by default).
 	 *
-	 * @param string|null $nonce Nonce, null for none.
+	 * @param string|null $nonce  Nonce, null for none.
+	 * @param string      $action Admin-post action.
 	 */
-	private function post( ?string $nonce ): void {
-		$_POST = [ 'action' => MigrationNotice::ACTION ];
+	private function post( ?string $nonce, string $action = MigrationNotice::ACTION ): void {
+		$_POST = [ 'action' => $action ];
 		if ( null !== $nonce ) {
 			$_POST['_wpnonce'] = $nonce;
 		}
@@ -588,13 +663,14 @@ class MigrationTest extends TestCase {
 	}
 
 	/**
-	 * Runs the handler and expects wp_die with a status code.
+	 * Runs a handler (the retry by default) and expects wp_die with a status code.
 	 *
-	 * @param int $code HTTP status.
+	 * @param int           $code    HTTP status.
+	 * @param callable|null $handler Handler.
 	 */
-	private function assert_dies( int $code ): void {
+	private function assert_dies( int $code, ?callable $handler = null ): void {
 		try {
-			MigrationNotice::handle();
+			( $handler ?? [ MigrationNotice::class, 'handle' ] )();
 			$this->fail( 'Expected wp_die.' );
 		} catch ( WPDieException $e ) {
 			$this->assertSame( $code, $e->getCode() );

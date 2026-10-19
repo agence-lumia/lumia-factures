@@ -9,11 +9,13 @@ namespace Lumia\Factures\Modules\Invoices\Admin;
 
 defined( 'ABSPATH' ) || exit;
 
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 
 /**
  * While the Facture PDF Lumia import blocks invoice numbering, every admin screen shows why, the
  * import status and counts, and a "Run the import now" button (admin-post, nonce + capability).
+ * Once it is done with conflicts, a warning lists the skipped orders until each manager dismisses it.
  *
  * Printed on `all_admin_notices`, not `admin_notices`: lumia-tools moves `admin_notices` into its
  * notification drawer, which would hide a blocking notice.
@@ -26,11 +28,112 @@ final class MigrationNotice {
 	public const ACTION = 'lumia_factures_invoices_migrate';
 
 	/**
+	 * Admin-post action and nonce action dismissing the conflicts notice.
+	 */
+	public const DISMISS_ACTION = 'lumia_factures_invoices_dismiss_conflicts';
+
+	/**
+	 * User meta: `finished_at` of the run whose conflicts the user dismissed.
+	 */
+	public const DISMISSED_META = 'lumia_factures_conflicts_dismissed';
+
+	/**
+	 * Conflicting orders listed by name; the rest is counted.
+	 */
+	private const LISTED = 20;
+
+	/**
 	 * Registers the hooks (admin only).
 	 */
 	public static function register(): void {
 		add_action( 'admin_post_' . self::ACTION, [ self::class, 'handle' ] );
+		add_action( 'admin_post_' . self::DISMISS_ACTION, [ self::class, 'dismiss' ] );
 		add_action( 'all_admin_notices', [ self::class, 'render' ] );
+		add_action( 'all_admin_notices', [ self::class, 'render_conflicts' ] );
+	}
+
+	/**
+	 * Warning listing the legacy invoices the last run skipped (conflicts), with links to their
+	 * orders: those orders get no invoice until handled by hand. Shown to managers until each one
+	 * dismisses it; a later run that reports conflicts shows it again.
+	 */
+	public static function render_conflicts(): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			return;
+		}
+
+		$state     = Migration::state();
+		$conflicts = $state['report']['conflicts'] ?? [];
+		if ( ! is_array( $conflicts ) || [] === $conflicts ) {
+			return;
+		}
+
+		$dismissed = get_user_meta( get_current_user_id(), self::DISMISSED_META, true );
+		if ( '' !== $dismissed && (int) $dismissed === $state['finished_at'] ) {
+			return;
+		}
+
+		$count = count( $conflicts );
+
+		echo '<div class="notice notice-warning lumia-factures-conflicts-notice"><p><strong>';
+		printf(
+			/* translators: %d: number of legacy invoices not imported */
+			esc_html( _n( 'Lümia Factures: %d Facture PDF Lumia invoice was not imported (conflict).', 'Lümia Factures: %d Facture PDF Lumia invoices were not imported (conflicts).', $count, 'lumia-factures' ) ),
+			(int) $count
+		);
+		echo '</strong></p><p>';
+		esc_html_e( 'These orders get no invoice until the conflict is handled by hand. Fix the cause, then run "wp lumia-factures migrate --force".', 'lumia-factures' );
+		echo '</p><ul>';
+
+		foreach ( array_slice( $conflicts, 0, self::LISTED ) as $conflict ) {
+			$order_id = is_array( $conflict ) ? (int) ( $conflict['order_id'] ?? 0 ) : 0;
+			printf(
+				'<li><a href="%1$s">%2$s</a> (%3$s): %4$s</li>',
+				esc_url( OrderUtil::get_order_admin_edit_url( $order_id ) ),
+				/* translators: %d: order id */
+				esc_html( sprintf( __( 'Order #%d', 'lumia-factures' ), $order_id ) ),
+				esc_html( (string) ( $conflict['number'] ?? '' ) ),
+				esc_html( (string) ( $conflict['reason'] ?? '' ) )
+			);
+		}
+
+		if ( $count > self::LISTED ) {
+			printf(
+				'<li>%s</li>',
+				/* translators: %d: number of orders not listed */
+				esc_html( sprintf( _n( 'and %d more order.', 'and %d more orders.', $count - self::LISTED, 'lumia-factures' ), $count - self::LISTED ) )
+			);
+		}
+
+		echo '</ul>';
+		printf(
+			'<form method="post" action="%1$s"><p><input type="hidden" name="action" value="%2$s">',
+			esc_url( admin_url( 'admin-post.php' ) ),
+			esc_attr( self::DISMISS_ACTION )
+		);
+		wp_nonce_field( self::DISMISS_ACTION );
+		printf(
+			'<button type="submit" class="button">%s</button></p></form></div>',
+			esc_html__( 'Dismiss', 'lumia-factures' )
+		);
+	}
+
+	/**
+	 * Admin-post handler: capability, nonce, then hides the conflicts notice for the current user
+	 * until a later run reports conflicts again.
+	 */
+	public static function dismiss(): void {
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_die( esc_html__( 'You are not allowed to do this.', 'lumia-factures' ), '', [ 'response' => 403 ] );
+		}
+
+		check_admin_referer( self::DISMISS_ACTION );
+
+		update_user_meta( get_current_user_id(), self::DISMISSED_META, (string) Migration::state()['finished_at'] );
+
+		$back = wp_get_referer();
+		wp_safe_redirect( $back ? $back : admin_url() );
+		exit;
 	}
 
 	/**

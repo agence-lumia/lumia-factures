@@ -176,9 +176,10 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK ],
-			'meta'    => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date', Issuer::GATE_FLAG, Importer::NOTED_META ],
-			'tables'  => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
+			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK ],
+			'meta'      => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date', Issuer::GATE_FLAG, Importer::NOTED_META ],
+			'user_meta' => [ MigrationNotice::DISMISSED_META ],
+			'tables'    => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
 		];
 	}
 
