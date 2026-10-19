@@ -66,7 +66,7 @@ class Updater {
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'http_request_args', array( $this, 'authorize_asset_download' ), 10, 2 );
 		// Requests re-sends the original headers on a redirect: the token must not follow it off the API.
-		add_action( 'requests-requests.before_redirect', array( $this, 'strip_token_on_redirect' ), 10, 2 );
+		add_action( 'requests-requests.before_redirect', array( $this, 'strip_token_on_redirect' ), 10, 5 );
 
 		// After a plugin update, purge the remote version cache (12 h) and the WP
 		// updates transient, otherwise the "update available" badge persists until
@@ -107,19 +107,30 @@ class Updater {
 	 *
 	 * @param string $location New location (by reference).
 	 * @param mixed  $headers  Request headers of the redirected request (by reference).
+	 * @param mixed  $data     Request data (unused).
+	 * @param mixed  $options  Request options (unused).
+	 * @param mixed  $response Response that triggered the redirect (its url is the pre-redirect URL).
 	 */
-	public function strip_token_on_redirect( &$location, &$headers ): void {
-		if ( self::is_api_url( (string) $location ) ) {
+	public function strip_token_on_redirect( &$location, &$headers, &$data = null, &$options = null, $response = null ): void {
+		// This hook sees every HTTP request of the site: act only on our own
+		// (pre-redirect URL in this repository, and our own token as header).
+		if ( '' === self::token() || self::is_api_url( (string) $location ) ) {
 			return;
 		}
 
+		if ( is_object( $response ) && isset( $response->url ) && ! self::is_repo_api_url( (string) $response->url ) ) {
+			return;
+		}
+
+		$ours = 'Bearer ' . self::token();
+
 		if ( is_array( $headers ) ) {
-			foreach ( array_keys( $headers ) as $name ) {
-				if ( 0 === strcasecmp( (string) $name, 'Authorization' ) ) {
+			foreach ( $headers as $name => $value ) {
+				if ( 0 === strcasecmp( (string) $name, 'Authorization' ) && $ours === $value ) {
 					unset( $headers[ $name ] );
 				}
 			}
-		} elseif ( $headers instanceof \ArrayAccess ) {
+		} elseif ( $headers instanceof \ArrayAccess && isset( $headers['Authorization'] ) && $ours === $headers['Authorization'] ) {
 			unset( $headers['Authorization'] );
 		}
 	}

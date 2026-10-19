@@ -190,20 +190,40 @@ class UpdaterTest extends TestCase {
 		$this->assertSame( array( 'authorization' => 'token mine' ), $kept['headers'] );
 	}
 
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_authorization_removed_on_redirect_off_the_api(): void {
+		define( 'LUMIA_FACTURES_GITHUB_TOKEN', 'secret' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- test constant.
 		$updater  = Plugin::instance()->updater();
+		$ours     = (object) array( 'url' => 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/assets/13' );
 		$location = 'https://release-assets.githubusercontent.com/x';
 		$headers  = array(
 			'Authorization' => 'Bearer secret',
 			'Accept'        => 'application/octet-stream',
 		);
-		$updater->strip_token_on_redirect( $location, $headers );
+		$data     = null;
+		$options  = null;
+		$updater->strip_token_on_redirect( $location, $headers, $data, $options, $ours );
 		$this->assertSame( array( 'Accept' => 'application/octet-stream' ), $headers );
 
-		$location = 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/assets/13';
+		// Redirect staying on the API: kept.
+		$location = 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/assets/14';
 		$headers  = array( 'Authorization' => 'Bearer secret' );
-		$updater->strip_token_on_redirect( $location, $headers );
+		$updater->strip_token_on_redirect( $location, $headers, $data, $options, $ours );
 		$this->assertArrayHasKey( 'Authorization', $headers );
+
+		// Foreign request (other plugin, other token / other URL) redirected off the API: untouched.
+		$location = 'https://api.example.com/v2/x';
+		$headers  = array( 'Authorization' => 'Bearer other-plugin-token' );
+		$foreign  = (object) array( 'url' => 'https://api.example.com/v1/x' );
+		$updater->strip_token_on_redirect( $location, $headers, $data, $options, $foreign );
+		$this->assertSame( array( 'Authorization' => 'Bearer other-plugin-token' ), $headers );
+
+		$headers = array( 'Authorization' => 'Bearer secret' );
+		$updater->strip_token_on_redirect( $location, $headers, $data, $options, $foreign );
+		$this->assertArrayHasKey( 'Authorization', $headers, 'Pre-redirect URL not ours.' );
 
 		$this->assertNotFalse( has_action( 'requests-requests.before_redirect', array( $updater, 'strip_token_on_redirect' ) ) );
 	}
