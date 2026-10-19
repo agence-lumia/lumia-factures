@@ -46,4 +46,34 @@ class NumberFormatTest extends TestCase {
 	public function test_validate_accepts_neonat_format(): void {
 		$this->assertTrue( NumberFormat::validate( '{year}{month}{number:6}', true, 'yearly' ) );
 	}
+
+	public function test_build_neonat_format(): void {
+		$order = wc_create_order();
+		$time  = (int) strtotime( '2026-10-19 12:00:00 UTC' );
+
+		$this->assertSame( '202610029185', NumberFormat::build( '{year}{month}{number:6}', 29185, $order, $time ) );
+	}
+
+	public function test_build_pads_and_two_digit_year(): void {
+		$order = wc_create_order();
+		$time  = (int) strtotime( '2026-03-05 12:00:00 UTC' );
+
+		$this->assertSame( 'FA-26-03-05-0042', NumberFormat::build( 'FA-{year:2}-{month}-{day}-{number:4}', 42, $order, $time ) );
+		$this->assertSame( '42', NumberFormat::build( '{number}', 42, $order, $time ) );
+		$this->assertSame( $order->get_id() . '/' . $order->get_order_number(), NumberFormat::build( '{order_id}/{order_number}', 1, $order, $time ) );
+		$this->assertSame( '0', NumberFormat::build( '{customer_id}', 1, $order, $time ) );
+	}
+
+	public function test_build_resolves_unknown_tag_through_filter(): void {
+		$order = wc_create_order();
+		$cb    = static fn( string $value, string $tag, string $arg ): string => 'shop' === $tag ? 'X' . $arg : $value;
+
+		add_filter( 'lumia_factures_number_tag', $cb, 10, 3 );
+		$this->assertSame( 'XA-7', NumberFormat::build( '{shop:A}-{number}', 7, $order, time() ) );
+		remove_filter( 'lumia_factures_number_tag', $cb, 10 );
+	}
+
+	public function test_preview_uses_sample_values(): void {
+		$this->assertSame( '14243-27-0003', NumberFormat::preview( '{order_number}-{customer_id}-{number:4}', 3 ) );
+	}
 }

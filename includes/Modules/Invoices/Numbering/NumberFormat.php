@@ -9,8 +9,10 @@ namespace Lumia\Factures\Modules\Invoices\Numbering;
 
 defined( 'ABSPATH' ) || exit;
 
+use WC_Order;
+
 /**
- * Number format: tags, validation (rendering is added with the register).
+ * Number format: tags, validation and rendering.
  */
 final class NumberFormat {
 
@@ -96,5 +98,89 @@ final class NumberFormat {
 		}
 
 		return true;
+	}
+
+	/**
+	 * Builds an invoice number.
+	 *
+	 * @param string   $format    Format, e.g. `FA-{year}-{number:5}`.
+	 * @param int      $sequence  Sequence value.
+	 * @param WC_Order $order     Order.
+	 * @param int      $timestamp UTC timestamp the date tags refer to.
+	 */
+	public static function build( string $format, int $sequence, WC_Order $order, int $timestamp ): string {
+		return self::render( $format, $sequence, $timestamp, $order );
+	}
+
+	/**
+	 * Previews a format with sample order values (order 14243, customer 27) and the current date.
+	 *
+	 * @param string $format   Format to preview.
+	 * @param int    $sequence Sequence value to show.
+	 */
+	public static function preview( string $format, int $sequence ): string {
+		return self::render( $format, $sequence, time(), null );
+	}
+
+	/**
+	 * Replaces every tag of a format.
+	 *
+	 * @param string        $format    Format.
+	 * @param int           $sequence  Sequence value.
+	 * @param int           $timestamp UTC timestamp.
+	 * @param WC_Order|null $order     Order, or null for a preview with sample values.
+	 */
+	private static function render( string $format, int $sequence, int $timestamp, ?WC_Order $order ): string {
+		return (string) preg_replace_callback(
+			self::TAG_PATTERN,
+			static function ( array $matches ) use ( $sequence, $timestamp, $order ): string {
+				$tag      = $matches[1];
+				$argument = $matches[2] ?? '';
+
+				switch ( $tag ) {
+					case 'number':
+						$padding = '' !== $argument ? absint( $argument ) : 0;
+
+						return $padding > 0 ? str_pad( (string) $sequence, $padding, '0', STR_PAD_LEFT ) : (string) $sequence;
+
+					case 'year':
+						$year = (string) wp_date( 'Y', $timestamp );
+
+						return '2' === $argument ? substr( $year, -2 ) : $year;
+
+					case 'month':
+						return (string) wp_date( 'm', $timestamp );
+
+					case 'day':
+						return (string) wp_date( 'd', $timestamp );
+
+					case 'order_number':
+						return null === $order ? '14243' : (string) $order->get_order_number();
+
+					case 'order_id':
+						return null === $order ? '14243' : (string) $order->get_id();
+
+					case 'customer_id':
+						return null === $order ? '27' : (string) $order->get_customer_id();
+
+					default:
+						if ( null === $order ) {
+							return '';
+						}
+
+						/**
+						 * Filters the value of a tag the core does not resolve.
+						 *
+						 * @param string   $value    Value, empty by default.
+						 * @param string   $tag      Tag name.
+						 * @param string   $argument Argument after the colon, if any.
+						 * @param int      $sequence Sequence value.
+						 * @param WC_Order $order    Order.
+						 */
+						return (string) apply_filters( 'lumia_factures_number_tag', '', $tag, $argument, $sequence, $order );
+				}
+			},
+			$format
+		);
 	}
 }
