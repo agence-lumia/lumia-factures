@@ -64,6 +64,11 @@ jobs:
       - name: PHPUnit
         run: npm test
 
+      # Same suite on the legacy (posts) order storage; once is enough, on the newest PHP.
+      - name: PHPUnit (legacy order storage)
+        if: matrix.php == '8.5'
+        run: npm run test:legacy
+
       - name: Stop wp-env
         if: always()
         run: npx wp-env stop
