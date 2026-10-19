@@ -105,3 +105,31 @@ Pitfalls:
 - **A run killed by a fatal error** (memory, time) never reaches the `finally`: the lock and the `running` state stay. After 15 minutes `state()` reports `failed`, the lock is stale, and the next admin/cron request runs again; the importer resumes where it stopped.
 - **The execution time is only raised, never lowered**: `set_time_limit( 300 )` only when a limit below 300 s applies (an unlimited CLI run, the PHPUnit process included, keeps no limit).
 - **DDL commits the test transaction.** `Installer::install()` (dbDelta) can issue an `ALTER TABLE`, which is not rewritten to a temporary table and commits the transaction the WordPress test suite wraps each test in: the legacy fixtures created before it leaked into every later test (a committed order made `has_data()` true everywhere). `MigrationTest` runs `on_activate()` with `dbdelta_queries` emptied.
+
+## Legacy import: what is copied
+
+`Migration\Importer` reads the Facture PDF Lumia data and never writes to it: the options `fpl_*`, the table `{prefix}fpl_sequences`, the order meta `_fpl_invoice_*` and the files under `uploads/facture-pdf-lumia/` stay as a fallback.
+
+- **Settings** (`fpl_settings` -> `lumia_factures_module_invoices`) through `LegacySettings::map()`, only when the user never saved settings here (an option still equal to the defaults counts as never saved). Mapping notes go to the report.
+- **Invoices.** One register row per order carrying `_fpl_invoice_number`, with its number, sequence key, sequence and date. The date falls back to the PDF generation time, then to the order creation date (a report note says so). The new order meta `_lumia_factures_invoice_number` / `_date` and an order note are written too.
+- **PDFs.** A legacy PDF still on disk is validated (a real PDF, inside the legacy folder), copied into the archive and recorded with its checksum. An invoice without a file, or with a damaged one, is imported with `file = NULL`: it is built on first need with its original number and date (admin download, customer download, e-mail attachment).
+- **Counters.** Each key is raised to `max(legacy table value, highest imported sequence)`, never lowered. They are raised **before** the invoices are imported, so an interruption cannot leave a counter behind a legacy number. `LegacySource` ignores values that are not plain non-negative integers (a negative or overflowing value in the legacy data would otherwise corrupt a counter).
+- **Conflicts.** A number already in the register, or an order that already has another invoice, is reported and skipped; the run ends `done_with_conflicts`.
+- **Bricks.** When a Bricks template (`_bricks_page_content_2`) contains `{fpl_invoice_`, the Bricks module is turned on (see [bricks.md](bricks.md)).
+- **Dry run.** Same code, every write skipped: its report equals the one a real run gives.
+
+## Customer download, shortcode and legacy URLs
+
+`Front\CustomerDownload` answers `init` priority 20 on `?lumia_factures_invoice=<order id>[&key=<order key>][&inline=0]` and on the links of the old plugin (`?fpl_download=1&order=<id>[&document=invoice][&key=...][&inline=1]`), so the links already sent in e-mails and thank-you pages keep working.
+
+- **Access** (`can_access()`): a user with `manage_woocommerce`, the order's customer, or the holder of the order key (`hash_equals`). Filter `lumia_factures_can_access_invoice`. `url()` adds the key unless the visitor gets in without it (manager or owner): a guest, or a logged-in user who is not the owner, keeps it.
+- **One answer for every refusal**: a 404 "Invoice not found." for an unknown order, a wrong key, another customer, an order with no issued invoice, a rate-limited build or a damaged archive. Nothing tells whether an order exists.
+- **Disposition.** The new URL displays the PDF in the browser (`inline=0` asks for an attachment); the old URL downloads it unless `inline=1`, like the old plugin did.
+- **Same rule as the admin download (R41).** Only a register `file` that is NULL is built on first need (`Issuer::restore()`); a recorded file that is missing or damaged is a 404 for a visitor and is rebuilt explicitly by a manager from the order.
+- **Rate limit.** 10 builds per 60 seconds per user (or IP), transient `lumia_factures_rate_<md5>`, counted only when a never-built PDF must be generated: serving an archived file is never limited. The window starts at the first build.
+- **Shortcode** `[lumia_factures_invoice order_id="" label="" class="" inline="0"]` and the alias `[facture_pdf_lumia]` (same attributes; the alias keeps the class `fpl-download-button` by default). It renders a link only when an issued invoice exists and `can_access()` is true, never a dead button. Without `order_id` the order comes from the WooCommerce page (`OrderContext`).
+
+Pitfalls:
+
+- **A builder hands over the wrong post.** Bricks gives the `WP_Post` of the "My account" page even on the "View order" endpoint, and under HPOS that post ID can equal another order's id. `OrderContext::resolve()` therefore reads the endpoint first (query vars `view-order` / `order-received`, then the configured endpoint in the request URI) and only then the subject.
+- **Access is checked for every tag and the shortcode**, never inferred from the context: a page that renders them for the wrong order shows nothing.

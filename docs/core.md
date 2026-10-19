@@ -64,7 +64,7 @@ Modules are defined in `Modules::register_default_modules()` and extended throug
 | Id | Class | Notes |
 |---|---|---|
 | `invoices` | `Modules\Invoices\Module` | `locked => true`: always active, `activate()` / `deactivate()` are no-ops for it |
-| `bricks` | `Modules\Bricks\Module` | optional, inactive by default |
+| `bricks` | `Modules\Bricks\Module` | optional, inactive by default; turned on by the legacy import when a template uses `{fpl_invoice_*}` |
 
 `get_uninstall_keys()` declares `options`, `meta` (**post** meta), `user_meta`, `post_type`, `taxonomy`, `tables` (own tables, without prefix) and `cron`; every key is optional. A key filed in the wrong channel is never deleted.
 
@@ -133,6 +133,10 @@ Every public hook is prefixed `lumia_factures_`. Filters return their value; the
 | `lumia_factures_invoice_html` | filter | `Rendering/Renderer.php` | Final HTML handed to Dompdf. |
 | `lumia_factures_template_path` | filter | `Rendering/Renderer.php` | File used for a PDF template; the theme is never searched. |
 | `lumia_factures_dompdf_options` | filter | `Rendering/PdfEngine.php` | The `Dompdf\Options` object. |
+| `lumia_factures_legacy_import_batch_size` | filter | `Migration/Importer.php` | Legacy orders imported per batch (default 200, minimum 1). |
+| `lumia_factures_legacy_import_batch_done` | action | `Migration/Importer.php` | Fires after each batch of legacy orders (`$report`, `$after` last order id, `$dry_run`): progress reporting. |
+| `lumia_factures_customer_download_url` | filter | `Front/CustomerDownload.php` | Customer download URL of an invoice (`$url`, `$order`). |
+| `lumia_factures_can_access_invoice` | filter | `Front/CustomerDownload.php` | Whether the visitor may download the order's invoice (`$can`, `$order`, `$key`); applies to the endpoint, the shortcode and the Bricks tags. |
 
 ## Translations
 

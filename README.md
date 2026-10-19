@@ -17,7 +17,10 @@ The interface is in English and ships with a French translation (`fr_FR`).
 - Updates through GitHub, on a Stable or a Dev channel.
 - Coexists with lumia-tools on the same site.
 
-Planned, not delivered yet: migration of the legacy 1.x invoices and WP-CLI command (lot 3), customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
+- Imports the invoices, numbers, counters, settings and PDFs of the former Facture PDF Lumia plugin (see [Migrating from Facture PDF Lumia](#migrating-from-facture-pdf-lumia)); the old customer download links and shortcode keep working.
+- Customer download of the invoice by link (order key for guests), by the `[lumia_factures_invoice]` shortcode, and by the Bricks dynamic tags.
+
+Planned, not delivered yet: customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
 
 Modules: **Invoices** (core, always active) and **Bricks** (optional dynamic tags, inactive by default).
 
@@ -51,7 +54,24 @@ Invoice PDFs are stored in `wp-content/uploads/lumia-factures/`, protected on Ap
 
 ```nginx
 location ^~ /wp-content/uploads/lumia-factures/ { deny all; }
+location ^~ /wp-content/uploads/facture-pdf-lumia/ { deny all; }
 ```
+
+The second rule protects the archive of the former Facture PDF Lumia plugin, which stays in place after a migration.
+
+## Migrating from Facture PDF Lumia
+
+The former plugin (`facture-pdf-lumia`, 1.x) and this one cannot run together. Its data is imported by this plugin and never modified: it stays as a fallback.
+
+1. **Back up** the database and `wp-content/uploads/`.
+2. **Install** `lumia-factures` while the old plugin is still active. It shows the blocking notice "legacy plugin active" and starts nothing; nothing is imported yet.
+3. **Deactivate every copy** of the old plugin (also on a multisite or a staging copy sharing the database). The first admin page loaded afterwards starts the import by itself. You can look at it first, without writing anything: `wp lumia-factures migrate --dry-run`.
+4. **Check the import.** The notice at the top of the admin pages shows the status and the counts (`wp lumia-factures migration-status` and `wp lumia-factures migrate` do the same from the command line). Until the import is done, no new invoice is numbered: an order that changes status meanwhile gets an order note, and its e-mail goes out without an attachment. Conflicts (a number already used) are listed in the report; those orders are left alone for you to handle by hand.
+5. **Check one old and one new invoice**: open an imported invoice from its order (number, date and amounts as before), then let a new order reach an invoicing status and check that its number continues the old series. An old invoice whose PDF was no longer on disk is rebuilt the first time it is needed, with its original number and date.
+6. **Deny web access to the archives** with the rule below, for `wp-content/uploads/lumia-factures/` and for the old `wp-content/uploads/facture-pdf-lumia/` folder, if your server ignores `.htaccess` (Nginx).
+7. **Delete the old plugin files.** Its options, table, order meta and PDFs stay in place; do not remove them while you need the fallback.
+
+The links already sent to customers (`?fpl_download=1&order=...&key=...`), the `[facture_pdf_lumia]` shortcode and the `{fpl_invoice_url}`, `{fpl_invoice_number}` and `{fpl_invoice_status}` Bricks tags keep working. If a Bricks template uses them, the optional Bricks module is turned on by the import.
 
 ## Uninstalling
 
