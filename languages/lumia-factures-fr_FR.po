@@ -610,6 +610,17 @@ msgstr "Le PDF archivé de cette facture est manquant ou endommagé. Utilisez «
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr "Le PDF de la facture %s était manquant ou endommagé : il a été reconstruit à partir des données actuelles de la commande."
 
+msgid "%1$s \"%2$s\" is not available: replaced with Inter."
+msgstr "%1$s « %2$s » n'est pas disponible : remplacée par Inter."
+
+msgid "%1$s had %2$d entry: re-enter it in \"Legal text\"."
+msgid_plural "%1$s had %2$d entries: re-enter them in \"Legal text\"."
+msgstr[0] "%1$s contenait %2$d mention : saisissez-la à nouveau dans « Texte légal »."
+msgstr[1] "%1$s contenait %2$d mentions : saisissez-les à nouveau dans « Texte légal »."
+
+msgid "%s was set and is no longer supported: it was not imported."
+msgstr "%s était renseigné et n'est plus pris en charge : il n'a pas été importé."
+
 msgid "You are not allowed to download invoices."
 msgstr "Vous n'êtes pas autorisé à télécharger les factures."
 
