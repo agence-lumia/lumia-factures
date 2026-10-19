@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T16:07:39+00:00\n"
+"POT-Creation-Date: 2026-10-19T16:36:08+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -308,8 +308,7 @@ msgid "Rounding"
 msgstr ""
 
 #: includes/Modules/Invoices/Amounts/StatementBuilder.php:121
-#: includes/Modules/Invoices/Rendering/Context.php:340
-#: templates/admin/invoices/content.php:31
+msgctxt "grand total row of the invoice, VAT included"
 msgid "Total"
 msgstr ""
 
@@ -480,6 +479,11 @@ msgstr ""
 #: includes/Modules/Invoices/Rendering/Context.php:339
 #: templates/admin/invoices/content.php:30
 msgid "VAT"
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:340
+#: templates/admin/invoices/content.php:31
+msgid "Total"
 msgstr ""
 
 #: includes/Modules/Invoices/Rendering/Context.php:445

@@ -118,7 +118,7 @@ final class StatementBuilder {
 			$rows[] = new TotalRow( 'rounding', __( 'Rounding', 'lumia-factures' ), $rounding );
 		}
 
-		$rows[] = new TotalRow( 'total', __( 'Total', 'lumia-factures' ), $total, null, true );
+		$rows[] = new TotalRow( 'total', _x( 'Total', 'grand total row of the invoice, VAT included', 'lumia-factures' ), $total, null, true );
 
 		if ( $incl ) {
 			$tax_sum = 0;

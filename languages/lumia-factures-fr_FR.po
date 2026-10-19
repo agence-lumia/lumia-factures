@@ -452,6 +452,10 @@ msgid "Rounding"
 msgstr "Arrondi"
 
 #: includes/Modules/Invoices/Amounts/StatementBuilder.php:117
+msgctxt "grand total row of the invoice, VAT included"
+msgid "Total"
+msgstr "Total TTC"
+
 msgid "Total"
 msgstr "Total"
 
@@ -501,7 +505,7 @@ msgstr "Date de commande"
 
 #: includes/Modules/Invoices/Rendering/Context.php:281
 msgid "Payment method"
-msgstr "Mode de paiement"
+msgstr "Moyen de paiement"
 
 #: includes/Modules/Invoices/Rendering/Context.php:329
 msgid "Product"
