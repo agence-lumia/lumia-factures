@@ -4,7 +4,7 @@ Working guide for Claude Code on this repository. The rules below are absolute; 
 
 ## The project
 
-**Lümia Factures** (repository `agence-lumia/lumia-factures`, text domain and slug `lumia-factures`) is a WordPress plugin that issues PDF invoices for WooCommerce orders (PHP 8.1+, WP 6.9+, WooCommerce 9.0+, HPOS and legacy storage). It is a rebuild of the former `facture-pdf-lumia` plugin (1.x, tag `v1.1.1-legacy`) on the conventions of the agency plugin lumia-tools (v2.2.2): home-grown PSR-4 autoloader (`Lumia\Factures\` -> `includes/`), `AbstractModule` modules, a custom admin page, a GitHub updater. Every identifier is the lumia-tools one, renamed: namespace `Lumia\Factures`, prefix `lumia_factures_`, constants `LUMIA_FACTURES_`.
+**Lümia Factures** (repository `agence-lumia/lumia-factures`, text domain and slug `lumia-factures`) is a WordPress plugin that issues PDF invoices for WooCommerce orders (PHP 8.1+, WP 6.9+, WooCommerce 9.0+, HPOS and legacy storage). It is a rebuild of the former `facture-pdf-lumia` plugin (1.x, tag `v1.1.1`) on the conventions of the agency plugin lumia-tools (v2.2.2): home-grown PSR-4 autoloader (`Lumia\Factures\` -> `includes/`), `AbstractModule` modules, a custom admin page, a GitHub updater. Every identifier is the lumia-tools one, renamed: namespace `Lumia\Factures`, prefix `lumia_factures_`, constants `LUMIA_FACTURES_`.
 
 Two modules under `includes/Modules/`: `Invoices` (core, **locked**: always active, cannot be deactivated) and `Bricks` (optional, inactive by default). Both are skeletons in lot 1; the invoicing logic arrives in lot 2. Settings: `lumia_factures_settings` (global + module state) and `lumia_factures_module_{id}` (per module), merged **recursively** over the defaults.
 

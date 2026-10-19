@@ -56,6 +56,8 @@ Unlike lumia-tools, `Settings` keeps no copy of the option on the instance: ever
 
 Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `init()` (register hooks here), `get_settings()`, `save_settings()` (sanitize and persist yourself, the core applies nothing), `static get_defaults()`, `static get_uninstall_keys()`. Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 
+**`init()` timing.** A module `init()` runs inside the `init` action at priority 10. `woocommerce_init`, `woocommerce_loaded` and `before_woocommerce_init` have therefore already fired: a callback hooked on them from a module never runs. Likewise, an `init` callback added from a module at priority <= 10 never runs (that priority is being dispatched); use a later priority.
+
 Modules are defined in `Modules::register_default_modules()` and extended through the `lumia_factures_module_definitions` filter (array of `id => [name, description, menu_label, menu_desc, class, icon, locked]`) plus the `lumia_factures_register_modules` action. Current modules:
 
 | Id | Class | Notes |

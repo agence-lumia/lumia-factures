@@ -345,7 +345,7 @@
   document.addEventListener("click", function (e) {
     // Click on the overlay itself (outside the box)
     if (
-      e.target.classList.contains("lumia-factures-modal-overlay") &&
+      e.target.classList.contains("lumia-modal-overlay") &&
       e.target.id !== "lumia-factures-modal-overlay" // handled by initModal()
     ) {
       e.target.classList.remove("is-open");

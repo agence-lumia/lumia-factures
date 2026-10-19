@@ -36,7 +36,7 @@ window.lumiaFacturesModal.close(); // programmatic close
 
 `confirmLabel` and `cancelLabel` default to the translated `lumiaFacturesAdmin.i18n.confirm` / `.cancel`; pass module strings from `lumiaFacturesAdmin.i18n` (see [core.md](core.md#js-globals-and-strings)), never a literal.
 
-Uses the `#lumia-factures-modal-overlay` singleton of `templates/admin/layout.php`.
+Uses the `#lumia-factures-modal-overlay` singleton printed by `Admin::render_footer_ui()`.
 
 ### 2. Named modal (persistent HTML)
 
