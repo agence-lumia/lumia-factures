@@ -17,7 +17,10 @@ use WC_Order;
 final class Renderer {
 
 	/**
-	 * Invoice HTML (a complete document, styles inline).
+	 * Invoice HTML (a complete document, styles inline), in the site language.
+	 *
+	 * An invoice is archived for good: it is rendered in the site locale, never in the language
+	 * of the admin who happens to issue, rebuild or preview it.
 	 *
 	 * @param WC_Order             $order    Order.
 	 * @param DocumentData         $doc      Document.
@@ -25,6 +28,39 @@ final class Renderer {
 	 * @return string HTML, '' when the template is missing.
 	 */
 	public static function html( WC_Order $order, DocumentData $doc, array $settings ): string {
+		return self::in_site_locale( static fn(): string => self::build_html( $order, $doc, $settings ) );
+	}
+
+	/**
+	 * Runs a callback in the site locale, then restores the request's locale.
+	 *
+	 * `switch_to_locale()` reloads every text domain already loaded (the plugin's included) and
+	 * the date locale; it returns false when the request already runs in the site locale.
+	 *
+	 * @template T
+	 * @param callable(): T $run Callback.
+	 * @return T
+	 */
+	public static function in_site_locale( callable $run ) {
+		$switched = switch_to_locale( get_locale() );
+
+		try {
+			return $run();
+		} finally {
+			if ( $switched ) {
+				restore_previous_locale();
+			}
+		}
+	}
+
+	/**
+	 * Builds the invoice HTML in the current locale.
+	 *
+	 * @param WC_Order             $order    Order.
+	 * @param DocumentData         $doc      Document.
+	 * @param array<string, mixed> $settings Invoice settings.
+	 */
+	private static function build_html( WC_Order $order, DocumentData $doc, array $settings ): string {
 		$design = isset( $settings['design'] ) && is_array( $settings['design'] ) ? $settings['design'] : [];
 		$vars   = Context::build( $order, $doc, $settings );
 
@@ -61,15 +97,20 @@ final class Renderer {
 	 * @return string `%PDF` bytes, '' on failure.
 	 */
 	public static function pdf( WC_Order $order, DocumentData $doc, array $settings ): string {
-		$html = self::html( $order, $doc, $settings );
-		if ( '' === $html ) {
-			return '';
-		}
+		// The page footer label is translated by the engine: the whole render runs in the site locale.
+		return self::in_site_locale(
+			static function () use ( $order, $doc, $settings ): string {
+				$html = self::build_html( $order, $doc, $settings );
+				if ( '' === $html ) {
+					return '';
+				}
 
-		$design  = isset( $settings['design'] ) && is_array( $settings['design'] ) ? $settings['design'] : [];
-		$content = isset( $settings['content'] ) && is_array( $settings['content'] ) ? $settings['content'] : [];
+				$design  = isset( $settings['design'] ) && is_array( $settings['design'] ) ? $settings['design'] : [];
+				$content = isset( $settings['content'] ) && is_array( $settings['content'] ) ? $settings['content'] : [];
 
-		return PdfEngine::render( $html, $design, ! empty( $content['footer_pagination_enabled'] ) );
+				return PdfEngine::render( $html, $design, ! empty( $content['footer_pagination_enabled'] ) );
+			}
+		);
 	}
 
 	/**
