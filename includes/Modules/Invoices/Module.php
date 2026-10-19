@@ -11,6 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 /**
@@ -27,6 +28,8 @@ class Module extends AbstractModule {
 		// a callback added to it now would never fire. Updating a plugin does not run
 		// the activation hook, so the tables are checked on every boot.
 		Installer::maybe_upgrade();
+
+		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 	}
 
 	/**
