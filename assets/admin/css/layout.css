@@ -4,7 +4,8 @@
 
 .lumia-admin-container {
   display: flex;
-  height: calc(100vh - 32px);
+  flex: 1;
+  min-height: 0;
   gap: 16px;
   padding: 16px;
   overflow: hidden;
@@ -168,8 +169,8 @@
 
 @media screen and (max-width: 782px) {
   .lumia-admin-container {
+    flex: none;
     height: auto;
-    min-height: calc(100vh - 32px);
     overflow: visible;
     flex-direction: column;
   }
@@ -212,4 +213,35 @@
  */
 #wpbody-content {
   padding: 0 !important;
+}
+
+/*
+ * Bounded height: the sidebar stays fixed and only the main area scrolls.
+ * #wpbody-content is a column that holds the admin notices printed above the
+ * wrap, so the wrap takes what they leave instead of overflowing the screen.
+ */
+#wpbody-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 32px);
+}
+
+#wpbody-content > .lumia-factures-admin.lumia-admin-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+}
+
+@media screen and (max-width: 782px) {
+  #wpbody-content {
+    display: block;
+    height: auto;
+  }
+
+  #wpbody-content > .lumia-factures-admin.lumia-admin-wrap {
+    height: auto;
+    overflow: visible;
+  }
 }

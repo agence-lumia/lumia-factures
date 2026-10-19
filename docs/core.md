@@ -27,6 +27,7 @@ plugins_loaded -> Plugin::instance() (singleton)
 | `php` | PHP < 8.1 |
 | `wp` | WordPress < 6.9 |
 | `woocommerce` | WooCommerce missing, or < 9.0 |
+| `extensions` | a PHP extension of `['dom', 'mbstring', 'gd']` is not loaded (list filterable through `lumia_factures_required_extensions`) |
 | `dompdf` | `Dompdf\Dompdf` cannot be loaded (`vendor/` missing or damaged in the installed ZIP) |
 | `legacy_active` | the old `facture-pdf-lumia` plugin is active (it defines `FPL_VERSION`) |
 
@@ -54,7 +55,7 @@ Unlike lumia-tools, `Settings` keeps no copy of the option on the instance: ever
 
 ## Module system
 
-Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `init()` (register hooks here), `get_settings()`, `save_settings()` (sanitize and persist yourself, the core applies nothing), `static get_defaults()`, `static get_uninstall_keys()`. Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
+Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `init()` (register hooks here), `get_settings()`, `save_settings()` (the base implementation sanitizes the payload against `get_defaults()`: unknown keys dropped, values coerced to the type of their default, an empty-array default accepting a list or a keyed map of scalars; a module with richer settings overrides it), `static get_defaults()`, `static get_uninstall_keys()`. Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 
 **`init()` timing.** A module `init()` runs inside the `init` action at priority 10. `woocommerce_init`, `woocommerce_loaded` and `before_woocommerce_init` have therefore already fired: a callback hooked on them from a module never runs. Likewise, an `init` callback added from a module at priority <= 10 never runs (that priority is being dispatched); use a later priority.
 
@@ -89,7 +90,7 @@ Assets load on the plugin page only (`$hook === hook_suffix`): `tokens.css` firs
 
 ### Forms
 
-All forms post to `admin-post.php`; `SaveHandler` verifies a nonce and `manage_woocommerce`, then redirects with `lumia_notice` (shown as a toast):
+All forms post to `admin-post.php`; `SaveHandler` verifies a nonce and `manage_woocommerce`, then redirects with `lumia_factures_notice` (shown as a toast; modules add their own codes through the `lumia_factures_admin_notices` filter):
 
 | Action | Nonce field | Purpose |
 |---|---|---|
@@ -100,7 +101,7 @@ The automatic-update toggle writes WordPress's own `auto_update_plugins` site op
 
 ### AJAX
 
-Naming `wp_ajax_lumia_factures_{module}_{action}`; every handler starts with `check_ajax_referer( 'lumia_factures_admin_nonce', 'nonce' )` then a capability check, and answers with `wp_send_json_success()` / `wp_send_json_error()`. The nonce is localized as `lumiaFacturesAdmin.nonce`. No endpoint exists yet in lot 1.
+Naming `wp_ajax_lumia_factures_{module}_{action}`; every handler starts with `check_ajax_referer( 'lumia_factures_admin_nonce', 'nonce' )` then a capability check, and answers with `wp_send_json_success()` / `wp_send_json_error()`. The nonce is localized as `lumiaFacturesAdmin.nonce`. The Invoices module registers `lumia_factures_invoices_preview` (see [modules/invoices.md](modules/invoices.md#live-preview)).
 
 ### JS globals and strings
 
@@ -109,6 +110,29 @@ Every global is namespaced `lumiaFactures*` (lumia-tools defines `lumiaAdmin`, `
 ### Icons
 
 Inline SVGs rendered by `Admin::render_icon()` -> `Admin\Icons::render()`, from Lucide v1.34.0 official files only. A missing icon is fetched from Lucide as is, never drawn or edited; `Icons::FALLBACK` is `package`.
+
+## Hooks
+
+Every public hook is prefixed `lumia_factures_`. Filters return their value; the callback arguments are those of the `apply_filters()` call.
+
+| Hook | Type | Where | Purpose |
+|---|---|---|---|
+| `lumia_factures_module_definitions` | filter | `Core/Modules.php` | Module definitions `[ id => [ name, class, ... ] ]`; add or replace a module. |
+| `lumia_factures_register_modules` | action | `Core/Modules.php` | Imperative registration (`$modules`, `$only_active`). |
+| `lumia_factures_requirements_wc_active` | filter | `Core/Requirements.php` | Whether WooCommerce counts as active (tests). |
+| `lumia_factures_requirements_dompdf_class` | filter | `Core/Requirements.php` | Class name probed to detect Dompdf (tests). |
+| `lumia_factures_required_extensions` | filter | `Core/Requirements.php` | PHP extensions that must be loaded (`dom`, `mbstring`, `gd`). |
+| `lumia_factures_menu_parent` | filter | `Admin/Admin.php` | Parent menu slug of the plugin page (default `woocommerce`). |
+| `lumia_factures_admin_notices` | filter | `Admin/Admin.php` | Notice messages printed on the plugin page. |
+| `lumia_factures_can_issue` | filter | `Documents/Issuer.php` | Whether an invoice may be issued for an order (default: its status is a trigger status). |
+| `lumia_factures_invoice_issued` | action | `Documents/Issuer.php` | Fires once an invoice is numbered (`$doc`, `$order`); the PDF may be missing if rendering failed. |
+| `lumia_factures_number_tags` | filter | `Numbering/NumberFormat.php` | Tag names accepted in a number format. |
+| `lumia_factures_number_tag` | filter | `Numbering/NumberFormat.php` | Value of a custom number tag (`''`, `$tag`, `$argument`, `$sequence`, `$order`). |
+| `lumia_factures_invoice_context` | filter | `Rendering/Context.php` | Rendering context passed to the PDF templates. |
+| `lumia_factures_placeholders` | filter | `Rendering/Placeholders.php` | Placeholder values (plain text) of the free texts. |
+| `lumia_factures_invoice_html` | filter | `Rendering/Renderer.php` | Final HTML handed to Dompdf. |
+| `lumia_factures_template_path` | filter | `Rendering/Renderer.php` | File used for a PDF template; the theme is never searched. |
+| `lumia_factures_dompdf_options` | filter | `Rendering/PdfEngine.php` | The `Dompdf\Options` object. |
 
 ## Translations
 
@@ -126,7 +150,7 @@ Text domain `lumia-factures`, loaded on `init`. The procedure to add a string is
 
 ## Uninstall
 
-`uninstall.php` does **nothing** unless `LUMIA_FACTURES_REMOVE_ALL_DATA` is defined to `true` in `wp-config.php`: invoices must be kept 10 years. When set, it deletes the global option and, for each class of `Activator::MODULE_CLASSES`, the module option and whatever `get_uninstall_keys()` declares. Never add data deletion outside this gate.
+`uninstall.php` does **nothing** unless `LUMIA_FACTURES_REMOVE_ALL_DATA` is defined to `true` in `wp-config.php`: invoices must be kept 10 years. When set, it deletes the global option and, for each class of `Activator::MODULE_CLASSES`, the module option and whatever `get_uninstall_keys()` declares. Order meta goes through `Core\Uninstaller::delete_order_meta()`, which reaches `wp_postmeta` and, on HPOS, `{prefix}wc_orders_meta`. The archive folder `uploads/lumia-factures/` is **never** deleted, even with the constant: the PDFs are the legal record and only the site owner removes them by hand. The purge drops the sequence counters while the archived PDFs stay, so a reinstall restarts the numbering: before issuing again, set the start number above the last issued number, or raise the counters. Never add data deletion outside this gate.
 
 ## Development tooling
 
@@ -136,10 +160,11 @@ Composer holds the dev tooling **and** the one runtime dependency (Dompdf). No P
 docker run --rm -v "${PWD}:/app" -w /app composer:2 check    # PHPCS (WPCS 3 + PHPCompatibilityWP) then PHPStan level 8
 docker run --rm -v "${PWD}:/app" -w /app composer:2 lint:fix # phpcbf
 npm run env:start                                            # wp-env: WordPress + WooCommerce, plugin mapped from the working tree
-npm test                                                     # PHPUnit 9.6 in the wp-env tests-cli container
+npm test                                                     # PHPUnit 9.6 in the wp-env tests-cli container (HPOS order storage)
+npm run test:legacy                                          # same suite on the legacy posts order storage
 ```
 
-- **Tests.** `tests/Integration/` (Admin, Core: boot, modules, updater) with `tests/Support/TestCase.php`; `tests/fixtures/lumia-tools-stub.php` simulates lumia-tools being active (coexistence test). CI runs them on PHP 8.3 and 8.5 (`WP_ENV_PHP_VERSION`). `composer.json` pins the platform to PHP 8.1.99 so one `vendor/` works in every container.
+- **Tests.** `tests/Integration/` (Admin, Core: boot, modules, updater, uninstall helper, storage mode; Invoices) with `tests/Support/TestCase.php`; `tests/fixtures/lumia-tools-stub.php` simulates lumia-tools being active (coexistence test). CI runs them on PHP 8.3 and 8.5 (`WP_ENV_PHP_VERSION`) with HPOS, then once more on legacy storage (PHP 8.5). `tests/bootstrap.php` picks the storage from `LUMIA_FACTURES_TEST_LEGACY_ORDERS`; `StorageModeTest` pins it. `composer.json` pins the platform to PHP 8.1.99 so one `vendor/` works in every container.
 - **No baseline.** PHPCS and PHPStan run without one: any finding blocks CI. Fix it, or add a justified `phpcs:ignore` / `@phpstan-ignore`. PHPStan stops at level 8.
 - **CI.** `lint.yml` (PHPCS, PHPStan, PHP syntax, language-file gate, ZIP build and content check) and `tests.yml` on every PR to `dev` / `main`; `release-dev.yml` on push to `dev`; `release-please.yml` by manual dispatch.
 

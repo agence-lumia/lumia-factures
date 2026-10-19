@@ -96,4 +96,11 @@ class BootTest extends TestCase {
 		add_filter( 'lumia_factures_requirements_dompdf_class', fn() => 'Missing\Dompdf' );
 		$this->assertArrayHasKey( 'dompdf', Requirements::check() );
 	}
+
+	public function test_requirements_report_missing_extension(): void {
+		add_filter( 'lumia_factures_required_extensions', fn() => array( 'lumia_missing_ext' ) );
+		$errors = Requirements::check();
+		$this->assertArrayHasKey( 'extensions', $errors );
+		$this->assertStringContainsString( 'lumia_missing_ext', $errors['extensions'] );
+	}
 }

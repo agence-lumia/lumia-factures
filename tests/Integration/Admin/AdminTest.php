@@ -143,7 +143,7 @@ class AdminTest extends TestCase {
 		);
 		$this->assertSame( 'dev', Plugin::instance()->settings()->get( 'global.update_channel' ) );
 		$this->assertStringContainsString( 'page=lumia-factures', $location );
-		$this->assertStringContainsString( 'lumia_notice=settings_saved', $location );
+		$this->assertStringContainsString( 'lumia_factures_notice=settings_saved', $location );
 	}
 
 	public function test_save_settings_rejects_unknown_channel(): void {
@@ -172,7 +172,7 @@ class AdminTest extends TestCase {
 		);
 		$this->assertTrue( $modules->is_active( 'bricks' ) );
 		$this->assertTrue( $modules->is_active( 'invoices' ) );
-		$this->assertStringContainsString( 'lumia_notice=modules_updated', $location );
+		$this->assertStringContainsString( 'lumia_factures_notice=modules_updated', $location );
 
 		// Nothing checked: the optional module goes off, the locked one stays on.
 		$this->post_save(
@@ -194,8 +194,11 @@ class AdminTest extends TestCase {
 				'lumia_factures_module_settings' => array( 'sample' => '1' ),
 			)
 		);
-		// The invoices module declares no defaults: an unknown key is dropped.
-		$this->assertSame( array(), get_option( 'lumia_factures_module_invoices' ) );
+		// An unknown key is dropped: only the schema groups are stored.
+		$stored = get_option( 'lumia_factures_module_invoices' );
+		$this->assertIsArray( $stored );
+		$this->assertArrayNotHasKey( 'sample', $stored );
+		$this->assertSame( array( 'general', 'company', 'numbering', 'content', 'design' ), array_keys( $stored ) );
 	}
 
 	public function test_base_save_settings_keeps_known_keys_and_coerces_types(): void {
@@ -340,10 +343,51 @@ class AdminTest extends TestCase {
 		$this->render_tab( 'dashboard' );
 	}
 
+	public function test_toast_reads_prefixed_query_args(): void {
+		$this->login_admin();
+		do_action( 'admin_menu' );
+		set_current_screen( Plugin::instance()->admin()->get_hook_suffix() );
+
+		$_GET['lumia_notice'] = 'settings_saved';
+		$this->render_tab( 'settings' );
+		$this->assertStringNotContainsString( 'Settings saved successfully.', $this->footer_html() );
+
+		unset( $_GET['lumia_notice'] );
+		$_GET['lumia_factures_notice']      = 'settings_saved';
+		$_GET['lumia_factures_notice_type'] = 'warning';
+		$this->render_tab( 'settings' );
+		$footer = $this->footer_html();
+		$this->assertStringContainsString( 'Settings saved successfully.', $footer );
+		$this->assertStringContainsString( '"type":"warning"', $footer );
+	}
+
+	public function test_module_notice_codes_are_filterable(): void {
+		$this->login_admin();
+		do_action( 'admin_menu' );
+		set_current_screen( Plugin::instance()->admin()->get_hook_suffix() );
+		add_filter(
+			'lumia_factures_admin_notices',
+			static function ( array $messages ): array {
+				$messages['invoice_issued'] = 'Invoice issued.';
+				return $messages;
+			}
+		);
+
+		$_GET['lumia_factures_notice'] = 'invoice_issued';
+		$this->render_tab( 'settings' );
+		$this->assertStringContainsString( 'Invoice issued.', $this->footer_html() );
+	}
+
+	private function footer_html(): string {
+		ob_start();
+		Plugin::instance()->admin()->render_footer_ui();
+		return (string) ob_get_clean();
+	}
+
 	public function test_footer_prints_toast_and_modal_on_plugin_screen_only(): void {
 		$this->login_admin();
 		do_action( 'admin_menu' );
-		$_GET['lumia_notice'] = 'settings_saved';
+		$_GET['lumia_factures_notice'] = 'settings_saved';
 		$this->render_tab( 'settings' );
 
 		set_current_screen( 'edit.php' );
@@ -397,7 +441,7 @@ class AdminTest extends TestCase {
 				'lumia_factures_modules' => array( 'bricks' ),
 			)
 		);
-		$this->assertStringContainsString( 'lumia_notice=modules_updated', $location );
+		$this->assertStringContainsString( 'lumia_factures_notice=modules_updated', $location );
 		$this->assertFalse( (bool) $plugin->settings()->get( 'modules.bricks', false ) );
 	}
 

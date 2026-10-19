@@ -6,12 +6,20 @@ The interface is in English and ships with a French translation (`fr_FR`).
 
 ## What it does
 
-- Issues PDF invoices for WooCommerce orders, rendered with Dompdf, with continuous numbering per document type. An issued invoice is never modified. (Invoicing arrives in lot 2: the current build ships the foundations only.)
+- Issues PDF invoices for WooCommerce orders, rendered with Dompdf. An issued invoice is never modified: its number, date and archived PDF are fixed.
+- Continuous, unique numbering per document type, with a configurable format (`{year}`, `{month}`, `{number}`...) and yearly, monthly or no reset; counters can be raised, never lowered.
+- Amounts that always add up to the WooCommerce total (a rounding row absorbs any drift), in the order's currency, with the VAT rates read from the order.
+- Automatic issue on the order statuses you choose, manual issue and restore from the order screen, an invoice column in the order list, and the PDF attached to the WooCommerce e-mails you choose.
+- Write-once PDF archive in `wp-content/uploads/lumia-factures/`, protected from web access.
+- Settings screen (company, numbering, content, design) with a live PDF preview.
+- HPOS and legacy order storage.
 - One admin page, **WooCommerce > Invoices**, with an internal sidebar (`&tab=`) for the overview, the modules and the settings.
 - Updates through GitHub, on a Stable or a Dev channel.
 - Coexists with lumia-tools on the same site.
 
-Modules: **Invoices** (core, always active) and **Bricks** (optional dynamic tags, lot 2).
+Planned, not delivered yet: migration of the legacy 1.x invoices and WP-CLI command (lot 3), customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
+
+Modules: **Invoices** (core, always active) and **Bricks** (optional dynamic tags, inactive by default).
 
 ## Requirements
 
@@ -39,7 +47,7 @@ Optionally, define `LUMIA_FACTURES_GITHUB_TOKEN` in `wp-config.php` to raise the
 
 ## Invoice storage protection
 
-**Planned (lot 2), not implemented yet:** invoice PDFs will be stored in `wp-content/uploads/lumia-factures/`, protected on Apache/LiteSpeed by an `.htaccess` file. **Nginx ignores `.htaccess`**, so once storage lands, add this rule to the server block (harmless to add beforehand):
+Invoice PDFs are stored in `wp-content/uploads/lumia-factures/`, protected on Apache/LiteSpeed by an `.htaccess` file in every folder. **Nginx ignores `.htaccess`**: add this rule to the server block, otherwise the archive is reachable from the web:
 
 ```nginx
 location ^~ /wp-content/uploads/lumia-factures/ { deny all; }
@@ -53,6 +61,8 @@ Invoices must be kept 10 years, so deleting the plugin removes **nothing** by de
 define( 'LUMIA_FACTURES_REMOVE_ALL_DATA', true );
 ```
 
+The archive folder `wp-content/uploads/lumia-factures/` is never deleted, even then: remove the PDFs by hand once the legal retention period is over. The purge does drop the numbering counters while the archived PDFs stay, so a reinstall restarts the numbering: before issuing again, set the start number (Numbering tab) above the last issued number, or raise the counters.
+
 ## Development
 
 Working rules and conventions are in [CLAUDE.md](CLAUDE.md); technical documentation is in [docs/](docs/README.md). No PHP is needed on the machine: Docker and Node run everything.
@@ -60,7 +70,8 @@ Working rules and conventions are in [CLAUDE.md](CLAUDE.md); technical documenta
 ```bash
 npm install
 npm run env:start     # wp-env (WordPress + WooCommerce)
-npm test              # PHPUnit inside wp-env
+npm test              # PHPUnit inside wp-env (HPOS order storage)
+npm run test:legacy   # same suite on the legacy order storage
 
 # Lint (PHPCS) + static analysis (PHPStan level 8), through Docker
 docker run --rm -v "${PWD}:/app" -w /app composer:2 check          # PowerShell

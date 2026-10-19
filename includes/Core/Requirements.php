@@ -24,7 +24,7 @@ class Requirements {
 	/**
 	 * Returns the blocking errors, keyed by reason.
 	 *
-	 * Reasons: `php`, `wp`, `woocommerce`, `dompdf`, `legacy_active`.
+	 * Reasons: `php`, `wp`, `woocommerce`, `extensions`, `dompdf`, `legacy_active`.
 	 * An empty array means the plugin can start its modules.
 	 *
 	 * @return array<string, string> Reason => human-readable message.
@@ -84,6 +84,21 @@ class Requirements {
 		$dompdf_class = (string) apply_filters( 'lumia_factures_requirements_dompdf_class', 'Dompdf\Dompdf' );
 		if ( ! class_exists( $dompdf_class ) ) {
 			$errors['dompdf'] = __( 'The PDF engine (Dompdf) cannot be loaded: the vendor/ folder of Lümia Factures is missing or damaged. Reinstall the plugin from its release ZIP.', 'lumia-factures' );
+		}
+
+		/**
+		 * PHP extensions the invoicing engine needs (Dompdf, DOM and image handling).
+		 *
+		 * @param string[] $extensions Extension names checked with extension_loaded().
+		 */
+		$extensions = apply_filters( 'lumia_factures_required_extensions', [ 'dom', 'mbstring', 'gd' ] );
+		$missing    = is_array( $extensions ) ? array_values( array_filter( $extensions, static fn( $extension ) => is_string( $extension ) && ! extension_loaded( $extension ) ) ) : [];
+		if ( [] !== $missing ) {
+			$errors['extensions'] = sprintf(
+				/* translators: %s: comma-separated list of missing PHP extensions. */
+				__( 'Lümia Factures requires the following PHP extensions: %s. Ask your host to enable them.', 'lumia-factures' ),
+				implode( ', ', $missing )
+			);
 		}
 
 		// The legacy "Facture PDF Lumia" plugin defines FPL_VERSION. Running both

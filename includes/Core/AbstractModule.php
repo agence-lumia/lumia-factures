@@ -61,7 +61,7 @@ abstract class AbstractModule implements ModuleInterface {
 	 * @param array<string, mixed> $settings Settings to store (raw form payload).
 	 */
 	public function save_settings( array $settings ): bool {
-		return $this->save_module_settings( self::sanitize_against_defaults( static::get_defaults(), $settings ) );
+		return $this->save_module_settings( static::sanitize_against_defaults( static::get_defaults(), $settings ) );
 	}
 
 	/**
@@ -88,9 +88,26 @@ abstract class AbstractModule implements ModuleInterface {
 				if ( ! is_array( $value ) ) {
 					continue;
 				}
-				$clean[ $key ] = self::is_list( $default )
-					? array_values( array_map( 'sanitize_text_field', array_map( 'strval', array_filter( $value, 'is_scalar' ) ) ) )
-					: self::sanitize_against_defaults( $default, $value );
+				if ( [] === $default ) {
+					// Empty default: a list stays a list, an associative input is a keyed map.
+					$scalars = array_map( 'sanitize_text_field', array_map( 'strval', array_filter( $value, 'is_scalar' ) ) );
+					if ( self::is_list( $value ) ) {
+						$clean[ $key ] = array_values( $scalars );
+					} else {
+						$map = [];
+						foreach ( $scalars as $map_key => $map_value ) {
+							$map_key = sanitize_text_field( (string) $map_key );
+							if ( '' !== $map_key ) {
+								$map[ $map_key ] = $map_value;
+							}
+						}
+						$clean[ $key ] = $map;
+					}
+				} elseif ( self::is_list( $default ) ) {
+					$clean[ $key ] = array_values( array_map( 'sanitize_text_field', array_map( 'strval', array_filter( $value, 'is_scalar' ) ) ) );
+				} else {
+					$clean[ $key ] = static::sanitize_against_defaults( $default, $value );
+				}
 			} elseif ( is_bool( $default ) ) {
 				$clean[ $key ] = ! empty( $value );
 			} elseif ( is_int( $default ) ) {

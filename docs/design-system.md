@@ -162,7 +162,7 @@ Hover and focus both trigger the bubble (which `title` does not do); a tooltip a
 window.lumiaFacturesShowToast("Message", "success"); // success | error | info | warning
 ```
 
-Defined in `assets/admin/js/notifications.js`, loaded on the plugin page only. There are no persistent (cross-reload) notices in this plugin; after a redirect, `SaveHandler` passes `lumia_notice` / `lumia_notice_type` in the query string and `Admin::prepare_toast()` turns them into a toast.
+Defined in `assets/admin/js/notifications.js`, loaded on the plugin page only. There are no persistent (cross-reload) notices in this plugin; after a redirect, `SaveHandler` passes `lumia_factures_notice` / `lumia_factures_notice_type` in the query string and `Admin::prepare_toast()` turns them into a toast.
 
 ## Coexistence with lumia-tools
 

@@ -55,7 +55,7 @@ class Admin {
 	private string $hook_suffix = '';
 
 	/**
-	 * Toast to display (message + type), built from `lumia_notice`.
+	 * Toast to display (message + type), built from `lumia_factures_notice`.
 	 *
 	 * @var array{message: string, type: string}|null
 	 */
@@ -262,13 +262,13 @@ class Admin {
 	}
 
 	/**
-	 * Toast message (via `lumia_notice` in the query string, set by SaveHandler).
+	 * Toast message (via `lumia_factures_notice` in the query string, set by SaveHandler).
 	 */
 	private function prepare_toast(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
-		$notice = isset( $_GET['lumia_notice'] ) ? sanitize_key( wp_unslash( $_GET['lumia_notice'] ) ) : '';
+		$notice = isset( $_GET['lumia_factures_notice'] ) ? sanitize_key( wp_unslash( $_GET['lumia_factures_notice'] ) ) : '';
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
-		$type = isset( $_GET['lumia_notice_type'] ) ? sanitize_key( wp_unslash( $_GET['lumia_notice_type'] ) ) : 'success';
+		$type = isset( $_GET['lumia_factures_notice_type'] ) ? sanitize_key( wp_unslash( $_GET['lumia_factures_notice_type'] ) ) : 'success';
 
 		$messages = [
 			'settings_saved'  => __( 'Settings saved successfully.', 'lumia-factures' ),
@@ -276,7 +276,17 @@ class Admin {
 			'updates_checked' => __( 'Update check completed.', 'lumia-factures' ),
 		];
 
-		if ( isset( $messages[ $notice ] ) ) {
+		/**
+		 * Lets a module add toast codes, passed back as `lumia_factures_notice`.
+		 *
+		 * @param array<string, string> $messages Toast code => message.
+		 */
+		$messages = apply_filters( 'lumia_factures_admin_notices', $messages );
+		$messages = is_array( $messages ) ? $messages : [];
+
+		$this->toast = null;
+
+		if ( isset( $messages[ $notice ] ) && is_string( $messages[ $notice ] ) ) {
 			$this->toast = [
 				'message' => $messages[ $notice ],
 				'type'    => in_array( $type, [ 'success', 'error', 'warning', 'info' ], true ) ? $type : 'success',

@@ -34,10 +34,11 @@ class Activator {
 	 * Existing options are never overwritten: a reactivation keeps the settings.
 	 */
 	public static function activate(): void {
-		// Initial state of each module: the core module on, the optional ones off.
+		// Initial state of each module: the locked (core) ones on, the optional ones off.
+		$definitions      = Modules::default_definitions();
 		$modules_defaults = [];
-		foreach ( self::MODULE_CLASSES as $id => $class ) {
-			$modules_defaults[ $id ] = 'invoices' === $id;
+		foreach ( array_keys( self::MODULE_CLASSES ) as $id ) {
+			$modules_defaults[ $id ] = ! empty( $definitions[ $id ]['locked'] );
 		}
 
 		$default_settings = [
@@ -63,6 +64,12 @@ class Activator {
 
 			if ( ! empty( $defaults ) && false === get_option( $option_key ) ) {
 				add_option( $option_key, $defaults );
+			}
+
+			// A module that starts active (the locked core ones) never goes through
+			// Modules::activate_module(), so its on_activate() runs here.
+			if ( ! empty( $modules_defaults[ $id ] ) ) {
+				( new $class( $id ) )->on_activate();
 			}
 		}
 	}

@@ -49,9 +49,8 @@ foreach ( $module_classes as $id => $class ) {
 		delete_site_option( $option_key );
 	}
 
-	foreach ( $keys['meta'] ?? [] as $meta_key ) {
-		delete_post_meta_by_key( $meta_key );
-	}
+	// Order meta, on legacy storage and on HPOS. The archive folder uploads/lumia-factures/ is never deleted.
+	\Lumia\Factures\Core\Uninstaller::delete_order_meta( $keys['meta'] ?? [] );
 
 	// Tables owned by a module, declared without a prefix. The name only comes
 	// from the module code, never from user input: it is still restricted to

@@ -38,6 +38,14 @@ tests_add_filter(
 		if ( class_exists( 'WC_Install' ) ) {
 			WC_Install::install();
 		}
+		// Real tables must exist before the first test: inside a test, CREATE TABLE becomes CREATE TEMPORARY TABLE.
+		\Lumia\Factures\Modules\Invoices\Database\Installer::install();
+
+		// Order storage of the run: HPOS by default, the legacy posts storage with `npm run test:legacy`.
+		// Data sync stays off in both modes so each run exercises exactly one storage.
+		$lumia_factures_legacy = '1' === getenv( 'LUMIA_FACTURES_TEST_LEGACY_ORDERS' );
+		update_option( 'woocommerce_custom_orders_table_enabled', $lumia_factures_legacy ? 'no' : 'yes' );
+		update_option( 'woocommerce_custom_orders_table_data_sync_enabled', 'no' );
 	}
 );
 

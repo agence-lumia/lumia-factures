@@ -6,7 +6,7 @@ Working guide for Claude Code on this repository. The rules below are absolute; 
 
 **Lümia Factures** (repository `agence-lumia/lumia-factures`, text domain and slug `lumia-factures`) is a WordPress plugin that issues PDF invoices for WooCommerce orders (PHP 8.1+, WP 6.9+, WooCommerce 9.0+, HPOS and legacy storage). It is a rebuild of the former `facture-pdf-lumia` plugin (1.x, tag `v1.1.1`) on the conventions of the agency plugin lumia-tools (v2.2.2): home-grown PSR-4 autoloader (`Lumia\Factures\` -> `includes/`), `AbstractModule` modules, a custom admin page, a GitHub updater. Every identifier is the lumia-tools one, renamed: namespace `Lumia\Factures`, prefix `lumia_factures_`, constants `LUMIA_FACTURES_`.
 
-Two modules under `includes/Modules/`: `Invoices` (core, **locked**: always active, cannot be deactivated) and `Bricks` (optional, inactive by default). Both are skeletons in lot 1; the invoicing logic arrives in lot 2. Settings: `lumia_factures_settings` (global + module state) and `lumia_factures_module_{id}` (per module), merged **recursively** over the defaults.
+Two modules under `includes/Modules/`: `Invoices` (core, **locked**: always active, cannot be deactivated) and `Bricks` (optional, inactive by default). `Invoices` delivers the invoice engine (lot 2: numbering, amounts, rendering, immutable archive, e-mails, order tools, settings and live preview); `Bricks` is still a skeleton. Migration of the 1.x data (lot 3) and the credit notes / customer access (lot 4) are planned. Settings: `lumia_factures_settings` (global + module state) and `lumia_factures_module_{id}` (per module), merged **recursively** over the defaults.
 
 Lifecycle: `plugins_loaded` -> `Plugin::instance()` -> `init` -> text domain, `Requirements::check()`, then (only when it returns no error) module definitions (filter `lumia_factures_module_definitions`) and `Module::init()` on every active module. The updater and `Admin` are built whatever the requirements. Full detail: [docs/core.md](docs/core.md).
 
@@ -28,18 +28,18 @@ Lifecycle: `plugins_loaded` -> `Plugin::instance()` -> `init` -> text domain, `R
 
 These hold for every change, in every lot. Any change that could break one is refused, however small.
 
-1. **An issued invoice never changes**: number, date, archived PDF.
-2. **Numbering is continuous and unique per document type.** A used number is never reissued.
-3. **The amounts on the PDF add up exactly to the WooCommerce total.**
-4. **No upgrade may lose an issued invoice or change its number.**
-5. **Compatibility**: PHP >= 8.1 (tested on 8.3 and 8.5), WP >= 6.9, WooCommerce >= 9.0, HPOS and legacy order storage.
+1. **An issued invoice never changes**: number, date, archived PDF. Pinned by: `IssuerTest::test_issue_is_idempotent`, `IssuerTest::test_archived_pdf_never_changes`, `RegisterTest::test_attach_file_cannot_repoint_an_issued_invoice`, `ArchiveTest::test_archive_refuses_overwrite`.
+2. **Numbering is continuous and unique per document type.** A used number is never reissued. Pinned by: `SequencesTest::test_next_reads_value_not_insert_id`, `SequencesTest::test_raise_never_lowers`, `RegisterTest::test_assign_refuses_duplicate_number`, `IssuerTest::test_issue_when_reserved_by_other_call_does_not_number_twice`.
+3. **The amounts on the PDF add up exactly to the WooCommerce total.** Pinned by: `StatementTest::test_rounding_row_absorbs_real_drift`, `StatementTest::test_incl_discount_is_the_balancing_figure_without_rounding_row`, `StatementTest::test_zero_total_order`.
+4. **No upgrade may lose an issued invoice or change its number.** Pinned by: `DatabaseTest::test_install_is_idempotent`, `DatabaseTest::test_maybe_upgrade_does_nothing_when_up_to_date`, `UninstallerTest` (all in `tests/Integration/`).
+5. **Compatibility**: PHP >= 8.1 (tested on 8.3 and 8.5), WP >= 6.9, WooCommerce >= 9.0, HPOS and legacy order storage. Pinned by: `StorageModeTest` (HPOS run via `npm test`, legacy run via `npm run test:legacy`).
 
 ## Deviations from lumia-tools
 
 - **`vendor/` ships.** lumia-tools has no runtime dependency; here Dompdf (`dompdf/dompdf ^3.1`) is loaded from `vendor/`, installed by `build-zip.sh` with `composer install --no-dev --optimize-autoloader --classmap-authoritative`. The dev `vendor/` of the working tree is never copied into the ZIP. A missing or damaged `vendor/` is reported by `Requirements` (key `dompdf`), never a fatal error.
 - **Automated tests are mandatory for `includes/Modules/Invoices`.** lumia-tools has none. Any change under `includes/Modules/Invoices/` comes with PHPUnit integration tests (run in WordPress through wp-env: `npm test`). A change to that module without a test is not mergeable. The other areas have integration tests for boot, modules, updater and admin (`tests/Integration/`).
 - **Files are forced to LF** by `.gitattributes` (`* text=auto eol=lf`) on every OS: fixtures are compared byte for byte.
-- **Requirements gate and blocking notice.** `Requirements::check()` returns the blocking errors keyed `php`, `wp`, `woocommerce`, `dompdf`, `legacy_active` (the old `facture-pdf-lumia` plugin defines `FPL_VERSION`; both must never run together). While one is present no module starts, and a notice is printed on **`all_admin_notices`**, not `admin_notices`: lumia-tools moves `admin_notices` into its notification drawer, which would hide a blocking error.
+- **Requirements gate and blocking notice.** `Requirements::check()` returns the blocking errors keyed `php`, `wp`, `woocommerce`, `extensions`, `dompdf`, `legacy_active` (the old `facture-pdf-lumia` plugin defines `FPL_VERSION`; both must never run together). While one is present no module starts, and a notice is printed on **`all_admin_notices`**, not `admin_notices`: lumia-tools moves `admin_notices` into its notification drawer, which would hide a blocking error.
 
 ## Working convention
 
@@ -52,7 +52,7 @@ Tracking lives **in GitHub issues** (`gh issue list`): read them before proposin
 5. **Batch the merges locally, then a single push** of `dev`, so that only one pre-release is triggered per batch.
 6. **`composer check` and `npm test` before the PR.** No PHP on the machine: go through Docker/wp-env.
    - Lint + static analysis: `docker run --rm -v "${PWD}:/app" -w /app composer:2 check` (PowerShell; `"$PWD:/app"` on macOS/Linux; Git Bash: `MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/app" -w /app composer:2 check`).
-   - Tests: `npm run env:start` once, then `npm test`.
+   - Tests: `npm run env:start` once, then `npm test` (HPOS) and `npm run test:legacy` (legacy order storage).
 
    `lint.yml` (PHPCS, PHPStan, language gate, ZIP build) and `tests.yml` (PHPUnit on PHP 8.3 and 8.5) replay them on every PR.
 
