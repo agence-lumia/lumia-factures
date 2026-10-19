@@ -29,6 +29,12 @@ final class LegacySource {
 	public const META_NUMBER = '_fpl_invoice_number';
 
 	/**
+	 * A legacy counter value we accept: plain digits, at most 18 (always inside PHP_INT_MAX).
+	 * The SQL of max_sequences() applies the same rule.
+	 */
+	private const COUNTER_PATTERN = '/^[0-9]{1,18}$/';
+
+	/**
 	 * Whether the site has legacy data to import: settings or any invoiced order.
 	 */
 	public static function has_data(): bool {
@@ -66,7 +72,10 @@ final class LegacySource {
 
 		$sequences = [];
 		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
-			$sequences[ (string) $row['sequence_key'] ] = (int) $row['current_value'];
+			// A value that is not a plain counter (negative, overflowing) would corrupt the new counter.
+			if ( 1 === preg_match( self::COUNTER_PATTERN, (string) $row['current_value'] ) ) {
+				$sequences[ (string) $row['sequence_key'] ] = (int) $row['current_value'];
+			}
 		}
 
 		return $sequences;
@@ -94,7 +103,7 @@ final class LegacySource {
 		foreach ( $sources as [ $table, $column ] ) {
 			$suppressed = $wpdb->suppress_errors( true );
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table and column names are fixed above.
-			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT k.meta_value AS sequence_key, MAX(CAST(s.meta_value AS UNSIGNED)) AS value FROM {$table} s INNER JOIN {$table} k ON k.{$column} = s.{$column} AND k.meta_key = %s WHERE s.meta_key = %s GROUP BY k.meta_value", '_fpl_invoice_sequence_key', '_fpl_invoice_sequence' ), ARRAY_A );
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT k.meta_value AS sequence_key, MAX(CAST(s.meta_value AS UNSIGNED)) AS value FROM {$table} s INNER JOIN {$table} k ON k.{$column} = s.{$column} AND k.meta_key = %s WHERE s.meta_key = %s AND s.meta_value REGEXP '^[0-9]{1,18}\$' GROUP BY k.meta_value", '_fpl_invoice_sequence_key', '_fpl_invoice_sequence' ), ARRAY_A );
 			$wpdb->suppress_errors( $suppressed );
 
 			foreach ( is_array( $rows ) ? $rows : [] as $row ) {
