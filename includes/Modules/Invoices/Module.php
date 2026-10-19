@@ -12,6 +12,7 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
+use Lumia\Factures\Modules\Invoices\Emails\Attachments;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 /**
@@ -30,6 +31,7 @@ class Module extends AbstractModule {
 		Installer::maybe_upgrade();
 
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
+		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
 	}
 
 	/**
