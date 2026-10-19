@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T16:36:08+00:00\n"
+"POT-Creation-Date: 2026-10-19T17:23:13+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -208,11 +208,15 @@ msgstr ""
 msgid "You are not allowed to do this."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Download.php:61
+#: includes/Modules/Invoices/Admin/Download.php:65
 msgid "You are not allowed to download invoices."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Download.php:119
+#: includes/Modules/Invoices/Admin/Download.php:76
+msgid "The archived PDF of this invoice is missing or damaged. Use \"Rebuild missing PDF\" in the invoice box of the order."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Download.php:136
 msgid "This invoice does not exist."
 msgstr ""
 
@@ -224,7 +228,7 @@ msgstr ""
 
 #: includes/Modules/Invoices/Admin/OrderTools.php:58
 #: includes/Modules/Invoices/Admin/OrderTools.php:130
-#: includes/Modules/Invoices/Rendering/Context.php:174
+#: includes/Modules/Invoices/Rendering/Context.php:175
 #: templates/admin/invoices/content.php:40
 msgid "Invoice"
 msgstr ""
@@ -318,42 +322,43 @@ msgstr ""
 msgid "VAT %s"
 msgstr ""
 
-#: includes/Modules/Invoices/Documents/Issuer.php:124
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Documents/Issuer.php:137
+#, php-format
+msgid "Invoice %s issued."
+msgstr ""
+
+#: includes/Modules/Invoices/Documents/Issuer.php:258
+#: includes/Modules/Invoices/Documents/Issuer.php:300
 msgid "Invoice could not be numbered."
 msgstr ""
 
 #. translators: %d: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:136
+#: includes/Modules/Invoices/Documents/Issuer.php:270
 #, php-format
 msgid "Invoice sequence value %d could not be turned into a number; this sequence value is skipped."
 msgstr ""
 
 #. translators: 1: invoice number, 2: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:149
+#: includes/Modules/Invoices/Documents/Issuer.php:287
 #, php-format
 msgid "Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:264
+#: includes/Modules/Invoices/Documents/Issuer.php:314
 #, php-format
-msgid "Invoice %s issued."
+msgid "The PDF of invoice %s could not be stored; the PDF will be built on first download."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:269
+#: includes/Modules/Invoices/Documents/Issuer.php:318
 #, php-format
-msgid "Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download."
+msgid "The PDF of invoice %s could not be generated; the PDF will be built on first download."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:273
-#, php-format
-msgid "Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download."
-msgstr ""
-
-#. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:333
+#: includes/Modules/Invoices/Documents/Issuer.php:378
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""
@@ -411,120 +416,120 @@ msgstr ""
 msgid "With a monthly reset, the format must contain {year} and {month}, otherwise two months would print the same numbers."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:196
-#: includes/Modules/Invoices/Rendering/Context.php:458
+#: includes/Modules/Invoices/Rendering/Context.php:197
+#: includes/Modules/Invoices/Rendering/Context.php:459
 msgid "Tel"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:197
-#: includes/Modules/Invoices/Rendering/Context.php:459
+#: includes/Modules/Invoices/Rendering/Context.php:198
+#: includes/Modules/Invoices/Rendering/Context.php:460
 msgid "Mob"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:224
+#: includes/Modules/Invoices/Rendering/Context.php:225
 #: templates/admin/invoices/content.php:66
 msgid "Bill to"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:239
+#: includes/Modules/Invoices/Rendering/Context.php:240
 #: templates/admin/invoices/content.php:71
 msgid "Ship to"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:278
+#: includes/Modules/Invoices/Rendering/Context.php:279
 msgid "Invoice no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:279
+#: includes/Modules/Invoices/Rendering/Context.php:280
 msgid "Invoice date"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:280
+#: includes/Modules/Invoices/Rendering/Context.php:281
 msgid "Order no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:281
+#: includes/Modules/Invoices/Rendering/Context.php:282
 msgid "Order date"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:282
+#: includes/Modules/Invoices/Rendering/Context.php:283
 msgid "Payment method"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:334
+#: includes/Modules/Invoices/Rendering/Context.php:335
 #: templates/admin/invoices/content.php:25
 msgid "Product"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:335
+#: includes/Modules/Invoices/Rendering/Context.php:336
 #: templates/admin/invoices/content.php:26
 msgid "Description"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:336
+#: includes/Modules/Invoices/Rendering/Context.php:337
 #: templates/admin/invoices/content.php:27
 msgid "SKU"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:337
+#: includes/Modules/Invoices/Rendering/Context.php:338
 #: templates/admin/invoices/content.php:28
 msgid "Qty"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:338
+#: includes/Modules/Invoices/Rendering/Context.php:339
 #: templates/admin/invoices/content.php:29
 msgid "Unit price"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:339
+#: includes/Modules/Invoices/Rendering/Context.php:340
 #: templates/admin/invoices/content.php:30
 msgid "VAT"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:340
+#: includes/Modules/Invoices/Rendering/Context.php:341
 #: templates/admin/invoices/content.php:31
 msgid "Total"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:445
+#: includes/Modules/Invoices/Rendering/Context.php:446
 #: templates/admin/invoices/content.php:166
 #: templates/admin/invoices/content.php:171
 msgid "Customer note"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:462
+#: includes/Modules/Invoices/Rendering/Context.php:463
 #: templates/admin/invoices/company.php:84
 #: templates/admin/invoices/content.php:189
 msgid "SIRET"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:463
+#: includes/Modules/Invoices/Rendering/Context.php:464
 #: templates/admin/invoices/company.php:85
 #: templates/admin/invoices/content.php:190
 msgid "RCS"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:464
+#: includes/Modules/Invoices/Rendering/Context.php:465
 msgid "VAT no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:465
+#: includes/Modules/Invoices/Rendering/Context.php:466
 #: templates/admin/invoices/company.php:87
 #: templates/admin/invoices/content.php:192
 msgid "Share capital"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:466
+#: includes/Modules/Invoices/Rendering/Context.php:467
 msgid "APE"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:467
+#: includes/Modules/Invoices/Rendering/Context.php:468
 #: templates/admin/invoices/company.php:89
 #: templates/admin/invoices/content.php:194
 msgid "IBAN"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:468
+#: includes/Modules/Invoices/Rendering/Context.php:469
 #: templates/admin/invoices/company.php:90
 #: templates/admin/invoices/content.php:195
 msgid "BIC"
@@ -727,6 +732,10 @@ msgstr ""
 #: templates/admin/invoices/content.php:18
 #, php-format
 msgid "Tags replaced on each invoice: %s"
+msgstr ""
+
+#: templates/admin/invoices/content.php:20
+msgid "Prefer {invoice_date} to {current_date}: a rebuilt PDF would print the date of the rebuild."
 msgstr ""
 
 #: templates/admin/invoices/content.php:24

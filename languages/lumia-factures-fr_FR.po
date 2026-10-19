@@ -592,16 +592,17 @@ msgid "Invoice %s issued."
 msgstr "Facture %s émise."
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:269
 #, php-format
-msgid "Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download."
-msgstr "Facture %s émise. Son PDF n'a pas pu être enregistré ; le PDF sera créé au premier téléchargement."
+msgid "The PDF of invoice %s could not be stored; the PDF will be built on first download."
+msgstr "Le PDF de la facture %s n'a pas pu être enregistré ; le PDF sera créé au premier téléchargement."
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:273
 #, php-format
-msgid "Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download."
-msgstr "Facture %s émise. Son PDF n'a pas pu être généré ; le PDF sera créé au premier téléchargement."
+msgid "The PDF of invoice %s could not be generated; the PDF will be built on first download."
+msgstr "Le PDF de la facture %s n'a pas pu être généré ; le PDF sera créé au premier téléchargement."
+
+msgid "The archived PDF of this invoice is missing or damaged. Use \"Rebuild missing PDF\" in the invoice box of the order."
+msgstr "Le PDF archivé de cette facture est manquant ou endommagé. Utilisez « Reconstruire le PDF manquant » dans le bloc Facture de la commande."
 
 #. translators: %s: invoice number
 #: includes/Modules/Invoices/Documents/Issuer.php:333
@@ -734,6 +735,9 @@ msgstr "Code APE"
 
 msgid "Tags replaced on each invoice: %s"
 msgstr "Balises remplacées sur chaque facture : %s"
+
+msgid "Prefer {invoice_date} to {current_date}: a rebuilt PDF would print the date of the rebuild."
+msgstr "Préférez {invoice_date} à {current_date} : un PDF reconstruit afficherait la date de la reconstruction."
 
 msgid "Image"
 msgstr "Image"
