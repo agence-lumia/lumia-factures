@@ -103,10 +103,11 @@ final class Command {
 	 * Migration::run() (lock, state, report); without `$force` it only runs while the import is
 	 * not done. Nothing runs on a site without legacy data, even with `$force`.
 	 *
-	 * @param bool $dry_run True to report without writing.
-	 * @param bool $force   True to run even when the import is done.
 	 * A real run is refused (`blocked`) while a requirement fails: the legacy plugin still active
 	 * would keep numbering behind the import. A dry run only reads, and only needs WooCommerce.
+	 *
+	 * @param bool $dry_run True to report without writing.
+	 * @param bool $force   True to run even when the import is done.
 	 *
 	 * @return array{outcome: string, rows: array<int, array{field: string, value: string}>, conflicts: array<int, array{order_id: int, number: string, reason: string}>, notes: string[], error: string}
 	 *         `outcome`: `dry_run`, `done`, `done_with_conflicts`, `failed`, `busy`, `blocked`,
@@ -178,12 +179,13 @@ final class Command {
 	 */
 	public static function status_rows(): array {
 		$state  = Migration::state();
-		$errors = array_keys( Requirements::check() );
+		$by_key = Requirements::check();
+		$errors = array_keys( $by_key );
 
 		$rows = [
 			self::row( 'Status', $state['status'] ),
 			self::row( 'Blocked by', [] === $errors ? '-' : implode( ', ', $errors ) ),
-			self::row( 'Issuing blocked', Migration::blocks_issuing() ? 'yes' : 'no' ),
+			self::row( 'Issuing blocked', isset( $by_key['woocommerce'] ) ? 'unknown' : ( Migration::blocks_issuing() ? 'yes' : 'no' ) ),
 			self::row( 'Started', self::date( $state['started_at'] ) ),
 			self::row( 'Finished', self::date( $state['finished_at'] ) ),
 		];

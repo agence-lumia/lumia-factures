@@ -172,6 +172,20 @@ class CliTest extends TestCase {
 		$this->assertSame( '4', $this->row( $rows, 'Highest legacy sequence ' . $this->key ) );
 	}
 
+	public function test_cli_status_does_not_touch_woocommerce_when_it_is_missing(): void {
+		$this->legacy_order( 'FA-0004', 4 );
+
+		add_filter( 'lumia_factures_requirements_wc_active', '__return_false' );
+		try {
+			$rows = Command::status_rows();
+		} finally {
+			remove_filter( 'lumia_factures_requirements_wc_active', '__return_false' );
+		}
+
+		$this->assertSame( 'woocommerce', $this->row( $rows, 'Blocked by' ) );
+		$this->assertSame( 'unknown', $this->row( $rows, 'Issuing blocked' ) );
+	}
+
 	public function test_cli_status_compares_counters_with_the_legacy_sequences(): void {
 		$this->legacy_order( 'FA-0004', 4 );
 

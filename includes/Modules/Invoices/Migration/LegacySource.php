@@ -38,6 +38,10 @@ final class LegacySource {
 	 * Whether the site has legacy data to import: settings or any invoiced order.
 	 */
 	public static function has_data(): bool {
+		if ( ! class_exists( OrderUtil::class ) ) {
+			return false !== get_option( self::OPTION, false );
+		}
+
 		return false !== get_option( self::OPTION, false ) || [] !== self::order_ids( 0, 1 );
 	}
 
