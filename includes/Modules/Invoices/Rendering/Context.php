@@ -69,6 +69,7 @@ final class Context {
 	public static function build( WC_Order $order, DocumentData $doc, array $settings ): array {
 		$builder   = new self( $order, $doc, $settings );
 		$statement = StatementBuilder::build( $order, $settings );
+		$items     = $builder->items( $statement );
 
 		$context = [
 			'preview'    => $doc->preview,
@@ -79,8 +80,8 @@ final class Context {
 			'shipping'   => $builder->shipping(),
 			'meta'       => $builder->meta(),
 			'message'    => $builder->message(),
-			'columns'    => $builder->columns(),
-			'items'      => $builder->items( $statement ),
+			'columns'    => $builder->columns( $items ),
+			'items'      => $items,
 			'totals'     => $builder->totals( $statement ),
 			'notes'      => $builder->notes(),
 			'footer'     => $builder->footer(),
@@ -321,9 +322,13 @@ final class Context {
 	/**
 	 * Active columns of the products table, widths scaled to 100 %.
 	 *
+	 * The image, description and SKU columns are dropped when no line has anything for them: an
+	 * empty column only squeezes the others.
+	 *
+	 * @param array<int, array<string, mixed>> $items Lines, as built by items().
 	 * @return array<int, array{key: string, label: string, width: float, align: string}>
 	 */
-	private function columns(): array {
+	private function columns( array $items ): array {
 		$definitions = [
 			'image'       => [ '', 'left' ],
 			'name'        => [ __( 'Product', 'lumia-factures' ), 'left' ],
@@ -339,6 +344,10 @@ final class Context {
 		$sum     = 0.0;
 		foreach ( $definitions as $key => $definition ) {
 			if ( ! $this->on( 'col_' . $key . '_enabled' ) ) {
+				continue;
+			}
+
+			if ( in_array( $key, [ 'image', 'description', 'sku' ], true ) && [] === array_filter( array_column( $items, $key ) ) ) {
 				continue;
 			}
 

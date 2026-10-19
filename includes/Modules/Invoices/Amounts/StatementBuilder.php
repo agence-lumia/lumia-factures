@@ -100,6 +100,11 @@ final class StatementBuilder {
 			$rows[] = new TotalRow( 'fee', $fee->get_name(), self::amount( $fee->get_total(), $fee->get_total_tax(), $incl ) );
 		}
 
+		$total = Money::to_minor( $order->get_total() );
+		if ( $incl ) {
+			$rows = self::balance_discount( $rows, $total );
+		}
+
 		$taxes      = self::tax_rows( $tax_items, $rates, $incl );
 		$excl_label = __( 'Total excl. VAT', 'lumia-factures' );
 
@@ -108,7 +113,6 @@ final class StatementBuilder {
 			$rows   = array_merge( $rows, $taxes );
 		}
 
-		$total    = Money::to_minor( $order->get_total() );
 		$rounding = $total - self::sum( $rows );
 		if ( 0 !== $rounding ) {
 			$rows[] = new TotalRow( 'rounding', __( 'Rounding', 'lumia-factures' ), $rounding );
@@ -337,6 +341,40 @@ final class StatementBuilder {
 		$rows = [];
 		foreach ( $groups as $label => $amount ) {
 			$rows[] = new TotalRow( 'tax', (string) $label, $amount, null, false, $incl );
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * In incl. VAT mode, makes the discount the balancing figure of the summed rows.
+	 *
+	 * WooCommerce rounds the discount per tax rate, so a 5.00 coupon split over two rates reads 4.99
+	 * once re-added incl. VAT, with a 0.01 rounding row to compensate. The discount the customer was
+	 * given is what balances the order total, so it is printed as that and no rounding row remains.
+	 * A gap larger than a few minor units is not rounding and is left to the rounding row.
+	 *
+	 * @param TotalRow[] $rows  Rows built so far (no tax rows yet).
+	 * @param int        $total Order total, minor units.
+	 * @return TotalRow[]
+	 */
+	private static function balance_discount( array $rows, int $total ): array {
+		foreach ( $rows as $index => $row ) {
+			if ( 'discount' !== $row->key ) {
+				continue;
+			}
+
+			$others = 0;
+			foreach ( $rows as $other ) {
+				if ( $other !== $row && ! $other->informational && ! $other->grand && null !== $other->amount ) {
+					$others += $other->amount;
+				}
+			}
+
+			$balanced = $total - $others;
+			if ( $balanced < 0 && abs( $balanced - (int) $row->amount ) <= 5 ) {
+				$rows[ $index ] = new TotalRow( 'discount', $row->label, $balanced );
+			}
 		}
 
 		return $rows;

@@ -403,6 +403,34 @@ class RenderingTest extends TestCase {
 		$this->assertStringStartsWith( '%PDF-', $pdf );
 	}
 
+	public function test_columns_without_data_are_dropped_and_widths_sum_to_100(): void {
+		$product = OrderFactory::simple_product( 10.0 );
+		$product->set_sku( '' );
+		$product->save();
+		$order = OrderFactory::order( [ [ $product ] ] );
+		// Image, description and SKU (switched on here) are empty on every line.
+		$html = Renderer::html( $order, $this->doc(), $this->settings( [ 'content' => [ 'col_sku_enabled' => true ] ] ) );
+
+		$this->assertStringNotContainsString( '>SKU<', $html );
+		$this->assertStringNotContainsString( '>Description<', $html );
+		$this->assertSame( 5, substr_count( $html, '<col ' ), 'name, quantity, unit price, VAT, total remain.' );
+
+		preg_match_all( '/<col style="width: ([0-9.]+)%;">/', $html, $matches );
+		$this->assertEqualsWithDelta( 100.0, array_sum( array_map( 'floatval', $matches[1] ) ), 0.05 );
+	}
+
+	public function test_description_column_kept_when_a_line_has_one(): void {
+		$product = OrderFactory::simple_product( 10.0 );
+		$product->set_short_description( 'Grain free' );
+		$product->save();
+		$order = OrderFactory::order( [ [ $product ] ] );
+
+		$html = Renderer::html( $order, $this->doc(), $this->settings() );
+
+		$this->assertStringContainsString( 'Grain free', $html );
+		$this->assertStringContainsString( '>Description<', $html );
+	}
+
 	public function test_chroot_is_plugin_dir_only(): void {
 		$chroot = PdfEngine::options()->getChroot();
 

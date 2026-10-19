@@ -180,6 +180,37 @@ class StatementTest extends TestCase {
 		$this->assertAddsUp( $statement );
 	}
 
+	public function test_incl_discount_is_the_balancing_figure_without_rounding_row(): void {
+		OrderFactory::tax_rates(
+			[
+				''             => 20.0,
+				'reduced-rate' => 5.5,
+			]
+		);
+		$order = OrderFactory::order(
+			[
+				[ OrderFactory::simple_product( 12.5 ), 2 ],
+				[ OrderFactory::simple_product( 9.9, 'reduced-rate' ) ],
+			],
+			[
+				'prices_include_tax' => true,
+				'shipping'           => 5,
+				'coupon'             => [
+					'code'   => 'bienvenue',
+					'type'   => 'fixed_cart',
+					'amount' => 5,
+				],
+			]
+		);
+
+		$statement = $this->build( $order, 'incl' );
+
+		$this->assertSame( -500, $this->row( $statement, 'discount' )->amount );
+		$this->assertSame( [], $this->rows( $statement, 'rounding' ) );
+		$this->assertSame( 3590, $this->row( $statement, 'total' )->amount );
+		$this->assertAddsUp( $statement );
+	}
+
 	public function test_rounding_row_absorbs_real_drift(): void {
 		$ids     = OrderFactory::tax_rates( [ '' => 20.0 ] );
 		$product = OrderFactory::simple_product( 1.0 );
