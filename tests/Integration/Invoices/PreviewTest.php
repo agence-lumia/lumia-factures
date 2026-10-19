@@ -13,14 +13,11 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
-use LumiaFacturesModulesInvoicesDocumentsRegister;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
 use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
-use LumiaFacturesModulesInvoicesRenderingDocumentData;
-use LumiaFacturesModulesInvoicesRenderingRenderer;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;

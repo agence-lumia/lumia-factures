@@ -119,6 +119,51 @@ class SettingsSchemaTest extends TestCase {
 		$this->assertNotEmpty( $result['errors'] );
 	}
 
+	public function test_invalid_format_also_reverts_the_reset_policy(): void {
+		$current                               = Schema::defaults();
+		$current['numbering']['format']        = 'FA-{number}';
+		$current['numbering']['reset_enabled'] = false;
+		$current['numbering']['reset_period']  = 'yearly';
+
+		// A broken format posted together with a new policy: the whole numbering policy is kept.
+		$result = Schema::sanitize(
+			[
+				'numbering' => [
+					'format'        => 'FA-{year}-{month}',
+					'reset_enabled' => '1',
+					'reset_period'  => 'monthly',
+				],
+			],
+			$current
+		);
+		$this->assertNotEmpty( $result['errors'] );
+		$this->assertSame( 'FA-{number}', $result['settings']['numbering']['format'] );
+		$this->assertFalse( $result['settings']['numbering']['reset_enabled'] );
+		$this->assertSame( 'yearly', $result['settings']['numbering']['reset_period'] );
+
+		// A policy alone that the kept format cannot carry (a reset without {year}) is refused too.
+		$result = Schema::sanitize( [ 'numbering' => [ 'reset_enabled' => '1' ] ], $current );
+		$this->assertNotEmpty( $result['errors'] );
+		$this->assertFalse( $result['settings']['numbering']['reset_enabled'] );
+		$this->assertSame( 'FA-{number}', $result['settings']['numbering']['format'] );
+
+		// Through the module: nothing of the refused policy is stored.
+		update_option( 'lumia_factures_module_invoices', $current );
+		( new Module( 'invoices' ) )->save_settings(
+			[
+				'numbering' => [
+					'format'        => 'FA-{year}-{month}',
+					'reset_enabled' => '1',
+					'reset_period'  => 'monthly',
+				],
+			]
+		);
+		$stored = Module::settings()['numbering'];
+		$this->assertSame( 'FA-{number}', $stored['format'] );
+		$this->assertFalse( $stored['reset_enabled'] );
+		$this->assertSame( 'yearly', $stored['reset_period'] );
+	}
+
 	public function test_multiline_fields_keep_line_breaks(): void {
 		$result = Schema::sanitize( [ 'company' => [ 'address' => "1 rue X\n<b>75000</b> Paris" ] ], Schema::defaults() );
 		$this->assertSame( "1 rue X\n75000 Paris", $result['settings']['company']['address'] );

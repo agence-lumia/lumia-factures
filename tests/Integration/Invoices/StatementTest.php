@@ -246,6 +246,104 @@ class StatementTest extends TestCase {
 		$this->assertAddsUp( $statement );
 	}
 
+	public function test_incl_discount_gap_above_rounding_keeps_woocommerce_discount(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order(
+			[ [ OrderFactory::simple_product( 35.0 ) ] ],
+			[
+				'prices_include_tax' => true,
+				'coupon'             => [
+					'code'   => 'ecart',
+					'type'   => 'fixed_cart',
+					'amount' => 5,
+				],
+			]
+		);
+		// 0.10 below what the rows give: not rounding, the discount must not absorb it (R23).
+		$order->set_total( '29.90' );
+		$order->save();
+		$order = wc_get_order( $order->get_id() );
+
+		$statement = $this->build( $order, 'incl' );
+
+		$this->assertSame( -500, $this->row( $statement, 'discount' )->amount );
+		$this->assertSame( -10, $this->row( $statement, 'rounding' )->amount );
+		$this->assertSame( 2990, $this->row( $statement, 'total' )->amount );
+		$this->assertAddsUp( $statement );
+	}
+
+	public function test_incl_balanced_discount_is_never_zero_or_positive(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 35.0 ) ] ], [ 'prices_include_tax' => true ] );
+
+		// A 0.03 discount whose balancing figure would be 0.00, then +0.01: within the rounding
+		// tolerance, but a discount row printed as 0 or as a positive amount makes no sense.
+		$cases = [
+			'35.00' => 3,
+			'35.01' => 4,
+		];
+		foreach ( $cases as $total => $rounding ) {
+			$order->set_discount_total( '0.03' );
+			$order->set_discount_tax( '0' );
+			$order->set_total( $total );
+			$order->save();
+
+			$statement = $this->build( wc_get_order( $order->get_id() ), 'incl' );
+
+			$this->assertSame( -3, $this->row( $statement, 'discount' )->amount, $total );
+			$this->assertSame( $rounding, $this->row( $statement, 'rounding' )->amount, $total );
+			$this->assertAddsUp( $statement );
+		}
+	}
+
+	public function test_negative_fee_adds_up(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order(
+			[ [ OrderFactory::simple_product( 20.0 ) ] ],
+			[
+				'fee' => [
+					'name'   => 'Remise fidelite',
+					'amount' => -2,
+				],
+			]
+		);
+
+		$fees = array_values( $order->get_fees() );
+		$this->assertCount( 1, $fees );
+		$fee_incl = Money::to_minor( (float) $fees[0]->get_total() + (float) $fees[0]->get_total_tax() );
+		$this->assertLessThan( 0, $fee_incl );
+
+		$incl = $this->build( $order, 'incl' );
+		$this->assertSame( 'Remise fidelite', $this->row( $incl, 'fee' )->label );
+		$this->assertSame( $fee_incl, $this->row( $incl, 'fee' )->amount );
+		$this->assertSame( 2400, $this->row( $incl, 'subtotal' )->amount );
+		$this->assertSame( Money::to_minor( $order->get_total() ), $this->row( $incl, 'total' )->amount );
+		$this->assertAddsUp( $incl );
+
+		$excl = $this->build( $order, 'excl' );
+		$this->assertSame( -200, $this->row( $excl, 'fee' )->amount );
+		$this->assertSame( 1800, $this->row( $excl, 'total_excl' )->amount );
+		$this->assertAddsUp( $excl );
+	}
+
+	public function test_taxed_shipping_incl_display(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 12.5 ), 2 ] ], [ 'shipping' => 5.90 ] );
+
+		$statement = $this->build( $order, 'incl' );
+
+		$this->assertSame( 3000, $this->row( $statement, 'subtotal' )->amount );
+		$this->assertSame( 708, $this->row( $statement, 'shipping' )->amount );
+		$this->assertSame( [], $this->rows( $statement, 'rounding' ) );
+		$this->assertSame( 3708, $this->row( $statement, 'total' )->amount );
+		$this->assertSame( 3090, $this->row( $statement, 'total_excl' )->amount );
+		$this->assertTrue( $this->row( $statement, 'total_excl' )->informational );
+		$tax = $this->row( $statement, 'tax' );
+		$this->assertSame( 618, $tax->amount );
+		$this->assertTrue( $tax->informational );
+		$this->assertAddsUp( $statement );
+	}
+
 	public function test_variation_shows_parent_name_and_attribute(): void {
 		$variation = OrderFactory::variable_product( 'Conditionnement', '500 g', 12.0 );
 		$order     = OrderFactory::order( [ [ $variation ] ] );
