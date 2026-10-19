@@ -9,6 +9,7 @@ namespace Lumia\Factures\Modules\Invoices\Migration;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Throwable;
 
 /**
@@ -38,9 +39,102 @@ final class Migration {
 	public const STALE_AFTER = 15 * MINUTE_IN_SECONDS;
 
 	/**
+	 * Transient caching a negative legacy data lookup (12 hours), so a site without legacy data
+	 * does not query the order meta on every admin request and every issue.
+	 */
+	public const NO_DATA_TRANSIENT = 'lumia_factures_no_legacy_data';
+
+	/**
 	 * Statuses after which invoices may be issued.
 	 */
 	private const FINISHED = [ 'done', 'done_with_conflicts' ];
+
+	/**
+	 * Value of the lock held by the run in progress in this request, refreshed by the heartbeat.
+	 *
+	 * @var string|null
+	 */
+	private static ?string $token = null;
+
+	/**
+	 * Called from Module::init(): plans and runs the import when this request may do it.
+	 */
+	public static function boot(): void {
+		if ( ! self::may_auto_run() ) {
+			return;
+		}
+
+		self::prepare();
+		self::maybe_run();
+	}
+
+	/**
+	 * Whether this request may run the import by itself: cron, WP-CLI, or an admin page (not AJAX)
+	 * opened by a shop manager.
+	 *
+	 * `admin-post.php` and every `/wp-admin/` URL fire `init` before any authentication check, so
+	 * `is_admin()` alone would let an anonymous visitor (or a nopriv admin-post form) start the
+	 * import. The retry action runs the import itself: the auto-run stays out of that request.
+	 * Under WP-CLI the plugin's own commands (and their help) are left alone: `migrate --dry-run`
+	 * must report on the data as it is.
+	 */
+	public static function may_auto_run(): bool {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			$arguments = class_exists( 'WP_CLI' ) ? \WP_CLI::get_runner()->arguments : [];
+			$arguments = is_array( $arguments ) ? array_values( $arguments ) : [];
+			$command   = (string) ( $arguments[0] ?? '' );
+
+			return 'lumia-factures' !== $command && ! ( 'help' === $command && 'lumia-factures' === ( $arguments[1] ?? '' ) );
+		}
+
+		if ( wp_doing_cron() ) {
+			return true;
+		}
+
+		if ( ! is_admin() || wp_doing_ajax() ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Only compared, the handler checks the nonce.
+		$action = isset( $_REQUEST['action'] ) && is_string( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+		if ( MigrationNotice::ACTION === $action ) {
+			return false;
+		}
+
+		return current_user_can( 'manage_woocommerce' );
+	}
+
+	/**
+	 * On plugin activation: forgets a cached "no legacy data", plans and runs the import.
+	 */
+	public static function on_activate(): void {
+		self::forget_no_data();
+		self::prepare();
+		self::maybe_run();
+	}
+
+	/**
+	 * Whether the site has legacy data, a negative answer being cached 12 hours.
+	 */
+	public static function has_data(): bool {
+		if ( false !== get_transient( self::NO_DATA_TRANSIENT ) ) {
+			return false;
+		}
+
+		$has = LegacySource::has_data();
+		if ( ! $has ) {
+			set_transient( self::NO_DATA_TRANSIENT, 1, 12 * HOUR_IN_SECONDS );
+		}
+
+		return $has;
+	}
+
+	/**
+	 * Forgets a cached "no legacy data" answer.
+	 */
+	public static function forget_no_data(): void {
+		delete_transient( self::NO_DATA_TRANSIENT );
+	}
 
 	/**
 	 * Current state. A `running` state older than STALE_AFTER is reported as `failed`.
@@ -62,7 +156,7 @@ final class Migration {
 	 * A site without legacy data keeps the status `none` and no option is written.
 	 */
 	public static function prepare(): void {
-		if ( 'none' !== self::state()['status'] || ! LegacySource::has_data() ) {
+		if ( 'none' !== self::state()['status'] || ! self::has_data() ) {
 			return;
 		}
 
@@ -79,9 +173,20 @@ final class Migration {
 
 	/**
 	 * Runs the import when it is pending or failed (a stale `running` state counts as failed).
+	 *
+	 * Back-off: a failed import is retried automatically only STALE_AFTER after the failure, so a
+	 * failure that repeats does not cost every admin request a full attempt.
+	 *
+	 * @param bool $manual True for an explicit retry (notice button, WP-CLI): no delay.
 	 */
-	public static function maybe_run(): void {
-		if ( ! in_array( self::state()['status'], [ 'pending', 'failed' ], true ) ) {
+	public static function maybe_run( bool $manual = false ): void {
+		$state = self::state();
+
+		if ( 'pending' !== $state['status'] && 'failed' !== $state['status'] ) {
+			return;
+		}
+
+		if ( 'failed' === $state['status'] && ! $manual && $state['finished_at'] >= time() - self::STALE_AFTER ) {
 			return;
 		}
 
@@ -90,6 +195,9 @@ final class Migration {
 
 	/**
 	 * Runs the import now, under the lock.
+	 *
+	 * While it runs, each batch of the importer refreshes the lock and `started_at` (heartbeat), so
+	 * a run longer than STALE_AFTER is never taken for a dead one.
 	 *
 	 * @param bool $force True to run whatever the status (WP-CLI `--force`); otherwise only a
 	 *                    pending or failed import runs.
@@ -101,6 +209,9 @@ final class Migration {
 		if ( null === $token ) {
 			return null;
 		}
+
+		self::$token = $token;
+		add_action( 'lumia_factures_legacy_import_batch_done', [ self::class, 'heartbeat' ], 10, 3 );
 
 		try {
 			// Read again under the lock: another request may have finished the import meanwhile.
@@ -150,7 +261,44 @@ final class Migration {
 
 			return $report;
 		} finally {
-			self::unlock( $token );
+			remove_action( 'lumia_factures_legacy_import_batch_done', [ self::class, 'heartbeat' ], 10 );
+			self::unlock( self::$token ?? $token );
+			self::$token = null;
+		}
+	}
+
+	/**
+	 * Heartbeat, on `lumia_factures_legacy_import_batch_done` during a run: refreshes the lock
+	 * (compare-and-swap on the value this run holds) and the state's `started_at`.
+	 *
+	 * @param mixed $report  Report so far (unused).
+	 * @param mixed $after   Last order id of the batch (unused).
+	 * @param mixed $dry_run Whether nothing is written.
+	 */
+	public static function heartbeat( $report = null, $after = 0, $dry_run = false ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- Action signature.
+		global $wpdb;
+
+		if ( null === self::$token || true === $dry_run ) {
+			return;
+		}
+
+		$fresh = time() . '-' . wp_generate_password( 12, false );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Compare-and-swap on the value this run holds.
+		$refreshed = $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = %s WHERE option_name = %s AND option_value = %s", $fresh, self::LOCK, self::$token ) );
+		self::forget( self::LOCK );
+
+		if ( 1 !== $refreshed ) {
+			self::log( 'The Facture PDF Lumia import lock was lost during the run; the import goes on (it never writes anything twice).' );
+			return;
+		}
+
+		self::$token = $fresh;
+
+		$state = self::state_from_db();
+		if ( 'running' === $state['status'] ) {
+			$state['started_at'] = time();
+			self::save( $state );
 		}
 	}
 
@@ -167,8 +315,9 @@ final class Migration {
 			return false;
 		}
 
-		return 'none' !== $status || LegacySource::has_data();
+		return 'none' !== $status || self::has_data();
 	}
+
 
 	/**
 	 * Takes the run lock.

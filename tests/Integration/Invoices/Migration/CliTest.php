@@ -110,6 +110,12 @@ class CliTest extends TestCase {
 
 		$this->assertSame( 'no_data', $result['outcome'] );
 		$this->assertFalse( get_option( Migration::OPTION ) );
+
+		// --force does not change that: nothing to import, nothing written.
+		$forced = Command::migrate_data( false, true );
+		$this->assertSame( 'no_data', $forced['outcome'] );
+		$this->assertFalse( get_option( Migration::OPTION ) );
+		$this->assertFalse( get_option( 'lumia_factures_module_invoices' ) );
 	}
 
 	public function test_cli_status_rows(): void {

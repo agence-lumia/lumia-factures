@@ -32,6 +32,8 @@ class MigrationTest extends TestCase {
 
 	private const GATE_NOTE = 'Invoice not issued: the Facture PDF Lumia data is being imported.';
 
+	private const CONFLICT_NOTE = 'Invoice not issued: this order has a Facture PDF Lumia invoice that could not be imported; see the migration report.';
+
 	private LegacyFixture $legacy;
 
 	private string $key = '';
@@ -55,6 +57,7 @@ class MigrationTest extends TestCase {
 		delete_option( 'fpl_settings' );
 		delete_option( Migration::OPTION );
 		delete_option( Migration::LOCK );
+		delete_transient( Migration::NO_DATA_TRANSIENT );
 
 		$this->legacy = new LegacyFixture();
 		$this->key    = 'invoice_' . wp_date( 'Y' );
@@ -78,6 +81,7 @@ class MigrationTest extends TestCase {
 		$_POST    = [];
 		$_GET     = [];
 		$_REQUEST = [];
+		unset( $GLOBALS['current_screen'] );
 		ini_set( 'error_log', $this->previous_log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
 		wp_delete_file( $this->log_file );
 		parent::tear_down();
@@ -181,7 +185,31 @@ class MigrationTest extends TestCase {
 
 		$this->assertNull( Register::find( 'invoice', $orphan->get_id() ) );
 		$this->assertSame( 5, Sequences::current( $this->key ) );
+		// The import is done: the note names the permanent conflict, once.
+		$this->assertSame( 0, $this->count_notes( $orphan->get_id(), self::GATE_NOTE ) );
+		$this->assertSame( 1, $this->count_notes( $orphan->get_id(), self::CONFLICT_NOTE ) );
+	}
+
+	public function test_import_note_then_conflict_note_are_each_written_once(): void {
+		// Pending import: the order with a legacy number gets the import note.
+		$this->legacy_order( 'FA-0005', 5, false );
+		$orphan = $this->order();
+		$orphan->update_meta_data( '_fpl_invoice_number', 'FA-0005' );
+		$orphan->save();
+		Migration::prepare();
+
+		wc_get_order( $orphan->get_id() )->update_status( 'processing' );
 		$this->assertSame( 1, $this->count_notes( $orphan->get_id(), self::GATE_NOTE ) );
+
+		// The import reports it as a conflict (duplicate number): the conflict note follows, once.
+		Migration::maybe_run();
+		$this->assertSame( 'done_with_conflicts', Migration::state()['status'] );
+		wc_get_order( $orphan->get_id() )->update_status( 'completed' );
+		Issuer::issue( wc_get_order( $orphan->get_id() ) );
+
+		$this->assertNull( Register::find( 'invoice', $orphan->get_id() ) );
+		$this->assertSame( 1, $this->count_notes( $orphan->get_id(), self::GATE_NOTE ) );
+		$this->assertSame( 1, $this->count_notes( $orphan->get_id(), self::CONFLICT_NOTE ) );
 	}
 
 	public function test_filter_cannot_bypass_the_pending_migration(): void {
@@ -272,7 +300,138 @@ class MigrationTest extends TestCase {
 		$this->assertFalse( get_option( Migration::LOCK ) );
 		$this->assertTrue( Migration::blocks_issuing() );
 
+		// Back-off: an automatic retry waits 15 minutes after the failure.
 		Migration::maybe_run();
+		$this->assertSame( 'failed', Migration::state()['status'] );
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+
+		// A manual retry (notice button, WP-CLI) does not wait.
+		Migration::maybe_run( true );
+		$this->assertSame( 'done', Migration::state()['status'] );
+		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
+	}
+
+	public function test_failed_run_is_retried_automatically_after_the_delay(): void {
+		$order = $this->legacy_order( 'FA-0005', 5, false );
+		update_option(
+			Migration::OPTION,
+			[
+				'status'      => 'failed',
+				'started_at'  => time() - 20 * MINUTE_IN_SECONDS,
+				'finished_at' => time() - 16 * MINUTE_IN_SECONDS,
+				'error'       => 'boom',
+			]
+		);
+
+		Migration::maybe_run();
+
+		$this->assertSame( 'done', Migration::state()['status'] );
+		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
+	}
+
+	public function test_anonymous_admin_request_does_not_run_the_import(): void {
+		$order = $this->legacy_order( 'FA-0005', 5, false );
+		set_current_screen( 'dashboard' );
+		$this->assertTrue( is_admin() );
+
+		// admin-post.php or any /wp-admin/ URL fires init before authentication.
+		wp_set_current_user( 0 );
+		Migration::boot();
+		$this->assertSame( 'none', Migration::state()['status'] );
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+
+		// A customer neither.
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		Migration::boot();
+		$this->assertSame( 'none', Migration::state()['status'] );
+
+		// The retry action runs the import itself, not the init auto-run.
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+		$_REQUEST['action'] = MigrationNotice::ACTION;
+		Migration::boot();
+		$this->assertSame( 'none', Migration::state()['status'] );
+
+		// A manager on an admin page does.
+		unset( $_REQUEST['action'] );
+		Migration::boot();
+		$this->assertSame( 'done', Migration::state()['status'] );
+		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
+	}
+
+	public function test_front_end_request_does_not_run_the_import(): void {
+		$this->legacy_order( 'FA-0005', 5, false );
+		$this->assertFalse( is_admin() );
+
+		Migration::boot();
+
+		$this->assertSame( 'none', Migration::state()['status'] );
+	}
+
+	public function test_heartbeat_keeps_a_long_run_from_being_taken_over(): void {
+		global $wpdb;
+
+		$this->legacy_order( 'FA-0005', 5, false );
+		Migration::prepare();
+
+		$old     = ( time() - 20 * MINUTE_IN_SECONDS ) . '-long';
+		$checked = false;
+
+		// Before the heartbeat: the run looks 20 minutes old.
+		$age = static function () use ( $wpdb, $old ): void {
+			$wpdb->update( $wpdb->options, [ 'option_value' => $old ], [ 'option_name' => Migration::LOCK ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			wp_cache_delete( Migration::LOCK, 'options' );
+			$token = new \ReflectionProperty( Migration::class, 'token' );
+			$token->setAccessible( true );
+			$token->setValue( null, $old );
+		};
+
+		// After the heartbeat: a second request that saw the old value cannot take the lock over.
+		$takeover = function () use ( $wpdb, $old, &$checked ): void {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$this->assertSame( 0, $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->options} SET option_value = 'thief' WHERE option_name = %s AND option_value = %s", Migration::LOCK, $old ) ) );
+			$this->assertNull( Migration::run() );
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$current = (string) $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM {$wpdb->options} WHERE option_name = %s", Migration::LOCK ) );
+			$this->assertGreaterThanOrEqual( time() - 5, (int) $current );
+			$this->assertGreaterThanOrEqual( time() - 5, Migration::state()['started_at'] );
+			$this->assertSame( 'running', Migration::state()['status'] );
+			$checked = true;
+		};
+
+		add_action( 'lumia_factures_legacy_import_batch_done', $age, 5 );
+		add_action( 'lumia_factures_legacy_import_batch_done', $takeover, 20 );
+		try {
+			Migration::maybe_run( true );
+		} finally {
+			remove_action( 'lumia_factures_legacy_import_batch_done', $age, 5 );
+			remove_action( 'lumia_factures_legacy_import_batch_done', $takeover, 20 );
+		}
+
+		$this->assertTrue( $checked );
+		$this->assertSame( 'done', Migration::state()['status'] );
+		$this->assertFalse( get_option( Migration::LOCK ) );
+	}
+
+	public function test_negative_legacy_lookup_is_cached_and_cleared_by_the_retry(): void {
+		$this->assertFalse( Migration::blocks_issuing() );
+		$this->assertNotFalse( get_transient( Migration::NO_DATA_TRANSIENT ) );
+
+		// Legacy data found later: the cached answer holds until the retry action or an activation.
+		$order = $this->legacy_order( 'FA-0005', 5, false );
+		$this->assertFalse( Migration::blocks_issuing() );
+
+		$this->assertSame( 'migration_done', MigrationNotice::migrate_for() );
+		$this->assertFalse( get_transient( Migration::NO_DATA_TRANSIENT ) );
+		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
+	}
+
+	public function test_activation_clears_the_negative_legacy_lookup(): void {
+		$this->assertFalse( Migration::blocks_issuing() );
+		$order = $this->legacy_order( 'FA-0005', 5, false );
+
+		$this->activate();
+
 		$this->assertSame( 'done', Migration::state()['status'] );
 		$this->assertSame( 'FA-0005', Register::find( 'invoice', $order->get_id() )->number );
 	}

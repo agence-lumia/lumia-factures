@@ -97,19 +97,20 @@ final class MigrationNotice {
 	}
 
 	/**
-	 * Runs the import when it is due.
+	 * Runs the import when it is due (a fresh legacy data lookup, no back-off delay).
 	 *
 	 * @return string Notice code: `migration_done`, `migration_conflicts`, `migration_failed`,
 	 *                `migration_busy` (another run holds the lock) or `migration_nothing`.
 	 */
 	public static function migrate_for(): string {
-		$status = Migration::state()['status'];
+		Migration::forget_no_data();
 
-		if ( 'none' === $status ) {
+		if ( 'none' === Migration::state()['status'] ) {
 			Migration::prepare();
 		}
 
-		Migration::maybe_run();
+		// Manual: a failed import is retried at once, without the automatic back-off.
+		Migration::maybe_run( true );
 
 		return match ( Migration::state()['status'] ) {
 			'done'                => 'migration_done',

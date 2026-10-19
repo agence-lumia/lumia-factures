@@ -55,7 +55,10 @@ final class Command {
 				WP_CLI::error( 'Another import is running. Try again in a few minutes.' );
 		}
 
-		self::print_result( $result );
+		// A failed run has no report: no empty table.
+		if ( [] !== $result['rows'] ) {
+			self::print_result( $result );
+		}
 
 		match ( $result['outcome'] ) {
 			'dry_run'             => WP_CLI::success( 'Dry run: nothing was written.' ),
@@ -88,7 +91,7 @@ final class Command {
 	 *
 	 * A dry run never takes the lock nor changes the state. A real run goes through
 	 * Migration::run() (lock, state, report); without `$force` it only runs while the import is
-	 * not done, and not at all on a site without legacy data.
+	 * not done. Nothing runs on a site without legacy data, even with `$force`.
 	 *
 	 * @param bool $dry_run True to report without writing.
 	 * @param bool $force   True to run even when the import is done.
@@ -104,7 +107,9 @@ final class Command {
 			'error'     => '',
 		];
 
-		if ( ! $force && ! LegacySource::has_data() ) {
+		// A fresh lookup (never the cached negative answer); --force does not import "nothing" either.
+		Migration::forget_no_data();
+		if ( ! LegacySource::has_data() ) {
 			$result['outcome'] = 'no_data';
 			return $result;
 		}
