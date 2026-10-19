@@ -424,3 +424,39 @@ msgstr "Avec une remise à zéro périodique, le format doit contenir {year}, si
 #: includes/Modules/Invoices/Numbering/NumberFormat.php:94
 msgid "With a monthly reset, the format must contain {year} and {month}, otherwise two months would print the same numbers."
 msgstr "Avec une remise à zéro mensuelle, le format doit contenir {year} et {month}, sinon deux mois imprimeraient les mêmes numéros."
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:62
+msgid "Subtotal"
+msgstr "Sous-total"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:66
+msgid "Discount"
+msgstr "Remise"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:73
+msgid "Coupon code"
+msgid_plural "Coupon codes"
+msgstr[0] "Code promo"
+msgstr[1] "Codes promo"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:86
+msgid "Shipping"
+msgstr "Livraison"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:95
+msgid "Total excl. VAT"
+msgstr "Total HT"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:105
+msgid "Rounding"
+msgstr "Arrondi"
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:108
+msgid "Total"
+msgstr "Total"
+
+#. translators: %s: formatted tax rate, e.g. "20 %"
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:255
+#, php-format
+msgid "VAT %s"
+msgstr "TVA %s"
