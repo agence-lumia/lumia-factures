@@ -1,0 +1,5 @@
+# Keep LF in the repository and in the working tree on every OS (fixtures are compared byte for byte).
+* text=auto eol=lf
+*.mo binary
+*.zip binary
+*.png binary

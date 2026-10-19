@@ -18,7 +18,7 @@
 #
 # <version> is only used in messages: the version bump of lumia-factures.php is done by the
 # workflows before calling this script. Needs bash, rsync, zip, unzip, composer, php (or wp) and
-# node/npx. No PHP on the machine: run it through Docker, see docs/core.md.
+# node/npx. No PHP on the machine: run it through Docker, see tools/i18n/README.md (Docker commands).
 #
 # Exit code: 0 on success, 1 on any failure, 2 on bad usage.
 

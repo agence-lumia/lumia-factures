@@ -4,14 +4,12 @@ Development only: `tools/` is never shipped (anchored `/tools` exclude in `tools
 
 Source strings in the code are English; the French catalogue is
 `languages/lumia-factures-fr_FR.po` (compiled to `.mo`). **The `.po` is the only source
-of the French text**: to add or change a translation, edit it there (workflow in
-`CLAUDE.md` and `docs/core.md`).
+of the French text**: to add or change a translation, edit it there, then run
+`composer i18n:pot`, `i18n:mo` and `i18n:check`.
 
-History: the `.po` was generated once from the `.pot` plus one pair file per scope,
-each mapping an English source to the **original** French text. `languages/pairs/`
-was deleted afterwards (find it in the history of the `chore/15-rename-lumia`
-branch if needed), and `build-po.php build` was that one-time pairs-to-`.po`
-generator. It is kept only for its tests; no Composer script runs it.
+History: `build-po.php build` is the generator lumia-tools used once to create its `.po` from
+the `.pot` plus pair files. lumia-factures does not use it (its `.po` is written directly);
+it is kept, with its tests, to stay identical to lumia-tools. No Composer script runs it.
 
 ## Pair files (historical)
 

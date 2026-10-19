@@ -46,12 +46,14 @@
         "test": "phpunit",
         "i18n:pot": "sh tools/i18n/wp.sh i18n make-pot . languages/lumia-factures.pot --slug=lumia-factures --domain=lumia-factures --exclude=vendor,tools,docs,dist,tests,node_modules",
         "i18n:mo": "sh tools/i18n/wp.sh i18n make-mo languages/",
-        "i18n:check": "@php tools/i18n/build-po.php check languages/lumia-factures.pot languages/lumia-factures-fr_FR.po languages/lumia-factures-fr_FR.mo"
+        "i18n:check": "@php tools/i18n/build-po.php check languages/lumia-factures.pot languages/lumia-factures-fr_FR.po languages/lumia-factures-fr_FR.mo",
+        "i18n:test": "sh tools/i18n/test.sh"
     },
     "scripts-descriptions": {
         "test": "Run the PHPUnit suite (inside wp-env: see package.json).",
         "i18n:pot": "Regenerate languages/lumia-factures.pot from the source (WP-CLI make-pot).",
         "i18n:mo": "Compile the .po files of languages/ into .mo (WP-CLI make-mo).",
-        "i18n:check": "Check the .po covers the .pot and the .mo matches the .po."
+        "i18n:check": "Check the .po covers the .pot and the .mo matches the .po.",
+        "i18n:test": "Run the tests of tools/i18n/build-po.php."
     }
 }
