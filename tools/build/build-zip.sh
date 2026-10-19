@@ -155,7 +155,7 @@ entries="$(unzip -Z1 "${output}")"
 outside="$(grep -v "^${PLUGIN_SLUG}/" <<<"${entries}" || true)"
 [ -z "${outside}" ] || die "entries outside ${PLUGIN_SLUG}/: ${outside}"
 # vendor/ ships (Dompdf) but never its dev tooling.
-forbidden="$(grep -E "^${PLUGIN_SLUG}/(tools|docs|node_modules|tests|\.git|\.github|\.superpowers)/|^${PLUGIN_SLUG}/vendor/(phpunit|bin|squizlabs|wp-coding-standards|phpcsstandards|phpcompatibility|dealerdirect|phpstan|yoast)/|\.(po|pot)$|^${PLUGIN_SLUG}/(composer\.(json|lock)|CLAUDE\.md)$" <<<"${entries}" || true)"
+forbidden="$(grep -E "^${PLUGIN_SLUG}/(tools|docs|node_modules|tests|\.git|\.github|\.superpowers)/|^${PLUGIN_SLUG}/vendor/(phpunit|bin|squizlabs|wp-coding-standards|phpcsstandards|phpcompatibility|dealerdirect|phpstan|yoast)/|\.(po|pot)$|^${PLUGIN_SLUG}/(composer\.(json|lock)|CLAUDE\.md|\.gitignore|\.gitattributes|\.phpunit\.result\.cache)$" <<<"${entries}" || true)"
 if [ -n "${forbidden}" ]; then
 	rm -f "${output}"
 	die "development files ended up in the zip: ${forbidden}"

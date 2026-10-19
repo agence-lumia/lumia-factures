@@ -1,0 +1,188 @@
+name: Release Stable Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment (patch, minor or major)
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lumia-factures-release-stable
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      # Build tools (tools/build/build-zip.sh): PHP + Composer install the runtime dependencies
+      # (Dompdf) and run WP-CLI for the .l10n.php files, Node runs the pinned esbuild. Set up
+      # first: a setup failure stops the run before the version commit and the tag are pushed.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Fetch full tag history
+        run: git fetch --tags --force
+
+      - name: Determine release version
+        id: version
+        env:
+          BUMP: ${{ inputs.bump || 'patch' }}
+        run: |
+          set -euo pipefail
+
+          # The 2.x line starts with this plugin rebuild: the legacy 1.x tags (v1.1.0, v1.1.1) do
+          # not count. While the latest stable tag is older than the floor (or there is none),
+          # the first stable release is 2.0.0, whatever the bump. Afterwards the bump applies to
+          # the latest stable tag. The PHP file may carry a dev suffix, so it is never the source.
+          floor_version="2.0.0"
+
+          latest_stable_tag=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          current_version="${latest_stable_tag#v}"
+
+          highest="$floor_version"
+          if [[ -n "$current_version" ]]; then
+            highest=$(printf '%s\n%s\n' "$floor_version" "$current_version" | sort -V | tail -n1)
+          fi
+
+          if [[ -z "$current_version" || "$highest" != "$current_version" ]]; then
+            target_version="$floor_version"
+          else
+            IFS='.' read -r major minor patch <<< "$current_version"
+            case "$BUMP" in
+              major) target_version="$((major + 1)).0.0" ;;
+              minor) target_version="${major}.$((minor + 1)).0" ;;
+              patch) target_version="${major}.${minor}.$((patch + 1))" ;;
+              *)
+                echo "Unknown bump type: $BUMP"
+                exit 1
+                ;;
+            esac
+          fi
+
+          if git rev-parse "v${target_version}" >/dev/null 2>&1; then
+            echo "Tag v${target_version} already exists"
+            exit 1
+          fi
+
+          echo "Latest stable tag: ${latest_stable_tag:-none}"
+          echo "Bump: $BUMP"
+          echo "Target version: $target_version"
+          echo "version=$target_version" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update plugin version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" lumia-factures.php
+          sed -E -i "s/(define[[:space:]]*\([[:space:]]*'LUMIA_FACTURES_VERSION'[[:space:]]*,[[:space:]]*')[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]*)?/\1${VERSION}/" lumia-factures.php
+
+          # Both places must carry the new version, or the updater compares the wrong one.
+          grep -qF " * Version:     ${VERSION}" lumia-factures.php
+          grep -qF "'LUMIA_FACTURES_VERSION', '${VERSION}'" lumia-factures.php
+
+      # Built before the version commit and the tag are pushed: a failed build
+      # leaves no tag without a release.
+      - name: Build release zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash tools/build/build-zip.sh "$VERSION" "dist/lumia-factures-${VERSION}.zip"
+
+      # The updater installs the lumia-factures-<version>.zip asset. Its zipball fallback unpacks
+      # into a wrongly named folder, so a release without this asset must never be published.
+      - name: Check the release asset exists
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          asset="dist/lumia-factures-${VERSION}.zip"
+          [[ -s "$asset" ]] || { echo "Release asset ${asset} was not built"; exit 1; }
+          unzip -Z1 "$asset" | grep -qx 'lumia-factures/lumia-factures.php'
+
+      - name: Commit release version
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TARGET_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet; then
+            echo "No version changes to commit"
+            exit 0
+          fi
+
+          git add lumia-factures.php
+          git commit -m "chore(release): v${VERSION}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          tag="v${VERSION}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag ${tag} already exists"
+            exit 1
+          fi
+
+          git tag -a "$tag" -m "Release ${tag}"
+          git push origin "$tag"
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          files: dist/lumia-factures-${{ steps.version.outputs.version }}.zip
+          fail_on_unmatched_files: true
+          prerelease: false
+          generate_release_notes: true
+
+      - name: Verify the asset is attached to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=$(gh release view "v${VERSION}" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          if ! grep -qx "lumia-factures-${VERSION}.zip" <<< "$assets"; then
+            echo "Asset lumia-factures-${VERSION}.zip is missing from release v${VERSION}"
+            exit 1
+          fi

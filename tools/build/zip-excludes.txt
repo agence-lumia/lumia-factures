@@ -11,6 +11,8 @@
 /.claude
 /.mcp.json
 /.gitignore
+/.gitattributes
+/.phpunit.result.cache
 /composer.json
 /composer.lock
 /phpcs.xml.dist
