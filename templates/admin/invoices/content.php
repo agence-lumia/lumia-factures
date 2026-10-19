@@ -17,7 +17,7 @@ $content_help = sprintf(
 	/* translators: %s: list of tags such as {order_number}. */
 	__( 'Tags replaced on each invoice: %s', 'lumia-factures' ),
 	$content_tags
-);
+) . ' ' . __( 'Prefer {invoice_date} to {current_date}: a rebuilt PDF would print the date of the rebuild.', 'lumia-factures' );
 
 // Product table columns: key => [label, default label].
 $content_columns = [

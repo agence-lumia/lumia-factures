@@ -406,6 +406,10 @@ class SettingsScreenTest extends TestCase {
 		$this->assertContains( 'media-editor', $instance->get_admin_js_deps() );
 	}
 
+	public function test_free_text_help_recommends_the_invoice_date(): void {
+		$this->assertStringContainsString( 'Prefer {invoice_date} to {current_date}', $this->render() );
+	}
+
 	public function test_every_help_tag_is_resolved(): void {
 		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		$doc   = new DocumentData( '', 'FA-1', time() );
