@@ -150,7 +150,7 @@ Text domain `lumia-factures`, loaded on `init`. The procedure to add a string is
 
 ## Uninstall
 
-`uninstall.php` does **nothing** unless `LUMIA_FACTURES_REMOVE_ALL_DATA` is defined to `true` in `wp-config.php`: invoices must be kept 10 years. When set, it deletes the global option and, for each class of `Activator::MODULE_CLASSES`, the module option and whatever `get_uninstall_keys()` declares. Order meta goes through `Core\Uninstaller::delete_order_meta()`, which reaches `wp_postmeta` and, on HPOS, `{prefix}wc_orders_meta`. The archive folder `uploads/lumia-factures/` is **never** deleted, even with the constant: the PDFs are the legal record and only the site owner removes them by hand. Never add data deletion outside this gate.
+`uninstall.php` does **nothing** unless `LUMIA_FACTURES_REMOVE_ALL_DATA` is defined to `true` in `wp-config.php`: invoices must be kept 10 years. When set, it deletes the global option and, for each class of `Activator::MODULE_CLASSES`, the module option and whatever `get_uninstall_keys()` declares. Order meta goes through `Core\Uninstaller::delete_order_meta()`, which reaches `wp_postmeta` and, on HPOS, `{prefix}wc_orders_meta`. The archive folder `uploads/lumia-factures/` is **never** deleted, even with the constant: the PDFs are the legal record and only the site owner removes them by hand. The purge drops the sequence counters while the archived PDFs stay, so a reinstall restarts the numbering: before issuing again, set the start number above the last issued number, or raise the counters. Never add data deletion outside this gate.
 
 ## Development tooling
 

@@ -61,7 +61,7 @@ Invoices must be kept 10 years, so deleting the plugin removes **nothing** by de
 define( 'LUMIA_FACTURES_REMOVE_ALL_DATA', true );
 ```
 
-The archive folder `wp-content/uploads/lumia-factures/` is never deleted, even then: remove the PDFs by hand once the legal retention period is over.
+The archive folder `wp-content/uploads/lumia-factures/` is never deleted, even then: remove the PDFs by hand once the legal retention period is over. The purge does drop the numbering counters while the archived PDFs stay, so a reinstall restarts the numbering: before issuing again, set the start number (Numbering tab) above the last issued number, or raise the counters.
 
 ## Development
 
