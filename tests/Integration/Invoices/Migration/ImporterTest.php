@@ -128,6 +128,10 @@ class ImporterTest extends TestCase {
 		Importer::run( false );
 		$this->track( $orders );
 
+		// The importer is run directly: mark the migration done, as Migration::run() does, so the
+		// issuing gate (which stays strict while the state is not done) lets the next invoice through.
+		update_option( \Lumia\Factures\Modules\Invoices\Migration\Migration::OPTION, [ 'status' => 'done' ] );
+
 		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		$order->update_status( 'processing' );
 

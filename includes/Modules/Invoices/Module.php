@@ -10,13 +10,18 @@ namespace Lumia\Factures\Modules\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\AbstractModule;
+use Lumia\Factures\Core\Requirements;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
+use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
+use Lumia\Factures\Modules\Invoices\Cli\Command;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Migration\Importer;
+use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
@@ -36,6 +41,13 @@ class Module extends AbstractModule {
 		// the activation hook, so the tables are checked on every boot.
 		Installer::maybe_upgrade();
 
+		// The legacy import runs by itself, never during a front-end request (a visitor would wait
+		// for it): until it is done, Issuer::can_issue() refuses to number.
+		if ( self::may_migrate() ) {
+			Migration::prepare();
+			Migration::maybe_run();
+		}
+
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
 
@@ -45,8 +57,29 @@ class Module extends AbstractModule {
 			Download::register();
 			Counters::register();
 			Preview::register();
+			MigrationNotice::register();
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
+
+		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI' ) ) {
+			\WP_CLI::add_command( 'lumia-factures', Command::class );
+		}
+	}
+
+	/**
+	 * Whether this request may run the legacy import: an admin page (not AJAX), cron, or WP-CLI.
+	 *
+	 * Under WP-CLI, not for the plugin's own commands: `wp lumia-factures migrate --dry-run` must
+	 * report on the data as it is, and `migrate` runs the import itself.
+	 */
+	private static function may_migrate(): bool {
+		if ( defined( 'WP_CLI' ) && WP_CLI ) {
+			$arguments = class_exists( 'WP_CLI' ) ? \WP_CLI::get_runner()->arguments : [];
+
+			return ! is_array( $arguments ) || 'lumia-factures' !== ( $arguments[0] ?? '' );
+		}
+
+		return ( is_admin() && ! wp_doing_ajax() ) || wp_doing_cron();
 	}
 
 	/**
@@ -133,10 +166,20 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Creates the tables on activation.
+	 * Creates the tables on activation, then imports the Facture PDF Lumia data when there is some.
+	 *
+	 * The import needs WooCommerce, and must never run while the legacy plugin is still active
+	 * (it would keep numbering): it waits for a request that meets the requirements.
 	 */
 	public function on_activate(): void {
 		Installer::install();
+
+		if ( [] !== Requirements::check() ) {
+			return;
+		}
+
+		Migration::prepare();
+		Migration::maybe_run();
 	}
 
 	/**
@@ -147,8 +190,8 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ 'lumia_factures_module_invoices', Installer::OPTION ],
-			'meta'    => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date' ],
+			'options' => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK ],
+			'meta'    => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date', Issuer::GATE_FLAG, Importer::NOTED_META ],
 			'tables'  => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
 		];
 	}
