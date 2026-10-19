@@ -121,8 +121,15 @@ class SaveHandler {
 		$global = isset( $_POST['lumia_factures_global'] ) && is_array( $_POST['lumia_factures_global'] ) ? wp_unslash( $_POST['lumia_factures_global'] ) : []; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce verified in handle(); each key is sanitized below.
 
 		if ( array_key_exists( 'update_channel', $global ) ) {
-			$channel = sanitize_key( (string) $global['update_channel'] );
-			$this->settings->set( 'global.update_channel', in_array( $channel, self::CHANNELS, true ) ? $channel : 'stable' );
+			$channel  = sanitize_key( (string) $global['update_channel'] );
+			$channel  = in_array( $channel, self::CHANNELS, true ) ? $channel : 'stable';
+			$previous = (string) $this->settings->get( 'global.update_channel', 'stable' );
+			$this->settings->set( 'global.update_channel', $channel );
+
+			// A pre-release found on the dev channel must not stay offered once back on stable.
+			if ( $channel !== $previous ) {
+				$this->updater->purge_caches();
+			}
 		}
 
 		// Unchecked box = absent from POST. Written only when the user changed the

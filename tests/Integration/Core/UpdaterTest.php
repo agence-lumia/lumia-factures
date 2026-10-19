@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Core;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Admin\SaveHandler;
 use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Core\Updater;
 use Lumia\Factures\Tests\Support\TestCase;
@@ -163,5 +164,65 @@ class UpdaterTest extends TestCase {
 
 	public function test_updater_registered_independently_of_requirements(): void {
 		$this->assertNotFalse( has_filter( 'pre_set_site_transient_update_plugins', array( Plugin::instance()->updater(), 'check_update' ) ) );
+	}
+
+	/**
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_token_scoped_to_this_repository(): void {
+		define( 'LUMIA_FACTURES_GITHUB_TOKEN', 'secret' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- test constant.
+		$updater = Plugin::instance()->updater();
+
+		$ours = $updater->authorize_asset_download( array(), 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/latest' );
+		$this->assertSame( 'Bearer secret', $ours['headers']['Authorization'] );
+
+		$asset = $updater->authorize_asset_download( array(), 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/assets/12' );
+		$this->assertSame( 'application/octet-stream', $asset['headers']['Accept'] );
+
+		$other = $updater->authorize_asset_download( array(), 'https://api.github.com/repos/agence-lumia/lumia-tools/releases/latest' );
+		$this->assertArrayNotHasKey( 'headers', $other );
+
+		$evil = $updater->authorize_asset_download( array(), 'https://api.github.com.evil.tld/repos/agence-lumia/lumia-factures/x' );
+		$this->assertArrayNotHasKey( 'headers', $evil );
+
+		$kept = $updater->authorize_asset_download( array( 'headers' => array( 'authorization' => 'token mine' ) ), 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/latest' );
+		$this->assertSame( array( 'authorization' => 'token mine' ), $kept['headers'] );
+	}
+
+	public function test_authorization_removed_on_redirect_off_the_api(): void {
+		$updater  = Plugin::instance()->updater();
+		$location = 'https://release-assets.githubusercontent.com/x';
+		$headers  = array(
+			'Authorization' => 'Bearer secret',
+			'Accept'        => 'application/octet-stream',
+		);
+		$updater->strip_token_on_redirect( $location, $headers );
+		$this->assertSame( array( 'Accept' => 'application/octet-stream' ), $headers );
+
+		$location = 'https://api.github.com/repos/agence-lumia/lumia-factures/releases/assets/13';
+		$headers  = array( 'Authorization' => 'Bearer secret' );
+		$updater->strip_token_on_redirect( $location, $headers );
+		$this->assertArrayHasKey( 'Authorization', $headers );
+
+		$this->assertNotFalse( has_action( 'requests-requests.before_redirect', array( $updater, 'strip_token_on_redirect' ) ) );
+	}
+
+	public function test_channel_change_purges_update_caches(): void {
+		$settings = Plugin::instance()->settings();
+		$settings->set( 'global.update_channel', 'dev' );
+		set_transient( 'lumia_factures_github_update_dev', array( 'version' => '9.9.9-dev.1' ), 600 );
+		set_site_transient( 'update_plugins', (object) array( 'response' => array( self::BASENAME => (object) array( 'new_version' => '9.9.9-dev.1' ) ) ) );
+
+		$_POST['lumia_factures_global'] = array( 'update_channel' => 'stable' );
+		$handler                        = new SaveHandler( Plugin::instance()->modules(), $settings, 'lumia-factures', Plugin::instance()->updater() );
+		$method                         = new \ReflectionMethod( $handler, 'save_global' );
+		$method->setAccessible( true );
+		$method->invoke( $handler );
+		unset( $_POST['lumia_factures_global'] );
+
+		$this->assertSame( 'stable', $settings->get( 'global.update_channel' ) );
+		$this->assertFalse( get_transient( 'lumia_factures_github_update_dev' ) );
+		$this->assertFalse( get_site_transient( 'update_plugins' ) );
 	}
 }

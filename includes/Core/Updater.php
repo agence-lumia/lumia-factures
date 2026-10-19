@@ -65,6 +65,8 @@ class Updater {
 		add_filter( 'pre_set_site_transient_update_plugins', array( $this, 'check_update' ) );
 		add_filter( 'plugins_api', array( $this, 'plugin_info' ), 10, 3 );
 		add_filter( 'http_request_args', array( $this, 'authorize_asset_download' ), 10, 2 );
+		// Requests re-sends the original headers on a redirect: the token must not follow it off the API.
+		add_action( 'requests-requests.before_redirect', array( $this, 'strip_token_on_redirect' ), 10, 2 );
 
 		// After a plugin update, purge the remote version cache (12 h) and the WP
 		// updates transient, otherwise the "update available" badge persists until
@@ -82,6 +84,44 @@ class Updater {
 	public static function is_api_url( string $url ): bool {
 		return 'https' === wp_parse_url( $url, PHP_URL_SCHEME )
 			&& 'api.github.com' === wp_parse_url( $url, PHP_URL_HOST );
+	}
+
+	/**
+	 * Whether a URL is a GitHub API URL of this repository (token scope).
+	 *
+	 * @param string $url URL to test.
+	 */
+	public static function is_repo_api_url( string $url ): bool {
+		if ( ! self::is_api_url( $url ) ) {
+			return false;
+		}
+
+		return 0 === strpos( (string) wp_parse_url( $url, PHP_URL_PATH ), '/repos/' . self::REPO . '/' );
+	}
+
+	/**
+	 * Drops the Authorization header when a redirect leaves the GitHub API.
+	 *
+	 * The release asset endpoint answers 302 to a storage host: the token must
+	 * not be sent there (and that host rejects it).
+	 *
+	 * @param string $location New location (by reference).
+	 * @param mixed  $headers  Request headers of the redirected request (by reference).
+	 */
+	public function strip_token_on_redirect( &$location, &$headers ): void {
+		if ( self::is_api_url( (string) $location ) ) {
+			return;
+		}
+
+		if ( is_array( $headers ) ) {
+			foreach ( array_keys( $headers ) as $name ) {
+				if ( 0 === strcasecmp( (string) $name, 'Authorization' ) ) {
+					unset( $headers[ $name ] );
+				}
+			}
+		} elseif ( $headers instanceof \ArrayAccess ) {
+			unset( $headers['Authorization'] );
+		}
 	}
 
 	/**
@@ -117,11 +157,19 @@ class Updater {
 	 */
 	public function authorize_asset_download( $args, $url ): array {
 		$args = (array) $args;
-		if ( '' === self::token() || ! self::is_api_url( (string) $url ) ) {
+		if ( '' === self::token() || ! self::is_repo_api_url( (string) $url ) ) {
 			return $args;
 		}
 
-		$args['headers']                  = isset( $args['headers'] ) && is_array( $args['headers'] ) ? $args['headers'] : array();
+		$args['headers'] = isset( $args['headers'] ) && is_array( $args['headers'] ) ? $args['headers'] : array();
+
+		// Never overwrite an Authorization header set by the caller.
+		foreach ( array_keys( $args['headers'] ) as $name ) {
+			if ( 0 === strcasecmp( (string) $name, 'Authorization' ) ) {
+				return $args;
+			}
+		}
+
 		$args['headers']['Authorization'] = 'Bearer ' . self::token();
 
 		// Asset download through the API: the binary, not the JSON metadata.
