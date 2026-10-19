@@ -9,6 +9,7 @@ namespace Lumia\Factures\Modules\Invoices\Migration;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
@@ -103,6 +104,7 @@ final class Importer {
 		} while ( [] !== $batch );
 
 		self::sequences( $highest, $dry_run, $report );
+		self::bricks( $dry_run, $report );
 
 		self::log(
 			sprintf(
@@ -120,6 +122,42 @@ final class Importer {
 		return $report;
 	}
 
+	/**
+	 * Turns the Bricks module on when a Bricks template still uses a Facture PDF Lumia tag.
+	 *
+	 * The module renders the `{fpl_invoice_*}` names as well, so the existing templates keep working
+	 * without an edit. Nothing happens when the module is already on.
+	 *
+	 * @param bool   $dry_run Dry run.
+	 * @param Report $report  Report.
+	 */
+	private static function bricks( bool $dry_run, Report $report ): void {
+		global $wpdb;
+
+		$modules = Plugin::instance()->modules();
+		if ( $modules->is_active( 'bricks' ) ) {
+			return;
+		}
+
+		$used = $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- One-off detection, never cached.
+			$wpdb->prepare(
+				"SELECT meta_id FROM {$wpdb->postmeta} WHERE meta_key = %s AND meta_value LIKE %s LIMIT 1",
+				'_bricks_page_content_2',
+				'%' . $wpdb->esc_like( '{fpl_invoice_' ) . '%'
+			)
+		);
+		if ( null === $used ) {
+			return;
+		}
+
+		if ( ! $dry_run && ! $modules->activate( 'bricks' ) ) {
+			self::log( 'The Bricks module could not be turned on.' );
+			return;
+		}
+
+		$report->notes[] = __( 'A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before.', 'lumia-factures' );
+		self::log( 'A Bricks template uses the legacy invoice tags: the Bricks module ' . ( $dry_run ? 'would be' : 'was' ) . ' turned on.' );
+	}
 	/**
 	 * Imports the legacy settings unless the user already saved settings.
 	 *
