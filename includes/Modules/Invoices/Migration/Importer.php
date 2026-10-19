@@ -246,13 +246,10 @@ final class Importer {
 			// Imported by an earlier run: complete what an interrupted run may have left.
 			++$report->invoices_already;
 			if ( ! $dry_run ) {
-				self::guard( $report, $order_id, 'order meta', static fn() => self::meta( $order_id, $number, $existing->issued_at ) );
+				self::guard( $report, $order_id, 'order meta and note', static fn() => self::update_order( $order_id, $number, $existing->issued_at ) );
 			}
 			if ( null === $existing->file ) {
 				self::file( $invoice, $existing->id, $existing->issued_at, $dry_run, $report, false );
-			}
-			if ( ! $dry_run ) {
-				self::guard( $report, $order_id, 'order note', static fn() => self::note( $order_id, $number ) );
 			}
 			return;
 		}
@@ -305,28 +302,46 @@ final class Importer {
 			return;
 		}
 
-		self::guard( $report, $order_id, 'order meta', static fn() => self::meta( $order_id, $number, $invoice['issued_at'] ) );
+		self::guard( $report, $order_id, 'order meta and note', static fn() => self::update_order( $order_id, $number, $invoice['issued_at'] ) );
 		self::file( $invoice, $id, $invoice['issued_at'], false, $report, true );
-		self::guard( $report, $order_id, 'order note', static fn() => self::note( $order_id, $number ) );
 	}
 
 	/**
-	 * Adds the "imported" order note once: the flag meta marks it written, so a run resumed
-	 * after an interruption adds a missing note and never a second one.
+	 * Writes the invoice meta when absent or different and the "imported" order note once, then
+	 * saves the order once: its hooks and webhooks fire a single time per imported order.
 	 *
-	 * @param int    $order_id Order id.
-	 * @param string $number   Invoice number.
+	 * The flag meta marks the note written, so a run resumed after an interruption adds a missing
+	 * note and never a second one.
+	 *
+	 * @param int    $order_id  Order id.
+	 * @param string $number    Invoice number.
+	 * @param int    $issued_at Issue date.
 	 */
-	private static function note( int $order_id, string $number ): void {
+	private static function update_order( int $order_id, string $number, int $issued_at ): void {
 		$order = wc_get_order( $order_id );
-		if ( ! $order instanceof WC_Order || '' !== (string) $order->get_meta( self::NOTED_META ) ) {
+		if ( ! $order instanceof WC_Order ) {
 			return;
 		}
 
-		/* translators: %s: invoice number */
-		$order->add_order_note( sprintf( __( 'Invoice %s imported from Facture PDF Lumia.', 'lumia-factures' ), $number ) );
-		$order->update_meta_data( self::NOTED_META, '1' );
-		$order->save();
+		$changed = false;
+
+		if ( (string) $order->get_meta( '_lumia_factures_invoice_number' ) !== $number || (string) $order->get_meta( '_lumia_factures_invoice_date' ) !== (string) $issued_at ) {
+			$order->update_meta_data( '_lumia_factures_invoice_number', $number );
+			$order->update_meta_data( '_lumia_factures_invoice_date', (string) $issued_at );
+			$changed = true;
+		}
+
+		if ( '' === (string) $order->get_meta( self::NOTED_META ) ) {
+			// add_order_note() writes its own comment, it does not save the order.
+			/* translators: %s: invoice number */
+			$order->add_order_note( sprintf( __( 'Invoice %s imported from Facture PDF Lumia.', 'lumia-factures' ), $number ) );
+			$order->update_meta_data( self::NOTED_META, '1' );
+			$changed = true;
+		}
+
+		if ( $changed ) {
+			$order->save();
+		}
 	}
 
 	/**
@@ -395,32 +410,11 @@ final class Importer {
 	}
 
 	/**
-	 * Writes the invoice meta on the order when absent or different.
-	 *
-	 * @param int    $order_id  Order id.
-	 * @param string $number    Number.
-	 * @param int    $issued_at Issue date.
-	 */
-	private static function meta( int $order_id, string $number, int $issued_at ): void {
-		$order = wc_get_order( $order_id );
-		if ( ! $order instanceof WC_Order ) {
-			return;
-		}
-
-		if ( (string) $order->get_meta( '_lumia_factures_invoice_number' ) === $number && (string) $order->get_meta( '_lumia_factures_invoice_date' ) === (string) $issued_at ) {
-			return;
-		}
-
-		$order->update_meta_data( '_lumia_factures_invoice_number', $number );
-		$order->update_meta_data( '_lumia_factures_invoice_date', (string) $issued_at );
-		$order->save();
-	}
-
-	/**
 	 * Raises each counter to the highest legacy value (legacy table or given values). Never lowers.
 	 *
-	 * Called before the invoices (from the meta tables) and after them (from the invoices read),
-	 * so the second call normally raises nothing. A dry run records what would be raised.
+	 * Called before the invoices (from the meta tables) and after them (from the invoices read and
+	 * the meta tables read again), so the second call raises only what the legacy plugin numbered
+	 * during the run. A dry run records what would be raised.
 	 *
 	 * @param array<string, int> $highest Highest legacy value per key.
 	 * @param bool               $dry_run Dry run.

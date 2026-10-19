@@ -271,6 +271,32 @@ class ImporterTest extends TestCase {
 		$this->assertSame( 29241, Sequences::current( $key ) );
 	}
 
+	public function test_each_imported_order_is_saved_once(): void {
+		$key   = 'invoice_' . wp_date( 'Y' );
+		$order = $this->order();
+		$this->legacy->invoice( $order, 'FA-0004', 4, $key, (int) strtotime( '-1 day' ), null );
+
+		$saves = [];
+		$count = static function ( $order_id ) use ( &$saves ): void {
+			$saves[ (int) $order_id ] = ( $saves[ (int) $order_id ] ?? 0 ) + 1;
+		};
+		add_action( 'woocommerce_update_order', $count );
+		try {
+			$report = Importer::run( false )->to_array();
+		} finally {
+			remove_action( 'woocommerce_update_order', $count );
+		}
+
+		// Meta, note flag and note in one save: hooks and webhooks fire once per order.
+		$this->assertSame( 1, $report['invoices_imported'] );
+		$this->assertSame( [ $order->get_id() => 1 ], $saves );
+
+		$fresh = wc_get_order( $order->get_id() );
+		$this->assertSame( 'FA-0004', $fresh->get_meta( '_lumia_factures_invoice_number' ) );
+		$this->assertSame( '1', $fresh->get_meta( Importer::NOTED_META ) );
+		$this->assertSame( 1, $this->count_notes( $fresh, 'imported from Facture PDF Lumia' ) );
+	}
+
 	public function test_legacy_number_written_during_the_import_raises_the_counter(): void {
 		$key   = 'invoice_' . wp_date( 'Y' );
 		$early = $this->order();

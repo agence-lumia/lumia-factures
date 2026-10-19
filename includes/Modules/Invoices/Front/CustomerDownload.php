@@ -171,7 +171,9 @@ final class CustomerDownload {
 	 */
 	public static function handle(): void {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- Access rests on the order key or the session, not on a nonce: the link is sent by email.
-		if ( ! isset( $_GET[ self::QUERY_VAR ] ) && ! isset( $_GET[ self::LEGACY_VAR ] ) ) {
+		// The legacy links always carry `fpl_download=1`: any other value is not ours.
+		$legacy = isset( $_GET[ self::LEGACY_VAR ] ) && '1' === $_GET[ self::LEGACY_VAR ];
+		if ( ! isset( $_GET[ self::QUERY_VAR ] ) && ! $legacy ) {
 			return;
 		}
 

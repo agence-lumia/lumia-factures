@@ -124,13 +124,13 @@ final class Issuer {
 	}
 
 	/**
-	 * Why the legacy import forbids numbering the order.
+	 * Why the legacy import forbids numbering the order. Reads only (the order meta box uses it).
 	 *
 	 * @param WC_Order $order Order.
 	 * @return string `import` (the import is not finished), `conflict` (a legacy number the import
 	 *                could not record), '' when the order may be numbered.
 	 */
-	private static function gate_reason( WC_Order $order ): string {
+	public static function gate_reason( WC_Order $order ): string {
 		if ( Migration::blocks_issuing() ) {
 			return 'import';
 		}

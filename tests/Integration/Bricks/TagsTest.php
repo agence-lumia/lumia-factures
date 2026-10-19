@@ -84,6 +84,23 @@ class TagsTest extends TestCase {
 		$this->assertSame( 'Lümia Factures', $list[1]['group'] );
 	}
 
+	public function test_url_inside_a_content_is_escaped(): void {
+		$order = $this->issued_order();
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+
+		$raw    = 'https://example.com/?a=1&b="x"';
+		$filter = static fn() => $raw;
+		add_filter( 'lumia_factures_customer_download_url', $filter );
+		try {
+			$html = apply_filters( 'bricks/dynamic_data/render_content', '<a href="{fpl_invoice_url}">PDF</a>', $order, 'text' );
+		} finally {
+			remove_filter( 'lumia_factures_customer_download_url', $filter );
+		}
+
+		$this->assertSame( '<a href="' . esc_url( $raw ) . '">PDF</a>', $html );
+		$this->assertStringNotContainsString( '"x"', $html );
+	}
+
 	public function test_legacy_aliases_render_same_values(): void {
 		$order = $this->issued_order();
 		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
@@ -129,7 +146,6 @@ class TagsTest extends TestCase {
 	public function test_status_values(): void {
 		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
 		$status = static fn( WC_Order $order ) => apply_filters( 'bricks/dynamic_data/render_tag', '{lumia_factures_invoice_status}', $order, 'text' );
-
 		$url    = static fn( WC_Order $order ) => apply_filters( 'bricks/dynamic_data/render_tag', '{lumia_factures_invoice_url}', $order, 'text' );
 
 		// Not in a trigger status: nothing to issue.

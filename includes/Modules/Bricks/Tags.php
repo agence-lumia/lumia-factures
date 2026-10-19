@@ -126,7 +126,9 @@ final class Tags {
 			foreach ( [ self::PREFIX, self::LEGACY_PREFIX ] as $prefix ) {
 				$tag = '{' . $prefix . $suffix . '}';
 				if ( str_contains( $content, $tag ) ) {
-					$content = str_replace( $tag, self::resolve( $suffix, $post ), $content );
+					// Usually inside an href: the URL is escaped (a filter may change it).
+					$value   = self::resolve( $suffix, $post );
+					$content = str_replace( $tag, 'url' === $suffix ? esc_url( $value ) : $value, $content );
 				}
 			}
 		}

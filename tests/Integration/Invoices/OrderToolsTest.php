@@ -372,6 +372,26 @@ class OrderToolsTest extends TestCase {
 		$this->assertStringContainsString( 'does not allow an invoice', $html );
 	}
 
+	public function test_metabox_explains_a_legacy_conflict(): void {
+		// The import is done (no legacy data is pending), but this order carries a legacy number
+		// the import could not record: a conflict, not an import still running.
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->update_meta_data( '_fpl_invoice_number', 'FA-0004' );
+		$order->save();
+		update_option( \Lumia\Factures\Modules\Invoices\Migration\Migration::OPTION, [ 'status' => 'done_with_conflicts' ] );
+
+		try {
+			$html = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+		} finally {
+			delete_option( \Lumia\Factures\Modules\Invoices\Migration\Migration::OPTION );
+		}
+
+		$this->assertStringContainsString( 'could not be imported', $html );
+		$this->assertStringNotContainsString( 'until the Facture PDF Lumia data is imported', $html );
+		$this->assertStringNotContainsString( 'lumia_factures_invoices_issue', $html );
+		$this->assertSame( [], wc_get_order_notes( [ 'order_id' => $order->get_id() ] ), 'Viewing the order never notes it.' );
+	}
+
 	public function test_notice_is_shown_only_on_order_screen_for_known_code(): void {
 		$_GET['lumia_factures_notice']      = 'invoice_issued';
 		$_GET['lumia_factures_notice_type'] = 'success';

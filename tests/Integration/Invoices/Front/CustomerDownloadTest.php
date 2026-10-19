@@ -156,6 +156,39 @@ class CustomerDownloadTest extends TestCase {
 		$this->refusal( [ 'key' => 'wc_order_wrong' ] + $request );
 	}
 
+	public function test_legacy_query_var_is_ours_only_when_it_is_1(): void {
+		$order = $this->issued_order();
+
+		// Another value of `fpl_download` is not a legacy invoice link: the request goes on untouched.
+		foreach ( [ '0', 'yes', '' ] as $value ) {
+			$_GET = [
+				'fpl_download' => $value,
+				'order'        => (string) $order->get_id(),
+				'key'          => $order->get_order_key(),
+			];
+			try {
+				CustomerDownload::handle();
+			} finally {
+				$_GET = [];
+			}
+		}
+
+		// `1` is handled: a wrong key gets the 404.
+		$_GET = [
+			'fpl_download' => '1',
+			'order'        => (string) $order->get_id(),
+			'key'          => 'wc_order_wrong',
+		];
+		try {
+			CustomerDownload::handle();
+			$this->fail( 'Expected the 404.' );
+		} catch ( \WPDieException $e ) {
+			$this->assertSame( 404, $e->getCode() );
+		} finally {
+			$_GET = [];
+		}
+	}
+
 	public function test_never_built_invoice_is_built_on_first_download(): void {
 		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		$id    = Register::import( 'invoice', $order->get_id(), '202610029241', 'invoice_2026', 29241, 1760000000 );
