@@ -73,6 +73,44 @@ final class LegacySource {
 	}
 
 	/**
+	 * Highest legacy counter value per sequence key, read from the order meta.
+	 *
+	 * Straight from the meta tables, without joining the orders: every order counts, trashed
+	 * ones and ones whose row cannot be loaded any more included, since their numbers were
+	 * printed all the same. Both meta tables are read (HPOS and posts): a copy left in the
+	 * inactive storage can only make the result higher, never lower. A missing table is skipped.
+	 *
+	 * @return array<string, int>
+	 */
+	public static function max_sequences(): array {
+		global $wpdb;
+
+		$sources = [
+			[ $wpdb->prefix . 'wc_orders_meta', 'order_id' ],
+			[ $wpdb->postmeta, 'post_id' ],
+		];
+		$max     = [];
+
+		foreach ( $sources as [ $table, $column ] ) {
+			$suppressed = $wpdb->suppress_errors( true );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table and column names are fixed above.
+			$rows = $wpdb->get_results( $wpdb->prepare( "SELECT k.meta_value AS sequence_key, MAX(CAST(s.meta_value AS UNSIGNED)) AS value FROM {$table} s INNER JOIN {$table} k ON k.{$column} = s.{$column} AND k.meta_key = %s WHERE s.meta_key = %s GROUP BY k.meta_value", '_fpl_invoice_sequence_key', '_fpl_invoice_sequence' ), ARRAY_A );
+			$wpdb->suppress_errors( $suppressed );
+
+			foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+				$key = (string) $row['sequence_key'];
+				if ( '' !== $key && (int) $row['value'] > 0 ) {
+					$max[ $key ] = max( $max[ $key ] ?? 0, (int) $row['value'] );
+				}
+			}
+		}
+
+		ksort( $max );
+
+		return $max;
+	}
+
+	/**
 	 * Legacy invoices of the orders after a given id, by ascending order id.
 	 *
 	 * `issued_at` is `_fpl_invoice_date`, else `_fpl_invoice_generated_at`, else the order creation

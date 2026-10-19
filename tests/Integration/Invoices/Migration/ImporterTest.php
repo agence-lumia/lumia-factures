@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices\Migration;
 
 defined( 'ABSPATH' ) || exit;
 
+use Automattic\WooCommerce\Utilities\OrderUtil;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
@@ -22,6 +23,7 @@ use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\LegacyFixture;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
+use RuntimeException;
 use WC_Order;
 
 /**
@@ -156,6 +158,8 @@ class ImporterTest extends TestCase {
 			$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
 			$fresh = wc_get_order( $order->get_id() );
 			$this->assertSame( '', $fresh->get_meta( '_lumia_factures_invoice_number' ) );
+			$this->assertFalse( $fresh->meta_exists( '_lumia_factures_invoice_date' ) );
+			$this->assertFalse( $fresh->meta_exists( '_lumia_factures_import_noted' ) );
 			$this->assertSame( 0, $this->count_notes( $fresh, 'imported from Facture PDF Lumia' ) );
 		}
 
@@ -218,6 +222,92 @@ class ImporterTest extends TestCase {
 		$doc = Register::find( 'invoice', $first->get_id() );
 		$this->assertTrue( Archive::verify( $doc ) );
 		$this->assertSame( $doc->number, wc_get_order( $first->get_id() )->get_meta( '_lumia_factures_invoice_number' ) );
+
+		// The note the dead run never wrote is added once, then never again.
+		foreach ( $orders as $order ) {
+			$fresh = wc_get_order( $order->get_id() );
+			$this->assertSame( 1, $this->count_notes( $fresh, 'imported from Facture PDF Lumia' ) );
+			$this->assertSame( '1', (string) $fresh->get_meta( '_lumia_factures_import_noted' ) );
+		}
+		Importer::run( false );
+		$this->assertSame( 1, $this->count_notes( wc_get_order( $first->get_id() ), 'imported from Facture PDF Lumia' ) );
+	}
+
+	public function test_counters_are_raised_before_the_invoices_are_imported(): void {
+		[ $orders, $key ] = $this->neonat();
+
+		// One order per batch, and the run dies after the first batch.
+		add_filter( 'lumia_factures_legacy_import_batch_size', static fn() => 1 );
+		$die = static function (): void {
+			throw new RuntimeException( 'interrupted' );
+		};
+		add_action( 'lumia_factures_legacy_import_batch_done', $die );
+
+		try {
+			Importer::run( false );
+			$this->fail( 'The run should have been interrupted.' );
+		} catch ( RuntimeException $e ) {
+			$this->assertSame( 'interrupted', $e->getMessage() );
+		}
+		$this->track( $orders );
+
+		// Only the first invoice is imported, yet the counter already covers every legacy number.
+		$this->assertNotNull( Register::find( 'invoice', $orders[0]->get_id() ) );
+		$this->assertNull( Register::find( 'invoice', $orders[2]->get_id() ) );
+		$this->assertSame( 29241, Sequences::current( $key ) );
+
+		remove_action( 'lumia_factures_legacy_import_batch_done', $die );
+		$report = Importer::run( false )->to_array();
+		$this->track( $orders );
+
+		$this->assertSame( 2, $report['invoices_imported'] );
+		$this->assertSame( 1, $report['invoices_already'] );
+		$this->assertSame( [], $report['sequences'] );
+		$this->assertSame( 29241, Sequences::current( $key ) );
+	}
+
+	public function test_unloadable_order_still_counts_toward_the_counter(): void {
+		[ $orders, $key ] = $this->neonat();
+
+		// An order whose row is gone but whose legacy meta remains: wc_get_order() cannot load it.
+		$ghost = $this->order();
+		$this->legacy->invoice( $ghost, wp_date( 'Ym' ) . '040000', 40000, $key, time(), null );
+		$this->delete_order_row( $ghost->get_id() );
+		$this->assertFalse( wc_get_order( $ghost->get_id() ) );
+
+		$this->assertSame( [ $key => 40000 ], LegacySource::max_sequences() );
+
+		$dry = Importer::run( true )->to_array();
+		$this->assertSame( [ $key => 40000 ], $dry['sequences'] );
+		$this->assertSame( 0, Sequences::current( $key ) );
+
+		$report = Importer::run( false )->to_array();
+		$this->track( $orders );
+
+		$this->assertSame( 3, $report['invoices_imported'] );
+		$this->assertSame( [ $key => 40000 ], $report['sequences'] );
+		$this->assertSame( 40000, Sequences::current( $key ) );
+	}
+
+	public function test_database_error_is_a_distinct_conflict(): void {
+		$key   = 'invoice_' . wp_date( 'Y' );
+		$order = $this->order();
+		$this->legacy->invoice( $order, 'FA-DBERR', 5, $key, (int) strtotime( '-1 day' ), null );
+
+		// The register INSERT of this number fails for a reason other than a duplicate.
+		$break = static function ( string $query ): string {
+			return str_contains( $query, 'lumia_factures_documents' ) && str_contains( $query, 'FA-DBERR' ) && str_starts_with( ltrim( $query ), 'INSERT' )
+				? 'INSERT INTO lumia_factures_missing_table (x) VALUES (1)'
+				: $query;
+		};
+		add_filter( 'query', $break );
+		$report = Importer::run( false )->to_array();
+		remove_filter( 'query', $break );
+
+		$this->assertSame( 0, $report['invoices_imported'] );
+		$this->assertSame( [ 'database_error' ], array_column( $report['conflicts'], 'code' ) );
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( 5, Sequences::current( $key ) );
 	}
 
 	public function test_conflict_is_reported_and_skipped(): void {
@@ -246,6 +336,7 @@ class ImporterTest extends TestCase {
 		$this->assertCount( 2, $report['conflicts'] );
 		$this->assertSame( [ $c->get_id(), $d->get_id() ], array_column( $report['conflicts'], 'order_id' ) );
 		$this->assertSame( [ 'FA-0011', 'FA-0012' ], array_column( $report['conflicts'], 'number' ) );
+		$this->assertSame( [ 'number_used', 'other_invoice' ], array_column( $report['conflicts'], 'code' ) );
 		$this->assertTrue( Importer::run( true )->has_conflicts() );
 
 		$this->assertSame( 'FA-0011', Register::find( 'invoice', $b->get_id() )->number );
@@ -340,9 +431,12 @@ class ImporterTest extends TestCase {
 		[ $orders ] = $this->neonat();
 
 		$meta = [];
+		$ids  = [];
 		foreach ( $orders as $order ) {
 			$meta[ $order->get_id() ] = LegacyFixture::legacy_meta( $order->get_id() );
+			$ids[ $order->get_id() ]  = LegacyFixture::legacy_meta_ids( $order->get_id() );
 		}
+		$folder = $this->legacy_folder_files();
 		$option = get_option( 'fpl_settings' );
 		$table  = $this->legacy->sequence_rows();
 		$hashes = $this->legacy->file_hashes();
@@ -352,10 +446,13 @@ class ImporterTest extends TestCase {
 
 		foreach ( $orders as $order ) {
 			$this->assertSame( $meta[ $order->get_id() ], LegacyFixture::legacy_meta( $order->get_id() ) );
+			$this->assertSame( $ids[ $order->get_id() ], LegacyFixture::legacy_meta_ids( $order->get_id() ) );
 		}
 		$this->assertSame( $option, get_option( 'fpl_settings' ) );
 		$this->assertSame( $table, $this->legacy->sequence_rows() );
 		$this->assertSame( $hashes, $this->legacy->file_hashes() );
+		$this->assertSame( $folder, $this->legacy_folder_files() );
+		$this->assertCount( 2, $folder );
 		$this->assertCount( 2, $hashes );
 	}
 
@@ -421,6 +518,34 @@ class ImporterTest extends TestCase {
 				$this->written[] = Archive::root() . '/' . $doc->file;
 			}
 		}
+	}
+
+	/**
+	 * Every PDF of the legacy folder.
+	 *
+	 * @return string[]
+	 */
+	private function legacy_folder_files(): array {
+		$files = glob( LegacyFixture::root() . '/*/*/*.pdf' );
+		$files = is_array( $files ) ? $files : [];
+		sort( $files );
+
+		return $files;
+	}
+
+	/**
+	 * Deletes the row of an order, leaving its meta behind, as a broken database would.
+	 *
+	 * @param int $order_id Order id.
+	 */
+	private function delete_order_row( int $order_id ): void {
+		global $wpdb;
+
+		$table = OrderUtil::get_table_for_orders();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Test fixture.
+		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE id = %d", $order_id ) );
+		clean_post_cache( $order_id );
+		wp_cache_flush();
 	}
 
 	/**

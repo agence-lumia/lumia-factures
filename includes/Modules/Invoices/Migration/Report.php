@@ -59,7 +59,7 @@ final class Report {
 	/**
 	 * Skipped legacy invoices.
 	 *
-	 * @var array<int, array{order_id: int, number: string, reason: string}>
+	 * @var array<int, array{order_id: int, number: string, code: string, reason: string}>
 	 */
 	public array $conflicts = [];
 
@@ -82,12 +82,14 @@ final class Report {
 	 *
 	 * @param int    $order_id Order id.
 	 * @param string $number   Legacy number.
-	 * @param string $reason   Why it was skipped.
+	 * @param string $code     `other_invoice`, `number_used` or `database_error`.
+	 * @param string $reason   Why it was skipped (translated).
 	 */
-	public function conflict( int $order_id, string $number, string $reason ): void {
+	public function conflict( int $order_id, string $number, string $code, string $reason ): void {
 		$this->conflicts[] = [
 			'order_id' => $order_id,
 			'number'   => $number,
+			'code'     => $code,
 			'reason'   => $reason,
 		];
 	}
@@ -102,7 +104,7 @@ final class Report {
 	/**
 	 * Plain array, for the stored state and the WP-CLI output.
 	 *
-	 * @return array{settings: string, invoices_imported: int, invoices_already: int, files_copied: int, files_missing: int, files_invalid: int, conflicts: array<int, array{order_id: int, number: string, reason: string}>, sequences: array<string, int>, notes: string[]}
+	 * @return array{settings: string, invoices_imported: int, invoices_already: int, files_copied: int, files_missing: int, files_invalid: int, conflicts: array<int, array{order_id: int, number: string, code: string, reason: string}>, sequences: array<string, int>, notes: string[]}
 	 */
 	public function to_array(): array {
 		return [

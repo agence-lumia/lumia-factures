@@ -141,6 +141,28 @@ final class LegacyFixture {
 	}
 
 	/**
+	 * Row ids of every `_fpl_*` meta of an order: unchanged ids prove no meta was deleted and re-added.
+	 *
+	 * @param int $order_id Order id.
+	 * @return array<string, int>
+	 */
+	public static function legacy_meta_ids( int $order_id ): array {
+		$order = wc_get_order( $order_id );
+		$ids   = [];
+
+		foreach ( $order->get_meta_data() as $item ) {
+			$data = $item->get_data();
+			if ( str_starts_with( (string) $data['key'], '_fpl_' ) ) {
+				$ids[ $data['key'] ] = (int) $data['id'];
+			}
+		}
+
+		ksort( $ids );
+
+		return $ids;
+	}
+
+	/**
 	 * SHA-256 of every legacy file, keyed by path.
 	 *
 	 * @return array<string, string>

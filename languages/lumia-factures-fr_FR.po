@@ -645,6 +645,9 @@ msgstr "Une facture est en cours d'émission pour cette commande."
 msgid "The order already has invoice %s."
 msgstr "La commande a déjà la facture %s."
 
+msgid "The invoice could not be recorded (database error, see the PHP error log)."
+msgstr "La facture n'a pas pu être enregistrée (erreur de base de données, voir le journal d'erreurs PHP)."
+
 msgid "You are not allowed to download invoices."
 msgstr "Vous n'êtes pas autorisé à télécharger les factures."
 

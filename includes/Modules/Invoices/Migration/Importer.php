@@ -38,6 +38,11 @@ final class Importer {
 	private const SETTINGS_OPTION = 'lumia_factures_module_invoices';
 
 	/**
+	 * Order meta flag: the "imported" order note was written.
+	 */
+	public const NOTED_META = '_lumia_factures_import_noted';
+
+	/**
 	 * Runs the import.
 	 *
 	 * @param bool $dry_run True to compute the report without writing anything.
@@ -49,14 +54,25 @@ final class Importer {
 
 		self::settings( $dry_run, $report );
 
-		// Highest legacy counter value seen per key, conflicts included: every number the legacy
-		// plugin printed must stay behind the counter, even one that could not be imported.
+		// Counters first: a run interrupted while importing must not leave a counter behind the
+		// legacy numbers, or an invoice issued before the next run could print one of them again.
+		// Every legacy sequence counts, conflicts and unloadable orders included.
+		self::sequences( LegacySource::max_sequences(), $dry_run, $report );
+
+		/**
+		 * Filters the number of legacy orders imported per batch.
+		 *
+		 * @param int $size Orders per batch (200).
+		 */
+		$size = max( 1, (int) apply_filters( 'lumia_factures_legacy_import_batch_size', self::BATCH ) );
+
+		// Highest legacy counter value seen per key: the final pass below is only a safety net.
 		$highest = [];
 		$seen    = [];
 		$after   = 0;
 
 		do {
-			$batch = LegacySource::invoices( $after, self::BATCH );
+			$batch = LegacySource::invoices( $after, $size );
 
 			foreach ( $batch as $invoice ) {
 				$after = $invoice['order_id'];
@@ -72,6 +88,17 @@ final class Importer {
 			// thousands of invoices one run would exhaust the memory (Action Scheduler does the same).
 			if ( ! wp_using_ext_object_cache() ) {
 				wp_cache_flush();
+			}
+
+			if ( [] !== $batch ) {
+				/**
+				 * Fires after each batch of legacy orders (progress reporting).
+				 *
+				 * @param Report $report  Report so far.
+				 * @param int    $after   Last order id of the batch.
+				 * @param bool   $dry_run Whether nothing is written.
+				 */
+				do_action( 'lumia_factures_legacy_import_batch_done', $report, $after, $dry_run );
 			}
 		} while ( [] !== $batch );
 
@@ -141,7 +168,7 @@ final class Importer {
 
 		if ( null !== $existing ) {
 			if ( $existing->number !== $number ) {
-				self::conflict( $report, $order_id, $number, self::reason_other_invoice( $existing->number ) );
+				self::conflict( $report, $order_id, $number, 'other_invoice', $existing->number );
 				return;
 			}
 
@@ -153,13 +180,16 @@ final class Importer {
 			if ( null === $existing->file ) {
 				self::file( $invoice, $existing->id, $existing->issued_at, $dry_run, $report, false );
 			}
+			if ( ! $dry_run ) {
+				self::guard( $report, $order_id, 'order note', static fn() => self::note( $order_id, $number ) );
+			}
 			return;
 		}
 
 		// Same answer as the unique keys of a real insert: a number already in the register,
 		// or one this run already took for an earlier order (a duplicate in the legacy meta).
 		if ( $dry_run && ( isset( $seen[ $number ] ) || Register::number_exists( Issuer::TYPE, $number ) ) ) {
-			self::conflict( $report, $order_id, $number, self::reason_number_used() );
+			self::conflict( $report, $order_id, $number, 'number_used' );
 			return;
 		}
 
@@ -167,7 +197,15 @@ final class Importer {
 		if ( ! $dry_run ) {
 			$id = Register::import( Issuer::TYPE, $order_id, $number, $invoice['sequence_key'], $invoice['sequence'], $invoice['issued_at'] );
 			if ( null === $id ) {
-				self::conflict( $report, $order_id, $number, self::reason_number_used() );
+				// Tell the refusals of the unique keys apart from a failed INSERT.
+				$current = Register::find( Issuer::TYPE, $order_id );
+				if ( null !== $current ) {
+					self::conflict( $report, $order_id, $number, 'other_invoice', $current->number );
+				} elseif ( Register::number_exists( Issuer::TYPE, $number ) ) {
+					self::conflict( $report, $order_id, $number, 'number_used' );
+				} else {
+					self::conflict( $report, $order_id, $number, 'database_error' );
+				}
 				return;
 			}
 		}
@@ -198,18 +236,26 @@ final class Importer {
 
 		self::guard( $report, $order_id, 'order meta', static fn() => self::meta( $order_id, $number, $invoice['issued_at'] ) );
 		self::file( $invoice, $id, $invoice['issued_at'], false, $report, true );
-		self::guard(
-			$report,
-			$order_id,
-			'order note',
-			static function () use ( $order_id, $number ): void {
-				$order = wc_get_order( $order_id );
-				if ( $order instanceof WC_Order ) {
-					/* translators: %s: invoice number */
-					$order->add_order_note( sprintf( __( 'Invoice %s imported from Facture PDF Lumia.', 'lumia-factures' ), $number ) );
-				}
-			}
-		);
+		self::guard( $report, $order_id, 'order note', static fn() => self::note( $order_id, $number ) );
+	}
+
+	/**
+	 * Adds the "imported" order note once: the flag meta marks it written, so a run resumed
+	 * after an interruption adds a missing note and never a second one.
+	 *
+	 * @param int    $order_id Order id.
+	 * @param string $number   Invoice number.
+	 */
+	private static function note( int $order_id, string $number ): void {
+		$order = wc_get_order( $order_id );
+		if ( ! $order instanceof WC_Order || '' !== (string) $order->get_meta( self::NOTED_META ) ) {
+			return;
+		}
+
+		/* translators: %s: invoice number */
+		$order->add_order_note( sprintf( __( 'Invoice %s imported from Facture PDF Lumia.', 'lumia-factures' ), $number ) );
+		$order->update_meta_data( self::NOTED_META, '1' );
+		$order->save();
 	}
 
 	/**
@@ -300,9 +346,12 @@ final class Importer {
 	}
 
 	/**
-	 * Raises each counter to the highest legacy value (legacy table or imported invoices). Never lowers.
+	 * Raises each counter to the highest legacy value (legacy table or given values). Never lowers.
 	 *
-	 * @param array<string, int> $highest Highest imported value per key.
+	 * Called before the invoices (from the meta tables) and after them (from the invoices read),
+	 * so the second call normally raises nothing. A dry run records what would be raised.
+	 *
+	 * @param array<string, int> $highest Highest legacy value per key.
 	 * @param bool               $dry_run Dry run.
 	 * @param Report             $report  Report.
 	 */
@@ -315,7 +364,8 @@ final class Importer {
 
 		foreach ( $highest as $key => $target ) {
 			$key = (string) $key;
-			if ( $target <= Sequences::current( $key ) ) {
+			// A dry run raises nothing: what it already planned counts as the current value.
+			if ( $target <= max( Sequences::current( $key ), $report->sequences[ $key ] ?? 0 ) ) {
 				continue;
 			}
 
@@ -326,16 +376,41 @@ final class Importer {
 	}
 
 	/**
-	 * Records a skipped legacy invoice.
+	 * Records a skipped legacy invoice: a translated reason in the report, an English line in the log.
 	 *
-	 * @param Report $report   Report.
-	 * @param int    $order_id Order id.
-	 * @param string $number   Legacy number.
-	 * @param string $reason   Reason (English, for the report and the log).
+	 * @param Report      $report   Report.
+	 * @param int         $order_id Order id.
+	 * @param string      $number   Legacy number.
+	 * @param string      $code     `other_invoice` (the order already has a row), `number_used`
+	 *                              (another order has the number) or `database_error`.
+	 * @param string|null $other    For `other_invoice`: the number in the register (null for a reservation).
 	 */
-	private static function conflict( Report $report, int $order_id, string $number, string $reason ): void {
-		$report->conflict( $order_id, $number, $reason );
-		self::log( 'Legacy invoice ' . $number . ' of order ' . $order_id . ' was not imported: ' . $reason );
+	private static function conflict( Report $report, int $order_id, string $number, string $code, ?string $other = null ): void {
+		switch ( $code ) {
+			case 'other_invoice':
+				if ( null === $other ) {
+					$reason = __( 'An invoice is being issued for this order.', 'lumia-factures' );
+					$log    = 'an invoice is being issued for this order';
+				} else {
+					/* translators: %s: invoice number */
+					$reason = sprintf( __( 'The order already has invoice %s.', 'lumia-factures' ), $other );
+					$log    = 'the order already has invoice ' . $other;
+				}
+				break;
+
+			case 'number_used':
+				$reason = __( 'The number is already used by another invoice.', 'lumia-factures' );
+				$log    = 'the number is already used by another invoice';
+				break;
+
+			default:
+				$code   = 'database_error';
+				$reason = __( 'The invoice could not be recorded (database error, see the PHP error log).', 'lumia-factures' );
+				$log    = 'the register insert failed (database error)';
+		}
+
+		$report->conflict( $order_id, $number, $code, $reason );
+		self::log( 'Legacy invoice ' . $number . ' of order ' . $order_id . ' was not imported: ' . $log . '.' );
 	}
 
 	/**
@@ -357,27 +432,6 @@ final class Importer {
 				$order_id
 			);
 		}
-	}
-
-	/**
-	 * Conflict reason: the number is already recorded for another order.
-	 */
-	private static function reason_number_used(): string {
-		return __( 'The number is already used by another invoice.', 'lumia-factures' );
-	}
-
-	/**
-	 * Conflict reason: the order already has another invoice in the register.
-	 *
-	 * @param string|null $number Number in the register (null for a reservation in progress).
-	 */
-	private static function reason_other_invoice( ?string $number ): string {
-		if ( null === $number ) {
-			return __( 'An invoice is being issued for this order.', 'lumia-factures' );
-		}
-
-		/* translators: %s: invoice number */
-		return sprintf( __( 'The order already has invoice %s.', 'lumia-factures' ), $number );
 	}
 
 	/**

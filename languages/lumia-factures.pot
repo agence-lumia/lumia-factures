@@ -407,6 +407,10 @@ msgstr ""
 msgid "The order already has invoice %s."
 msgstr ""
 
+#: includes/Modules/Invoices/Migration/Importer.php
+msgid "The invoice could not be recorded (database error, see the PHP error log)."
+msgstr ""
+
 #. translators: 1: setting name, e.g. design.font_body, 2: legacy font name
 #: includes/Modules/Invoices/Migration/LegacySettings.php:150
 #, php-format
