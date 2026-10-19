@@ -14,4 +14,4 @@ Core module (`includes/Modules/Invoices/`, locked: always active, cannot be deac
 
 - Every change under `includes/Modules/Invoices/` ships with PHPUnit integration tests (`npm test`, wp-env). See [CLAUDE.md](../../CLAUDE.md#deviations-from-lumia-tools).
 - The old plugin's code is reachable with `git show v1.1.1-legacy:<path>`; lot 2 ports it from there.
-- Storage under `wp-content/uploads/lumia-factures/` must stay unreachable from the web (see the Nginx rule in the [README](../../README.md#invoice-storage-protection)).
+- Storage under `wp-content/uploads/lumia-factures/` must stay unreachable from the web (planned for lot 2; see the Nginx rule in the [README](../../README.md#invoice-storage-protection)).

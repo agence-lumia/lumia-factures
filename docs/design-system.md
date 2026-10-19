@@ -34,7 +34,7 @@ window.lumiaFacturesModal.open({
 window.lumiaFacturesModal.close(); // programmatic close
 ```
 
-`confirmLabel` and `cancelLabel` default to the translated `lumiaFacturesAdmin.i18n.confirm` / `.cancel`; pass module strings from `lumiaFacturesAdmin.i18n` (see [core.md](core.md#translatable-strings-in-js)), never a literal.
+`confirmLabel` and `cancelLabel` default to the translated `lumiaFacturesAdmin.i18n.confirm` / `.cancel`; pass module strings from `lumiaFacturesAdmin.i18n` (see [core.md](core.md#js-globals-and-strings)), never a literal.
 
 Uses the `#lumia-factures-modal-overlay` singleton of `templates/admin/layout.php`.
 

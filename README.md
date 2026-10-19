@@ -39,7 +39,7 @@ Optionally, define `LUMIA_FACTURES_GITHUB_TOKEN` in `wp-config.php` to raise the
 
 ## Invoice storage protection
 
-Invoice PDFs live in `wp-content/uploads/lumia-factures/`. Apache/LiteSpeed sites are protected by an `.htaccess` file; **Nginx ignores it**, so add this rule to the server block:
+**Planned (lot 2), not implemented yet:** invoice PDFs will be stored in `wp-content/uploads/lumia-factures/`, protected on Apache/LiteSpeed by an `.htaccess` file. **Nginx ignores `.htaccess`**, so once storage lands, add this rule to the server block (harmless to add beforehand):
 
 ```nginx
 location ^~ /wp-content/uploads/lumia-factures/ { deny all; }
