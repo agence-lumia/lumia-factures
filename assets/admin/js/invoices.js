@@ -177,6 +177,30 @@
         event.stopPropagation();
       });
     });
+
+    // Raising is irreversible: confirm before the standalone form is submitted.
+    document.querySelectorAll(".lumia-factures-inv-raise-form").forEach(function (form) {
+      form.addEventListener("submit", function (event) {
+        var input = document.querySelector('[form="' + form.id + '"][name="value"]');
+        if (!input || !window.lumiaFacturesModal) return;
+        event.preventDefault();
+
+        var message = t("raiseMessage")
+          .replace("%1$s", input.getAttribute("data-lumia-factures-raise-key"))
+          .replace("%2$s", input.getAttribute("data-lumia-factures-raise-current"))
+          .replace("%3$s", input.value);
+
+        window.lumiaFacturesModal.open({
+          title: t("raiseTitle"),
+          message: message,
+          confirmLabel: t("raiseConfirm"),
+          danger: true,
+          onConfirm: function () {
+            form.submit();
+          },
+        });
+      });
+    });
   }
 
   /* ---------------- Tab from the URL hash ---------------- */

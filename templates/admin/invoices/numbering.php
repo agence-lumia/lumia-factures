@@ -95,7 +95,7 @@ $numbering_tags = [
 							<td>
 								<div class="lumia-inline">
 									<label class="screen-reader-text" for="<?php echo esc_attr( $numbering_input ); ?>"><?php echo esc_html__( 'New last number used', 'lumia-factures' ); ?></label>
-									<input type="number" class="lumia-input lumia-input--xs" id="<?php echo esc_attr( $numbering_input ); ?>" name="value" form="<?php echo esc_attr( $numbering_form ); ?>" min="<?php echo esc_attr( (string) ( $numbering_sequence['value'] + 1 ) ); ?>" step="1" value="<?php echo esc_attr( (string) ( $numbering_sequence['value'] + 1 ) ); ?>">
+									<input type="number" class="lumia-input lumia-input--xs" id="<?php echo esc_attr( $numbering_input ); ?>" name="value" form="<?php echo esc_attr( $numbering_form ); ?>" data-lumia-factures-raise-key="<?php echo esc_attr( $numbering_sequence['key'] ); ?>" data-lumia-factures-raise-current="<?php echo esc_attr( (string) $numbering_sequence['value'] ); ?>" min="<?php echo esc_attr( (string) ( $numbering_sequence['value'] + 1 ) ); ?>" step="1" value="<?php echo esc_attr( (string) ( $numbering_sequence['value'] + 1 ) ); ?>">
 									<button type="submit" class="lumia-btn lumia-btn--secondary lumia-btn--sm" form="<?php echo esc_attr( $numbering_form ); ?>" data-lumia-factures-raise><?php echo esc_html__( 'Raise', 'lumia-factures' ); ?></button>
 								</div>
 							</td>

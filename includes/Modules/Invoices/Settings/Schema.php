@@ -121,7 +121,8 @@ final class Schema {
 				return is_string( $value ) && in_array( $value, $field['options'], true ) ? $value : $previous;
 
 			case 'textarea':
-				return is_scalar( $value ) ? sanitize_textarea_field( (string) $value ) : $previous;
+				// Browsers post line breaks as CRLF: stored as LF so a saved form round-trips unchanged.
+				return is_scalar( $value ) ? sanitize_textarea_field( str_replace( [ "\r\n", "\r" ], "\n", (string) $value ) ) : $previous;
 
 			case 'statuses':
 			case 'emails':

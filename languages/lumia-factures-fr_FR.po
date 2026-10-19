@@ -1105,3 +1105,12 @@ msgstr "Utiliser cette image"
 
 msgid "Invalid format"
 msgstr "Format invalide"
+
+msgid "Raise this counter?"
+msgstr "Augmenter ce compteur ?"
+
+msgid "Raise the counter"
+msgstr "Augmenter le compteur"
+
+msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
+msgstr "Le compteur %1$s passe de %2$s à %3$s. Les numéros intermédiaires ne seront jamais utilisés, et un compteur ne peut jamais être diminué."

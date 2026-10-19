@@ -50,6 +50,11 @@ class SettingsSchemaTest extends TestCase {
 		$this->assertSame( '0102030405', $result['settings']['company']['phone'] );
 	}
 
+	public function test_textarea_line_breaks_are_normalised_to_lf(): void {
+		$result = Schema::sanitize( [ 'content' => [ 'message_body' => "a\r\nb\rc\nd" ] ], Schema::defaults() );
+		$this->assertSame( "a\nb\nc\nd", $result['settings']['content']['message_body'] );
+	}
+
 	public function test_absent_key_keeps_current(): void {
 		$current                     = Schema::defaults();
 		$current['company']['siret'] = '123';

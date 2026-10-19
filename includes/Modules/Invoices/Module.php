@@ -121,6 +121,10 @@ class Module extends AbstractModule {
 				'logoFrameTitle'  => __( 'Choose a logo', 'lumia-factures' ),
 				'logoFrameButton' => __( 'Use this image', 'lumia-factures' ),
 				'sampleInvalid'   => __( 'Invalid format', 'lumia-factures' ),
+				'raiseTitle'      => __( 'Raise this counter?', 'lumia-factures' ),
+				'raiseConfirm'    => __( 'Raise the counter', 'lumia-factures' ),
+				/* translators: 1: counter key, 2: current value, 3: new value. */
+				'raiseMessage'    => __( 'Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered.', 'lumia-factures' ),
 			],
 		];
 	}

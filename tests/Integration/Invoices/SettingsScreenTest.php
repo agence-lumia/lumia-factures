@@ -127,6 +127,75 @@ class SettingsScreenTest extends TestCase {
 		}
 	}
 
+	public function test_form_round_trip_leaves_the_settings_unchanged(): void {
+		$instance = Plugin::instance()->modules()->get_active_instances()['invoices'];
+		$instance->save_settings(
+			[
+				'company'   => [
+					'address'    => "1 rue Test\n75000 Paris",
+					'legal_form' => 'SAS',
+				],
+				'content'   => [
+					'message_body'       => "Line one\nLine two",
+					'col_sku_enabled'    => '1',
+					'footer_bic_enabled' => '1',
+					'invoice_title'      => 'Facture',
+				],
+				'numbering' => [
+					'reset_period' => 'monthly',
+					'format'       => 'F-{year}-{month}-{number:3}',
+				],
+				'design'    => [
+					'color_primary' => '#336699',
+					'font_size'     => '10.5',
+				],
+				'general'   => [ 'trigger_statuses' => [ 'completed' ] ],
+			]
+		);
+		$before = Module::settings();
+
+		$dom = new \DOMDocument();
+		libxml_use_internal_errors( true );
+		$dom->loadHTML( '<?xml encoding="utf-8"?>' . $this->render() );
+		libxml_clear_errors();
+
+		$form = $dom->getElementById( 'lumia-factures-module-form' );
+		$this->assertNotNull( $form );
+
+		// Like a browser: unchecked boxes are not posted, the last value of a name wins, textareas post CRLF.
+		$pairs = [];
+		foreach ( ( new \DOMXPath( $dom ) )->query( './/input | .//select | .//textarea', $form ) as $node ) {
+			$name = $node->getAttribute( 'name' );
+			if ( '' === $name || 0 !== strpos( $name, 'lumia_factures_module_settings[' ) ) {
+				continue;
+			}
+			$tag = $node->nodeName;
+			if ( 'input' === $tag ) {
+				$type = $node->getAttribute( 'type' );
+				if ( in_array( $type, [ 'checkbox', 'radio' ], true ) && ! $node->hasAttribute( 'checked' ) ) {
+					continue;
+				}
+				$value = $node->getAttribute( 'value' );
+			} elseif ( 'textarea' === $tag ) {
+				$value = str_replace( "\n", "\r\n", $node->textContent );
+			} else {
+				$value = '';
+				foreach ( ( new \DOMXPath( $dom ) )->query( './/option', $node ) as $i => $option ) {
+					if ( 0 === $i || $option->hasAttribute( 'selected' ) ) {
+						$value = $option->getAttribute( 'value' );
+					}
+				}
+			}
+			$pairs[] = rawurlencode( $name ) . '=' . rawurlencode( $value );
+		}
+		parse_str( implode( '&', $pairs ), $posted );
+
+		$instance->save_settings( $posted['lumia_factures_module_settings'] );
+
+		$this->assertSame( $before, Module::settings() );
+		$this->assertFalse( get_transient( 'lumia_factures_invoices_errors' ) );
+	}
+
 	public function test_list_settings_post_an_empty_entry_first(): void {
 		$html = $this->render();
 
