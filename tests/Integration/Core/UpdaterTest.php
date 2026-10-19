@@ -249,9 +249,9 @@ class UpdaterTest extends TestCase {
 
 	public function test_check_updates_requires_nonce_and_capability(): void {
 		$_POST = array();
-		$this->assertDies( 'administrator', array() );
+		$this->assertDies( 'administrator', array(), 'Invalid nonce.' );
 
-		$this->assertDies( 'editor', array( 'lumia_factures_check_nonce' => wp_create_nonce( 'lumia_factures_check_updates' ) ) );
+		$this->assertDies( 'editor', array( 'lumia_factures_check_nonce' => wp_create_nonce( 'lumia_factures_check_updates' ) ), 'Insufficient permissions.' );
 		$_POST = array();
 	}
 
@@ -260,8 +260,9 @@ class UpdaterTest extends TestCase {
 	 *
 	 * @param string               $role Role of the current user.
 	 * @param array<string, mixed> $post POST payload.
+	 * @param string               $message Expected wp_die() message.
 	 */
-	private function assertDies( string $role, array $post ): void {
+	private function assertDies( string $role, array $post, string $message ): void {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => $role ) ) );
 		$post_with_nonce = $post;
 		if ( 'administrator' !== $role ) {
@@ -271,7 +272,7 @@ class UpdaterTest extends TestCase {
 		try {
 			do_action( 'admin_post_lumia_factures_check_updates' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core admin-post hook with our action suffix.
 		} catch ( \WPDieException $e ) {
-			$this->assertNotEmpty( $e->getMessage() );
+			$this->assertSame( $message, $e->getMessage() );
 			return;
 		}
 		$this->fail( 'wp_die() expected for ' . $role );
