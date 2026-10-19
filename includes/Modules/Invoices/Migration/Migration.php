@@ -69,22 +69,19 @@ final class Migration {
 	}
 
 	/**
-	 * Whether this request may run the import by itself: cron, WP-CLI, or an admin page (not AJAX)
-	 * opened by a shop manager.
+	 * Whether this request may run the import by itself: WP cron, `wp cron event run`, or an admin
+	 * page (not AJAX) opened by a shop manager.
 	 *
 	 * `admin-post.php` and every `/wp-admin/` URL fire `init` before any authentication check, so
 	 * `is_admin()` alone would let an anonymous visitor (or a nopriv admin-post form) start the
 	 * import. The retry action runs the import itself: the auto-run stays out of that request.
-	 * Under WP-CLI the plugin's own commands (and their help) are left alone: `migrate --dry-run`
-	 * must report on the data as it is.
+	 * Under WP-CLI, see cli_may_auto_run().
 	 */
 	public static function may_auto_run(): bool {
 		if ( defined( 'WP_CLI' ) && WP_CLI ) {
 			$arguments = class_exists( 'WP_CLI' ) ? \WP_CLI::get_runner()->arguments : [];
-			$arguments = is_array( $arguments ) ? array_values( $arguments ) : [];
-			$command   = (string) ( $arguments[0] ?? '' );
 
-			return 'lumia-factures' !== $command && ! ( 'help' === $command && 'lumia-factures' === ( $arguments[1] ?? '' ) );
+			return self::cli_may_auto_run( is_array( $arguments ) ? $arguments : [] );
 		}
 
 		if ( wp_doing_cron() ) {
@@ -102,6 +99,20 @@ final class Migration {
 		}
 
 		return current_user_can( 'manage_woocommerce' );
+	}
+
+	/**
+	 * Whether a WP-CLI command may run the import by itself: only `wp cron event run ...`, which is
+	 * how a system cron drives WordPress. Any other command (a `wp option get` in a deploy script,
+	 * `wp plugin deactivate`) must not start a long write; `wp lumia-factures migrate` runs it
+	 * explicitly, and its dry run must report on the data as it is.
+	 *
+	 * @param array<int|string, mixed> $arguments Positional arguments of the command.
+	 */
+	public static function cli_may_auto_run( array $arguments ): bool {
+		$arguments = array_map( 'strval', array_slice( array_values( $arguments ), 0, 3 ) );
+
+		return [ 'cron', 'event', 'run' ] === $arguments;
 	}
 
 	/**
@@ -317,7 +328,6 @@ final class Migration {
 
 		return 'none' !== $status || self::has_data();
 	}
-
 
 	/**
 	 * Takes the run lock.

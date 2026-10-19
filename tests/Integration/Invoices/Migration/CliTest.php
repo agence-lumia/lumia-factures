@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices\Migration;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Core\Requirements;
 use Lumia\Factures\Modules\Invoices\Cli\Command;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
@@ -131,6 +132,79 @@ class CliTest extends TestCase {
 		$this->assertSame( 'done', $this->row( $rows, 'Status' ) );
 		$this->assertSame( 'no', $this->row( $rows, 'Issuing blocked' ) );
 		$this->assertSame( '1', $this->row( $rows, 'Invoices imported' ) );
+	}
+
+	/**
+	 * The runbook's dry run happens while the legacy plugin is still active: the modules do not
+	 * start, but the read-only commands work and a real run is refused.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
+	public function test_cli_dry_run_and_status_work_while_the_legacy_plugin_is_active(): void {
+		define( 'FPL_VERSION', '1.1.1' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- simulates the legacy plugin.
+		$this->assertArrayHasKey( 'legacy_active', Requirements::check() );
+
+		$order = $this->legacy_order( 'FA-0004', 4 );
+		$this->legacy->sequences( [ $this->key => 4 ] );
+
+		$dry = Command::migrate_data( true, false );
+		$this->assertSame( 'dry_run', $dry['outcome'] );
+		$this->assertSame( '1', $this->row( $dry['rows'], 'Invoices imported' ) );
+		$this->assertSame( '4', $this->row( $dry['rows'], 'Counter ' . $this->key ) );
+
+		// A real run, forced or not, is refused with the reason.
+		foreach ( [ false, true ] as $force ) {
+			$real = Command::migrate_data( false, $force );
+			$this->assertSame( 'blocked', $real['outcome'] );
+			$this->assertStringContainsString( 'Facture PDF Lumia', $real['error'] );
+		}
+
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( 0, Sequences::current( $this->key ) );
+		$this->assertFalse( get_option( Migration::OPTION ) );
+		$this->assertFalse( get_option( Migration::LOCK ) );
+
+		// The status works too, and says what blocks the plugin.
+		$rows = Command::status_rows();
+		$this->assertSame( 'none', $this->row( $rows, 'Status' ) );
+		$this->assertSame( 'legacy_active', $this->row( $rows, 'Blocked by' ) );
+		$this->assertSame( '4', $this->row( $rows, 'Highest legacy sequence ' . $this->key ) );
+	}
+
+	public function test_cli_status_compares_counters_with_the_legacy_sequences(): void {
+		$this->legacy_order( 'FA-0004', 4 );
+
+		$rows = Command::status_rows();
+		$this->assertSame( '-', $this->row( $rows, 'Blocked by' ) );
+		$this->assertSame( '4', $this->row( $rows, 'Highest legacy sequence ' . $this->key ) );
+		$this->assertNull( $this->row( $rows, 'Current counter ' . $this->key ) );
+
+		Command::migrate_data( false, false );
+		$this->assertSame( '4', $this->row( Command::status_rows(), 'Current counter ' . $this->key ) );
+	}
+
+	public function test_cli_dry_run_without_our_tables_reads_an_empty_register(): void {
+		$order = $this->legacy_order( 'FA-0004', 4 );
+		$this->assertSame( 'done', Command::migrate_data( false, false )['outcome'] );
+		Sequences::raise( $this->key, 10 );
+
+		// Our tables do not exist yet (the plugin never booted): empty register, counters at 0.
+		add_filter( 'lumia_factures_tables_exist', '__return_false' );
+		try {
+			$dry  = Command::migrate_data( true, false );
+			$rows = Command::status_rows();
+		} finally {
+			remove_filter( 'lumia_factures_tables_exist', '__return_false' );
+		}
+
+		$this->assertSame( 'dry_run', $dry['outcome'] );
+		$this->assertSame( '1', $this->row( $dry['rows'], 'Invoices imported' ) );
+		$this->assertSame( '0', $this->row( $dry['rows'], 'Invoices already imported' ) );
+		$this->assertSame( '4', $this->row( $dry['rows'], 'Counter ' . $this->key ) );
+		$this->assertNull( $this->row( $rows, 'Current counter ' . $this->key ) );
+		$this->assertSame( 'FA-0004', Register::find( 'invoice', $order->get_id() )->number );
+		$this->assertSame( 10, Sequences::current( $this->key ) );
 	}
 
 	/**

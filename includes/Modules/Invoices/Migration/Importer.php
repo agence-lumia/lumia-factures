@@ -10,6 +10,7 @@ namespace Lumia\Factures\Modules\Invoices\Migration;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\Plugin;
+use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
@@ -44,11 +45,34 @@ final class Importer {
 	public const NOTED_META = '_lumia_factures_import_noted';
 
 	/**
+	 * True during a dry run on a site whose tables do not exist yet (the plugin never started,
+	 * the legacy plugin still being active): the register reads as empty, the counters as 0.
+	 *
+	 * @var bool
+	 */
+	private static bool $no_tables = false;
+
+	/**
 	 * Runs the import.
 	 *
 	 * @param bool $dry_run True to compute the report without writing anything.
 	 */
 	public static function run( bool $dry_run ): Report {
+		self::$no_tables = $dry_run && ! Installer::tables_exist();
+
+		try {
+			return self::import( $dry_run );
+		} finally {
+			self::$no_tables = false;
+		}
+	}
+
+	/**
+	 * Runs the import (see run()).
+	 *
+	 * @param bool $dry_run True to compute the report without writing anything.
+	 */
+	private static function import( bool $dry_run ): Report {
 		$report = new Report();
 
 		self::log( ( $dry_run ? 'Dry run of the' : 'Running the' ) . ' Facture PDF Lumia import.' );
@@ -202,7 +226,7 @@ final class Importer {
 	private static function invoice( array $invoice, bool $dry_run, Report $report, array &$seen ): void {
 		$order_id = $invoice['order_id'];
 		$number   = $invoice['number'];
-		$existing = Register::find( Issuer::TYPE, $order_id );
+		$existing = self::$no_tables ? null : Register::find( Issuer::TYPE, $order_id );
 
 		if ( null !== $existing ) {
 			if ( $existing->number !== $number ) {
@@ -226,7 +250,7 @@ final class Importer {
 
 		// Same answer as the unique keys of a real insert: a number already in the register,
 		// or one this run already took for an earlier order (a duplicate in the legacy meta).
-		if ( $dry_run && ( isset( $seen[ $number ] ) || Register::number_exists( Issuer::TYPE, $number ) ) ) {
+		if ( $dry_run && ( isset( $seen[ $number ] ) || ( ! self::$no_tables && Register::number_exists( Issuer::TYPE, $number ) ) ) ) {
 			self::conflict( $report, $order_id, $number, 'number_used' );
 			return;
 		}
@@ -403,7 +427,8 @@ final class Importer {
 		foreach ( $highest as $key => $target ) {
 			$key = (string) $key;
 			// A dry run raises nothing: what it already planned counts as the current value.
-			if ( $target <= max( Sequences::current( $key ), $report->sequences[ $key ] ?? 0 ) ) {
+			$current = self::$no_tables ? 0 : Sequences::current( $key );
+			if ( $target <= max( $current, $report->sequences[ $key ] ?? 0 ) ) {
 				continue;
 			}
 

@@ -87,6 +87,35 @@ class Installer {
 	}
 
 	/**
+	 * Whether both tables exist.
+	 *
+	 * They may not yet: the tables are created when the module starts, and it does not start while
+	 * a requirement fails (the legacy plugin still active), when the read-only WP-CLI commands
+	 * already work.
+	 */
+	public static function tables_exist(): bool {
+		global $wpdb;
+
+		$exists = true;
+		foreach ( [ self::sequences_table(), self::documents_table() ] as $table ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Schema lookup, never cached.
+			if ( $table !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table ) ) ) ) {
+				$exists = false;
+			}
+		}
+
+		/**
+		 * Whether the tables of the module exist.
+		 *
+		 * @internal Test seam only, not a public extension point: a test cannot drop the tables
+		 *           (any DDL commits the test transaction).
+		 *
+		 * @param bool $exists True when both tables exist.
+		 */
+		return (bool) apply_filters( 'lumia_factures_tables_exist', $exists );
+	}
+
+	/**
 	 * Installs the tables when the stored version is lower than the code's.
 	 * Runs on init: updating a plugin does not run its activation hook.
 	 */

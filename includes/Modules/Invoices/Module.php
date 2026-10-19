@@ -16,7 +16,6 @@ use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
-use Lumia\Factures\Modules\Invoices\Cli\Command;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
@@ -64,9 +63,7 @@ class Module extends AbstractModule {
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
 
-		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI' ) ) {
-			\WP_CLI::add_command( 'lumia-factures', Command::class );
-		}
+		// The WP-CLI command is registered by Core\Plugin, whatever the requirements.
 	}
 
 	/**

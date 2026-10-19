@@ -367,6 +367,19 @@ class MigrationTest extends TestCase {
 		$this->assertSame( 'none', Migration::state()['status'] );
 	}
 
+	public function test_wp_cli_auto_runs_only_for_cron_event_run(): void {
+		$this->assertTrue( Migration::cli_may_auto_run( [ 'cron', 'event', 'run', '--due-now' ] ) );
+		$this->assertTrue( Migration::cli_may_auto_run( [ 'cron', 'event', 'run', 'woocommerce_cleanup_sessions' ] ) );
+
+		// Other commands never start it: our own migrate runs it explicitly, its dry run must not.
+		$this->assertFalse( Migration::cli_may_auto_run( [ 'lumia-factures', 'migrate', '--dry-run' ] ) );
+		$this->assertFalse( Migration::cli_may_auto_run( [ 'lumia-factures', 'migration-status' ] ) );
+		$this->assertFalse( Migration::cli_may_auto_run( [ 'cron', 'event', 'list' ] ) );
+		$this->assertFalse( Migration::cli_may_auto_run( [ 'option', 'get', 'siteurl' ] ) );
+		$this->assertFalse( Migration::cli_may_auto_run( [ 'plugin', 'deactivate', 'facture-pdf-lumia' ] ) );
+		$this->assertFalse( Migration::cli_may_auto_run( [] ) );
+	}
+
 	public function test_heartbeat_keeps_a_long_run_from_being_taken_over(): void {
 		global $wpdb;
 

@@ -9,9 +9,12 @@ namespace Lumia\Factures\Modules\Invoices\Cli;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Core\Requirements;
+use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\LegacySource;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
+use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use WP_CLI;
 
 /**
@@ -19,6 +22,10 @@ use WP_CLI;
  *
  * The logic lives in static methods returning data (`migrate_data()`, `status_rows()`), so the
  * tests call them without WP-CLI; the subcommands only print.
+ *
+ * Registered by Core\Plugin whatever the requirements: `migrate --dry-run` and `migration-status`
+ * only read, and must work while the legacy plugin is still active (the rollout dry run). A real
+ * run is refused while a requirement fails.
  */
 final class Command {
 
@@ -53,6 +60,9 @@ final class Command {
 				return;
 			case 'busy':
 				WP_CLI::error( 'Another import is running. Try again in a few minutes.' );
+				// WP_CLI::error() exits.
+			case 'blocked':
+				WP_CLI::error( 'The import cannot run: ' . $result['error'] );
 		}
 
 		// A failed run has no report: no empty table.
@@ -95,8 +105,12 @@ final class Command {
 	 *
 	 * @param bool $dry_run True to report without writing.
 	 * @param bool $force   True to run even when the import is done.
+	 * A real run is refused (`blocked`) while a requirement fails: the legacy plugin still active
+	 * would keep numbering behind the import. A dry run only reads, and only needs WooCommerce.
+	 *
 	 * @return array{outcome: string, rows: array<int, array{field: string, value: string}>, conflicts: array<int, array{order_id: int, number: string, reason: string}>, notes: string[], error: string}
-	 *         `outcome`: `dry_run`, `done`, `done_with_conflicts`, `failed`, `busy`, `already_done` or `no_data`.
+	 *         `outcome`: `dry_run`, `done`, `done_with_conflicts`, `failed`, `busy`, `blocked`,
+	 *         `already_done` or `no_data`.
 	 */
 	public static function migrate_data( bool $dry_run, bool $force ): array {
 		$result = [
@@ -106,6 +120,17 @@ final class Command {
 			'notes'     => [],
 			'error'     => '',
 		];
+
+		$errors = Requirements::check();
+		if ( $dry_run ) {
+			$errors = array_intersect_key( $errors, [ 'woocommerce' => true ] );
+		}
+
+		if ( [] !== $errors ) {
+			$result['outcome'] = 'blocked';
+			$result['error']   = implode( ' ', $errors );
+			return $result;
+		}
 
 		// A fresh lookup (never the cached negative answer); --force does not import "nothing" either.
 		Migration::forget_no_data();
@@ -145,13 +170,19 @@ final class Command {
 	/**
 	 * Rows of the status table.
 	 *
+	 * Besides the state and the last report: the requirements that keep the plugin from starting
+	 * (`-` for none), the current counters (none while the tables do not exist) and the highest
+	 * legacy sequence per key, which the counter of the same key must have reached after the import.
+	 *
 	 * @return array<int, array{field: string, value: string}>
 	 */
 	public static function status_rows(): array {
-		$state = Migration::state();
+		$state  = Migration::state();
+		$errors = array_keys( Requirements::check() );
 
 		$rows = [
 			self::row( 'Status', $state['status'] ),
+			self::row( 'Blocked by', [] === $errors ? '-' : implode( ', ', $errors ) ),
 			self::row( 'Issuing blocked', Migration::blocks_issuing() ? 'yes' : 'no' ),
 			self::row( 'Started', self::date( $state['started_at'] ) ),
 			self::row( 'Finished', self::date( $state['finished_at'] ) ),
@@ -163,6 +194,20 @@ final class Command {
 
 		if ( [] !== $state['report'] ) {
 			$rows = array_merge( $rows, self::from_report( $state['report'] )['rows'] );
+		}
+
+		foreach ( Installer::tables_exist() ? Sequences::all() : [] as $sequence ) {
+			$rows[] = self::row( 'Current counter ' . $sequence['key'], (string) $sequence['value'] );
+		}
+
+		$legacy = LegacySource::max_sequences();
+		foreach ( LegacySource::sequences() as $key => $value ) {
+			$legacy[ $key ] = max( $legacy[ $key ] ?? 0, $value );
+		}
+		ksort( $legacy );
+
+		foreach ( $legacy as $key => $value ) {
+			$rows[] = self::row( 'Highest legacy sequence ' . $key, (string) $value );
 		}
 
 		return $rows;
