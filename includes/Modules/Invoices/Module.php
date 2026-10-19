@@ -10,6 +10,7 @@ namespace Lumia\Factures\Modules\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\AbstractModule;
+use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 /**
@@ -21,7 +22,30 @@ class Module extends AbstractModule {
 	/**
 	 * Registers the module hooks.
 	 */
-	public function init(): void {}
+	public function init(): void {
+		add_action( 'init', [ Installer::class, 'maybe_upgrade' ] );
+	}
+
+	/**
+	 * Creates the tables on activation.
+	 */
+	public function on_activate(): void {
+		Installer::install();
+	}
+
+	/**
+	 * Data owned by the module, removed on uninstall only when
+	 * LUMIA_FACTURES_REMOVE_ALL_DATA is true. The storage folder is never deleted.
+	 *
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[], tables?: string[], cron?: string[]}
+	 */
+	public static function get_uninstall_keys(): array {
+		return [
+			'options' => [ 'lumia_factures_module_invoices', Installer::OPTION ],
+			'meta'    => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date' ],
+			'tables'  => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
+		];
+	}
 
 	/**
 	 * Default settings, keyed by group.

@@ -38,6 +38,8 @@ tests_add_filter(
 		if ( class_exists( 'WC_Install' ) ) {
 			WC_Install::install();
 		}
+		// Real tables must exist before the first test: inside a test, CREATE TABLE becomes CREATE TEMPORARY TABLE.
+		\Lumia\Factures\Modules\Invoices\Database\Installer::install();
 	}
 );
 
