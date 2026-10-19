@@ -20,6 +20,8 @@ use Lumia\Factures\Modules\Invoices\Cli\Command;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
+use Lumia\Factures\Modules\Invoices\Front\Shortcode;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
@@ -50,6 +52,9 @@ class Module extends AbstractModule {
 
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
+
+		CustomerDownload::register();
+		Shortcode::register();
 
 		// admin-post.php requests are is_admin() too.
 		if ( is_admin() ) {
