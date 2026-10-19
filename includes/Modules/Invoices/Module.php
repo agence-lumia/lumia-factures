@@ -183,7 +183,10 @@ class Module extends AbstractModule {
 	 * @param array<string, mixed> $settings Raw payload (unslashed).
 	 */
 	public function save_settings( array $settings ): bool {
-		$result = Schema::sanitize( $settings, self::settings() );
+		$current = self::settings();
+		$result  = Schema::sanitize( $settings, $current );
+
+		self::carry_counter( $current['numbering'], $result['settings']['numbering'] );
 
 		if ( [] !== $result['errors'] ) {
 			set_transient( 'lumia_factures_invoices_errors', $result['errors'], MINUTE_IN_SECONDS );
@@ -192,5 +195,42 @@ class Module extends AbstractModule {
 		}
 
 		return $this->save_module_settings( $result['settings'] );
+	}
+
+	/**
+	 * Keeps the invoice series going when the numbering policy changes.
+	 *
+	 * The reset policy chooses the counter key (`invoice`, `invoice_2026`, `invoice_2026_10`). A new
+	 * policy moves to another key that starts at the start number, behind the numbers already issued:
+	 * they would collide, or the series would restart within the period. The counter the new policy
+	 * uses for the current period is raised to the current value of the old one (never lowered).
+	 *
+	 * @param array<string, mixed> $before Numbering settings before the save.
+	 * @param array<string, mixed> $after  Numbering settings about to be saved.
+	 */
+	private static function carry_counter( array $before, array $after ): void {
+		$changed = false;
+		foreach ( [ 'format', 'reset_enabled', 'reset_period' ] as $field ) {
+			if ( ( $before[ $field ] ?? null ) !== ( $after[ $field ] ?? null ) ) {
+				$changed = true;
+			}
+		}
+
+		if ( ! $changed ) {
+			return;
+		}
+
+		$now     = time();
+		$old_key = Sequences::key( Issuer::TYPE, $now, $before );
+		$new_key = Sequences::key( Issuer::TYPE, $now, $after );
+		$value   = Sequences::current( $old_key );
+
+		if ( $old_key === $new_key || $value <= 0 ) {
+			return;
+		}
+
+		if ( Sequences::raise( $new_key, $value ) ) {
+			error_log( '[lumia-factures] Numbering policy changed: counter ' . $new_key . ' raised to ' . $value . ', the current value of ' . $old_key . ', so the series goes on.' ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Operational log, the project convention.
+		}
 	}
 }

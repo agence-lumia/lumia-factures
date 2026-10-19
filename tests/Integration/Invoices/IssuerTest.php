@@ -259,6 +259,26 @@ class IssuerTest extends TestCase {
 		$this->assertStringContainsString( (string) $doc->number, $captured[0] );
 	}
 
+	public function test_issued_note_is_written_before_rendering(): void {
+		$notes   = null;
+		$capture = function ( string $html, WC_Order $order ) use ( &$notes ): string {
+			$notes = array_map( static fn( $note ): string => (string) $note->content, wc_get_order_notes( [ 'order_id' => $order->get_id() ] ) );
+			return $html;
+		};
+		add_filter( 'lumia_factures_invoice_html', $capture, 10, 2 );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_filter( 'lumia_factures_invoice_html', $capture, 10 );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->track( $doc );
+		$this->assertIsArray( $notes );
+		$this->assertContains( sprintf( 'Invoice %s issued.', $doc->number ), $notes );
+		$this->assertFalse( $this->has_note_containing( $order, 'could not be' ) );
+	}
+
 	public function test_exception_after_assign_keeps_number_and_meta_is_backfilled(): void {
 		$throw = static function ( WC_Order $saved ): void {
 			if ( '' !== (string) $saved->get_meta( '_lumia_factures_invoice_number' ) ) {
@@ -379,7 +399,7 @@ class IssuerTest extends TestCase {
 		$this->assertNotEmpty( $doc->number );
 		$this->assertNull( $doc->file );
 		$this->assertTrue(
-			$this->has_note( $order, sprintf( 'Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download.', $doc->number ) )
+			$this->has_note( $order, sprintf( 'The PDF of invoice %s could not be stored; the PDF will be built on first download.', $doc->number ) )
 		);
 
 		$this->assertTrue( Issuer::restore( $doc, wc_get_order( $order->get_id() ) ) );
@@ -406,7 +426,8 @@ class IssuerTest extends TestCase {
 		$this->assertNull( $doc->file );
 		$this->assertNull( $doc->checksum );
 		$this->assertSame( $doc->number, wc_get_order( $order->get_id() )->get_meta( '_lumia_factures_invoice_number' ) );
-		$this->assertTrue( $this->has_note_containing( $order, 'PDF will be built on first download' ) );
+		$this->assertTrue( $this->has_note( $order, sprintf( 'Invoice %s issued.', $doc->number ) ) );
+		$this->assertTrue( $this->has_note( $order, sprintf( 'The PDF of invoice %s could not be generated; the PDF will be built on first download.', $doc->number ) ) );
 
 		// The first restore records the file once, keeping the number.
 		$this->assertTrue( Issuer::restore( $doc, wc_get_order( $order->get_id() ) ) );
@@ -416,25 +437,65 @@ class IssuerTest extends TestCase {
 		$this->assertTrue( Archive::verify( $restored ) );
 	}
 
-	public function test_duplicate_number_burns_sequence_with_note(): void {
-		update_option(
-			'lumia_factures_module_invoices',
-			[
-				'numbering' => [
-					'format'        => 'FA-{number}',
-					'reset_enabled' => false,
-				],
-			]
-		);
+	public function test_number_already_issued_is_skipped_without_note(): void {
+		$this->flat_format();
 		$key  = $this->key();
 		$next = Sequences::current( $key ) + 1;
 
-		// Another row already holds the number the next sequence value would give.
-		$other = (int) Register::reserve( 'invoice', 987654 );
-		Register::assign( $other, 'FA-' . $next, 'manual', 1, time() );
+		// Other invoices already hold the numbers the next two sequence values would give.
+		$this->occupy( 'FA-' . $next, 987654 );
+		$this->occupy( 'FA-' . ( $next + 1 ), 987655 );
 
 		$order = $this->order();
 		$order->update_status( 'processing' );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->track( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertSame( 'FA-' . ( $next + 2 ), $doc->number );
+		$this->assertSame( $next + 2, $doc->sequence );
+		$this->assertSame( $next + 2, Sequences::current( $key ) );
+		// The skipped values are printed on other invoices: the printed series has no gap, so no note.
+		$this->assertFalse( $this->has_note_containing( $order, 'skipped' ) );
+	}
+
+	public function test_number_retry_is_bounded(): void {
+		$this->flat_format();
+		$key  = $this->key();
+		$next = Sequences::current( $key ) + 1;
+
+		for ( $i = 0; $i < 20; $i++ ) {
+			$this->occupy( 'FA-' . ( $next + $i ), 900000 + $i );
+		}
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( $next + 19, Sequences::current( $key ) );
+		$this->assertTrue( $this->has_note( $order, 'Invoice could not be numbered.' ) );
+		$this->assertFalse( $this->has_note_containing( $order, 'skipped' ) );
+
+		// The next call goes on from there.
+		$again = Issuer::issue( wc_get_order( $order->get_id() ) );
+		$this->track( $again );
+		$this->assertSame( 'FA-' . ( $next + 20 ), $again->number );
+	}
+
+	public function test_record_failure_that_is_not_a_duplicate_burns_sequence_with_note(): void {
+		$this->flat_format();
+		$key  = $this->key();
+		$next = Sequences::current( $key ) + 1;
+
+		$break = static function ( string $query ): string {
+			return str_contains( $query, "SET status = 'issued'" ) ? 'SELECT 0 FROM DUAL WHERE 1 = 0' : $query;
+		};
+		add_filter( 'query', $break );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_filter( 'query', $break );
 
 		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
 		$this->assertSame( $next, Sequences::current( $key ) );
@@ -444,6 +505,74 @@ class IssuerTest extends TestCase {
 				sprintf( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'FA-' . $next, $next )
 			)
 		);
+	}
+
+	public function test_switch_yearly_to_no_reset_continues_the_series(): void {
+		Sequences::raise( Sequences::key( 'invoice', time(), Module::settings()['numbering'] ), 41 );
+		$first = $this->issued();
+		$this->assertSame( 'FA-' . wp_date( 'Y' ) . '-00042', $first->number );
+
+		$this->save( [ 'numbering' => [ 'reset_enabled' => '0' ] ] );
+		$this->assertSame( 'invoice', $this->key() );
+
+		$second = $this->issued();
+		$this->assertSame( 'FA-' . wp_date( 'Y' ) . '-00043', $second->number );
+		$this->assertFalse( $this->has_note_containing( wc_get_order( $second->order_id ), 'skipped' ) );
+	}
+
+	public function test_switch_monthly_to_yearly_continues_the_series(): void {
+		update_option(
+			'lumia_factures_module_invoices',
+			[
+				'numbering' => [
+					'format'        => 'FA-{year}-{month}-{number}',
+					'reset_enabled' => true,
+					'reset_period'  => 'monthly',
+				],
+			]
+		);
+		Sequences::raise( $this->key(), 7 );
+		$prefix = 'FA-' . wp_date( 'Y' ) . '-' . wp_date( 'm' ) . '-';
+		$first  = $this->issued();
+		$this->assertSame( $prefix . '8', $first->number );
+
+		$this->save( [ 'numbering' => [ 'reset_period' => 'yearly' ] ] );
+		$this->assertSame( 'invoice_' . wp_date( 'Y' ), $this->key() );
+
+		$second = $this->issued();
+		$this->assertSame( $prefix . '9', $second->number );
+		$this->assertFalse( $this->has_note_containing( wc_get_order( $second->order_id ), 'skipped' ) );
+	}
+
+	public function test_switch_no_reset_to_yearly_continues_the_series(): void {
+		update_option(
+			'lumia_factures_module_invoices',
+			[
+				'numbering' => [
+					'format'        => 'FA-{year}-{number:5}',
+					'reset_enabled' => false,
+				],
+			]
+		);
+		Sequences::raise( 'invoice', 41 );
+		$first = $this->issued();
+		$this->assertSame( 'FA-' . wp_date( 'Y' ) . '-00042', $first->number );
+
+		$this->save( [ 'numbering' => [ 'reset_enabled' => '1' ] ] );
+		$this->assertSame( 'invoice_' . wp_date( 'Y' ), $this->key() );
+
+		$second = $this->issued();
+		$this->assertSame( 'FA-' . wp_date( 'Y' ) . '-00043', $second->number );
+		$this->assertFalse( $this->has_note_containing( wc_get_order( $second->order_id ), 'skipped' ) );
+	}
+
+	public function test_policy_change_never_lowers_the_new_counter(): void {
+		Sequences::raise( 'invoice', 90 );
+		Sequences::raise( $this->key(), 5 );
+
+		$this->save( [ 'numbering' => [ 'reset_enabled' => '0' ] ] );
+
+		$this->assertSame( 90, Sequences::current( 'invoice' ) );
 	}
 
 	public function test_sequence_failure_releases_row(): void {
@@ -488,6 +617,56 @@ class IssuerTest extends TestCase {
 	 */
 	private function order(): WC_Order {
 		return OrderFactory::order( [ [ OrderFactory::simple_product( 10.0, '', 'Croquettes' ), 2 ] ] );
+	}
+
+	/**
+	 * An order moved to a trigger status, and its issued invoice.
+	 */
+	private function issued(): IssuedDocument {
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertNotNull( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->track( $doc );
+
+		return $doc;
+	}
+
+	/**
+	 * Saves settings through the module, as the settings form does.
+	 *
+	 * @param array<string, mixed> $settings Posted settings.
+	 */
+	private function save( array $settings ): void {
+		( new Module( 'invoices' ) )->save_settings( $settings );
+	}
+
+	/**
+	 * A flat `FA-{number}` format without reset.
+	 */
+	private function flat_format(): void {
+		update_option(
+			'lumia_factures_module_invoices',
+			[
+				'numbering' => [
+					'format'        => 'FA-{number}',
+					'reset_enabled' => false,
+				],
+			]
+		);
+	}
+
+	/**
+	 * Records an invoice number on another order.
+	 *
+	 * @param string $number   Number.
+	 * @param int    $order_id Order id.
+	 */
+	private function occupy( string $number, int $order_id ): void {
+		$id = (int) Register::reserve( 'invoice', $order_id );
+		$this->assertTrue( Register::assign( $id, $number, 'manual', 1, time() ) );
 	}
 
 	/**

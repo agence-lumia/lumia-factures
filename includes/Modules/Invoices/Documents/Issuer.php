@@ -39,6 +39,11 @@ final class Issuer {
 	public const STALE_AFTER = 600;
 
 	/**
+	 * Maximum counter values tried for one invoice when the numbers they give are already issued.
+	 */
+	private const MAX_NUMBER_ATTEMPTS = 20;
+
+	/**
 	 * Hook `woocommerce_order_status_changed`: issues the invoice when the new status is a trigger.
 	 *
 	 * An invoice failure never breaks the status change: everything is caught and logged.
@@ -112,53 +117,25 @@ final class Issuer {
 			return null !== $current && 'issued' === $current->status ? $current : null;
 		}
 
-		$settings  = Module::settings();
-		$numbering = $settings['numbering'];
-		$now       = time();
-		$key       = Sequences::key( self::TYPE, $now, $numbering );
-		$sequence  = Sequences::next( $key, (int) ( $numbering['start_number'] ?? 1 ) );
-
-		if ( 0 === $sequence ) {
-			Register::release( $id );
-			self::log( 'Invoice of order ' . $order_id . ' could not be numbered: no value from the sequence ' . $key . '.' );
-			$order->add_order_note( __( 'Invoice could not be numbered.', 'lumia-factures' ) );
+		$settings = Module::settings();
+		$now      = time();
+		$assigned = self::number( $id, $order, $settings['numbering'], $now );
+		if ( null === $assigned ) {
 			return null;
 		}
 
-		try {
-			$number = NumberFormat::build( (string) $numbering['format'], $sequence, $order, $now );
-		} catch ( Throwable $e ) {
-			Register::release( $id );
-			self::log( 'Invoice number of order ' . $order_id . ' could not be built from sequence ' . $key . ' = ' . $sequence . '; this sequence value is skipped: ' . $e->getMessage() );
-			$order->add_order_note(
-				sprintf(
-					/* translators: %d: sequence value */
-					__( 'Invoice sequence value %d could not be turned into a number; this sequence value is skipped.', 'lumia-factures' ),
-					$sequence
-				)
-			);
-			return null;
-		}
-
-		if ( ! Register::assign( $id, $number, $key, $sequence, $now ) ) {
-			Register::release( $id );
-			self::log( 'Invoice number ' . $number . ' (sequence ' . $key . ' = ' . $sequence . ') could not be recorded for order ' . $order_id . '; this sequence value is skipped.' );
-			$order->add_order_note(
-				sprintf(
-					/* translators: 1: invoice number, 2: sequence value */
-					__( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'lumia-factures' ),
-					$number,
-					$sequence
-				)
-			);
-			return null;
-		}
+		[ $number, $key, $sequence ] = $assigned;
 
 		// The number is recorded: from here on every step is attempted even when an earlier one
 		// fails (a third-party hook throwing on save, a broken render), and each failure is logged.
 		$doc = new IssuedDocument( $id, self::TYPE, $order_id, 'issued', $number, $key, $sequence, $now, null, null );
 
 		self::guard( 'order meta', $order_id, static fn() => self::sync_meta( $doc, $order ) );
+
+		// Written before rendering, so a fatal error inside Dompdf still leaves the number on the order.
+		/* translators: %s: invoice number */
+		$issued_note = sprintf( __( 'Invoice %s issued.', 'lumia-factures' ), $number );
+		self::guard( 'order note', $order_id, static fn() => $order->add_order_note( $issued_note ) );
 
 		$outcome = 'render_failed';
 		self::guard(
@@ -186,7 +163,9 @@ final class Issuer {
 			}
 		);
 
-		self::guard( 'order note', $order_id, static fn() => $order->add_order_note( self::issued_note( $outcome, $number ) ) );
+		if ( 'stored' !== $outcome ) {
+			self::guard( 'PDF failure note', $order_id, static fn() => $order->add_order_note( self::pdf_failure_note( $outcome, $number ) ) );
+		}
 
 		$doc = Register::find( self::TYPE, $order_id ) ?? $doc;
 
@@ -253,24 +232,90 @@ final class Issuer {
 	}
 
 	/**
-	 * Order note written once the invoice is numbered.
+	 * Gives the reserved row its number.
 	 *
-	 * @param string $outcome `stored`, `store_failed` or `render_failed`.
-	 * @param string $number  Invoice number.
+	 * A value whose number is already recorded on another invoice (a counter moved behind the
+	 * issued numbers, e.g. by a reset policy change) is skipped silently and the next value is
+	 * taken: that number is printed on the other invoice, so the printed series keeps no gap.
+	 * Any other failure releases the row, notes the burned value on the order and stops.
+	 *
+	 * @param int                  $id        Reserved row id.
+	 * @param WC_Order             $order     Order.
+	 * @param array<string, mixed> $numbering The `numbering` settings.
+	 * @param int                  $now       Issue timestamp.
+	 * @return array{0: string, 1: string, 2: int}|null Number, counter key and value; null when not numbered.
 	 */
-	private static function issued_note( string $outcome, string $number ): string {
-		if ( 'stored' === $outcome ) {
-			/* translators: %s: invoice number */
-			return sprintf( __( 'Invoice %s issued.', 'lumia-factures' ), $number );
+	private static function number( int $id, WC_Order $order, array $numbering, int $now ): ?array {
+		$order_id = $order->get_id();
+		$key      = Sequences::key( self::TYPE, $now, $numbering );
+
+		for ( $attempt = 1; $attempt <= self::MAX_NUMBER_ATTEMPTS; $attempt++ ) {
+			$sequence = Sequences::next( $key, (int) ( $numbering['start_number'] ?? 1 ) );
+
+			if ( 0 === $sequence ) {
+				Register::release( $id );
+				self::log( 'Invoice of order ' . $order_id . ' could not be numbered: no value from the sequence ' . $key . '.' );
+				$order->add_order_note( __( 'Invoice could not be numbered.', 'lumia-factures' ) );
+				return null;
+			}
+
+			try {
+				$number = NumberFormat::build( (string) $numbering['format'], $sequence, $order, $now );
+			} catch ( Throwable $e ) {
+				Register::release( $id );
+				self::log( 'Invoice number of order ' . $order_id . ' could not be built from sequence ' . $key . ' = ' . $sequence . '; this sequence value is skipped: ' . $e->getMessage() );
+				$order->add_order_note(
+					sprintf(
+						/* translators: %d: sequence value */
+						__( 'Invoice sequence value %d could not be turned into a number; this sequence value is skipped.', 'lumia-factures' ),
+						$sequence
+					)
+				);
+				return null;
+			}
+
+			if ( Register::assign( $id, $number, $key, $sequence, $now ) ) {
+				return [ $number, $key, $sequence ];
+			}
+
+			if ( ! Register::number_exists( self::TYPE, $number ) ) {
+				Register::release( $id );
+				self::log( 'Invoice number ' . $number . ' (sequence ' . $key . ' = ' . $sequence . ') could not be recorded for order ' . $order_id . '; this sequence value is skipped.' );
+				$order->add_order_note(
+					sprintf(
+						/* translators: 1: invoice number, 2: sequence value */
+						__( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'lumia-factures' ),
+						$number,
+						$sequence
+					)
+				);
+				return null;
+			}
+
+			self::log( 'Invoice number ' . $number . ' (sequence ' . $key . ' = ' . $sequence . ') is already issued; order ' . $order_id . ' takes the next value.' );
 		}
 
+		Register::release( $id );
+		self::log( 'Invoice of order ' . $order_id . ' could not be numbered: ' . self::MAX_NUMBER_ATTEMPTS . ' values of the sequence ' . $key . ' gave numbers already issued. Raise the counter above the issued numbers.' );
+		$order->add_order_note( __( 'Invoice could not be numbered.', 'lumia-factures' ) );
+
+		return null;
+	}
+
+	/**
+	 * Order note written when the PDF of a numbered invoice could not be archived.
+	 *
+	 * @param string $outcome `store_failed` or `render_failed`.
+	 * @param string $number  Invoice number.
+	 */
+	private static function pdf_failure_note( string $outcome, string $number ): string {
 		if ( 'store_failed' === $outcome ) {
 			/* translators: %s: invoice number */
-			return sprintf( __( 'Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download.', 'lumia-factures' ), $number );
+			return sprintf( __( 'The PDF of invoice %s could not be stored; the PDF will be built on first download.', 'lumia-factures' ), $number );
 		}
 
 		/* translators: %s: invoice number */
-		return sprintf( __( 'Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download.', 'lumia-factures' ), $number );
+		return sprintf( __( 'The PDF of invoice %s could not be generated; the PDF will be built on first download.', 'lumia-factures' ), $number );
 	}
 
 	/**

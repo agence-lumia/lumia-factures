@@ -53,6 +53,21 @@ final class Register {
 	}
 
 	/**
+	 * Whether a number is already recorded for a document type.
+	 *
+	 * @param string $type   Document type.
+	 * @param string $number Printed number.
+	 */
+	public static function number_exists( string $type, string $number ): bool {
+		global $wpdb;
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		return null !== $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE type = %s AND number = %s", $type, $number ) );
+	}
+
+	/**
 	 * Reserves the right to issue a document for an order.
 	 *
 	 * @param string $type     Document type.
