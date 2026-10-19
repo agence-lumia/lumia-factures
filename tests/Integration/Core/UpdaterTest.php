@@ -246,4 +246,65 @@ class UpdaterTest extends TestCase {
 		$this->assertFalse( get_transient( 'lumia_factures_github_update_dev' ) );
 		$this->assertFalse( get_site_transient( 'update_plugins' ) );
 	}
+
+	public function test_check_updates_requires_nonce_and_capability(): void {
+		$_POST = array();
+		$this->assertDies( 'administrator', array() );
+
+		$this->assertDies( 'editor', array( 'lumia_factures_check_nonce' => wp_create_nonce( 'lumia_factures_check_updates' ) ) );
+		$_POST = array();
+	}
+
+	/**
+	 * Fires the manual update check as a role and expects wp_die().
+	 *
+	 * @param string               $role Role of the current user.
+	 * @param array<string, mixed> $post POST payload.
+	 */
+	private function assertDies( string $role, array $post ): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => $role ) ) );
+		$post_with_nonce = $post;
+		if ( 'administrator' !== $role ) {
+			$post_with_nonce['lumia_factures_check_nonce'] = wp_create_nonce( 'lumia_factures_check_updates' );
+		}
+		$_POST = $post_with_nonce;
+		try {
+			do_action( 'admin_post_lumia_factures_check_updates' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core admin-post hook with our action suffix.
+		} catch ( \WPDieException $e ) {
+			$this->assertNotEmpty( $e->getMessage() );
+			return;
+		}
+		$this->fail( 'wp_die() expected for ' . $role );
+	}
+
+	public function test_auto_update_toggle_writes_site_option(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
+		delete_site_option( 'auto_update_plugins' );
+		// The test image may define AUTOMATIC_UPDATER_DISABLED, which turns the whole feature off.
+		add_filter( 'automatic_updater_disabled', '__return_false' );
+
+		$this->save_global_with( array( 'auto_update' => '1' ) );
+		$this->assertContains( self::BASENAME, (array) get_site_option( 'auto_update_plugins', array() ) );
+
+		$this->save_global_with(
+			array(
+				'auto_update_initial' => '1',
+			)
+		);
+		$this->assertNotContains( self::BASENAME, (array) get_site_option( 'auto_update_plugins', array() ) );
+	}
+
+	/**
+	 * Runs SaveHandler::save_global() with a global-settings payload.
+	 *
+	 * @param array<string, mixed> $payload Payload of lumia_factures_global.
+	 */
+	private function save_global_with( array $payload ): void {
+		$_POST['lumia_factures_global'] = $payload;
+		$handler                        = new SaveHandler( Plugin::instance()->modules(), Plugin::instance()->settings(), 'lumia-factures', Plugin::instance()->updater() );
+		$method                         = new \ReflectionMethod( $handler, 'save_global' );
+		$method->setAccessible( true );
+		$method->invoke( $handler );
+		unset( $_POST['lumia_factures_global'] );
+	}
 }

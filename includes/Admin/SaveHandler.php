@@ -103,10 +103,10 @@ class SaveHandler {
 		wp_safe_redirect(
 			add_query_arg(
 				[
-					'page'              => $this->slug,
-					'tab'               => $tab,
-					'lumia_notice'      => $notice,
-					'lumia_notice_type' => 'success',
+					'page'                       => $this->slug,
+					'tab'                        => $tab,
+					'lumia_factures_notice'      => $notice,
+					'lumia_factures_notice_type' => 'success',
 				],
 				admin_url( 'admin.php' )
 			)
@@ -183,10 +183,10 @@ class SaveHandler {
 		wp_safe_redirect(
 			add_query_arg(
 				[
-					'page'              => $this->slug,
-					'tab'               => 'settings',
-					'lumia_notice'      => 'updates_checked',
-					'lumia_notice_type' => 'success',
+					'page'                       => $this->slug,
+					'tab'                        => 'settings',
+					'lumia_factures_notice'      => 'updates_checked',
+					'lumia_factures_notice_type' => 'success',
 				],
 				admin_url( 'admin.php' )
 			)

@@ -4,7 +4,7 @@
 
 .lumia-admin-container {
   display: flex;
-  height: calc(100vh - 32px);
+  min-height: calc(100vh - 32px);
   gap: 16px;
   padding: 16px;
   overflow: hidden;
