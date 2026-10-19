@@ -18,7 +18,7 @@ final class DocumentData {
 	/**
 	 * Constructor.
 	 *
-	 * @param string $title   Document title, '' to use the configured one.
+	 * @param string $title   Document title; when not empty it wins over the configured one, '' to use the configured one.
 	 * @param string $number  Document number, '' when none (preview).
 	 * @param int    $date    Issue date as a Unix timestamp, 0 when none (preview).
 	 * @param bool   $preview The document is a preview, not an issued invoice.

@@ -169,9 +169,10 @@ final class Context {
 			}
 		}
 
-		$title = $this->label( 'invoice_title', '' );
+		// The document's own title (decided by the caller) wins, then the setting, then the default.
+		$title = $this->doc->title;
 		if ( '' === $title ) {
-			$title = '' !== $this->doc->title ? $this->doc->title : __( 'Invoice', 'lumia-factures' );
+			$title = $this->label( 'invoice_title', __( 'Invoice', 'lumia-factures' ) );
 		}
 
 		return [

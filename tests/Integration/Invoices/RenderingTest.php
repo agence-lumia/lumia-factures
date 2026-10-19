@@ -12,6 +12,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Module;
+use Lumia\Factures\Modules\Invoices\Rendering\Context;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
 use Lumia\Factures\Modules\Invoices\Rendering\Images;
 use Lumia\Factures\Modules\Invoices\Rendering\PdfEngine;
@@ -70,6 +71,20 @@ class RenderingTest extends TestCase {
 		$this->assertStringContainsString( 'Friandises', $html );
 		$this->assertStringContainsString( 'Invoice', $html );
 		$this->assertStringContainsString( '25,00', $html );
+	}
+
+	public function test_title_precedence(): void {
+		$order    = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$date     = (int) gmmktime( 12, 0, 0, 3, 15, 2026 );
+		$titled   = new DocumentData( 'Credit note', 'FA-2026-00042', $date, false );
+		$untitled = $this->doc();
+		$setting  = $this->settings( [ 'content' => [ 'invoice_title' => 'Proforma' ] ] );
+
+		// The document's own title wins over the setting, the setting over the default.
+		$this->assertSame( 'Credit note', Context::build( $order, $titled, $setting )['header']['title'] );
+		$this->assertSame( 'Credit note', Context::build( $order, $titled, $this->settings() )['header']['title'] );
+		$this->assertSame( 'Proforma', Context::build( $order, $untitled, $setting )['header']['title'] );
+		$this->assertSame( 'Invoice', Context::build( $order, $untitled, $this->settings() )['header']['title'] );
 	}
 
 	public function test_html_has_no_coupon_code_on_lines(): void {
