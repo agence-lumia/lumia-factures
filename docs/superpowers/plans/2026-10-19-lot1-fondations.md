@@ -157,8 +157,8 @@ public function test_requirements_report_missing_dompdf(): void {
 
 **Interfaces:**
 - **Menu:**
-  - `add_menu_page( 'Lümia Factures', …, 'manage_woocommerce', 'lumia-factures', …, <icône Lucide "receipt" en base64>, 56 )` (just below WooCommerce);
-  - submenus `&tab=dashboard|modules|settings` + one per active module.
+  - `add_submenu_page( apply_filters( 'lumia_factures_menu_parent', 'woocommerce' ), __( 'Invoices', 'lumia-factures' ), __( 'Invoices', 'lumia-factures' ), 'manage_woocommerce', 'lumia-factures', … )`, placed in the WooCommerce menu (fr: "Factures"), where the old "Facture PDF" sat.
+  - No top-level menu and no toggle: navigation between sections (Overview, Modules, active modules, Settings) only happens through the internal sidebar of the lumia-tools layout, with `&tab=`.
 - **Wrapper:** `.lumia-admin-wrap.lumia-factures-admin`. Every selector in `reset.css` is prefixed with `.lumia-factures-admin`.
 - **Handles:** `lumia-factures-*`. JS object `window.lumiaFacturesAdmin` (`nonce`, `ajaxUrl`, `i18n`).
 - **Form actions:** `lumia_factures_save_settings`, nonce `lumia_factures_nonce`.
@@ -167,10 +167,11 @@ public function test_requirements_report_missing_dompdf(): void {
 - [ ] **Step 1:** tests
 
 ```php
-public function test_menu_registered_for_shop_manager(): void {
+public function test_menu_registered_under_woocommerce_for_shop_manager(): void {
 	wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
 	do_action( 'admin_menu' );
-	$this->assertNotEmpty( menu_page_url( 'lumia-factures', false ) );
+	global $submenu;
+	$this->assertContains( 'lumia-factures', array_column( $submenu['woocommerce'] ?? array(), 2 ) );
 }
 public function test_save_settings_requires_nonce_and_capability(): void { /* POST sans nonce → wp_die ; abonné → wp_die ; admin + nonce → option mise à jour + redirection avec lumia_notice */ }
 public function test_coexists_with_lumia_tools(): void {

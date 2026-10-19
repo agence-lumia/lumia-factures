@@ -56,7 +56,7 @@ User decision: **rebuild the repo cleanly following the lumia-tools conventions*
   - `CreditNotes`: credit notes.
   - `Tools`: import/export, diagnostics.
 - **Admin**
-  - Top-level menu "Lümia Factures" with a sidebar and `&tab=` navigation (General, Company, Numbering, Content, Design + live preview, Modules, Settings/Updates).
+  - Submenu WooCommerce → "Factures" (filter `lumia_factures_menu_parent`), page with a lumia-tools sidebar and `&tab=` navigation (General, Company, Numbering, Content, Design + live preview, Modules, Settings/Updates).
   - PHP templates, vanilla JS.
   - Design system copied from lumia-tools (`tokens.css`, `reset.css`, `layout.css`, `sidebar.css`, `components.css`, `buttons.css`, `notifications.css`, `admin.js`, `notifications.js`), BEM prefix `lumia-`, Lucide icons only.
 - **Updater**
