@@ -23,7 +23,10 @@ class Module extends AbstractModule {
 	 * Registers the module hooks.
 	 */
 	public function init(): void {
-		add_action( 'init', [ Installer::class, 'maybe_upgrade' ] );
+		// Called directly: init() already runs inside the `init` hook at priority 10,
+		// a callback added to it now would never fire. Updating a plugin does not run
+		// the activation hook, so the tables are checked on every boot.
+		Installer::maybe_upgrade();
 	}
 
 	/**

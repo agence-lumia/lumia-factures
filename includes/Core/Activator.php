@@ -65,6 +65,12 @@ class Activator {
 			if ( ! empty( $defaults ) && false === get_option( $option_key ) ) {
 				add_option( $option_key, $defaults );
 			}
+
+			// A module that starts active (the locked core ones) never goes through
+			// Modules::activate_module(), so its on_activate() runs here.
+			if ( ! empty( $modules_defaults[ $id ] ) ) {
+				( new $class( $id ) )->on_activate();
+			}
 		}
 	}
 }

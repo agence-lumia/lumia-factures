@@ -11,7 +11,9 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Core\Activator;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Tests\Support\TestCase;
 
 /**
@@ -68,6 +70,22 @@ class DatabaseTest extends TestCase {
 		Installer::maybe_upgrade();
 
 		$this->assertSame( 99, (int) get_option( 'lumia_factures_db_version' ) );
+	}
+
+	public function test_module_init_upgrades_the_schema(): void {
+		delete_option( 'lumia_factures_db_version' );
+
+		( new Module( 'invoices' ) )->init();
+
+		$this->assertSame( Installer::DB_VERSION, (int) get_option( 'lumia_factures_db_version' ) );
+	}
+
+	public function test_plugin_activation_installs_the_schema(): void {
+		delete_option( 'lumia_factures_db_version' );
+
+		Activator::activate();
+
+		$this->assertSame( Installer::DB_VERSION, (int) get_option( 'lumia_factures_db_version' ) );
 	}
 
 	public function test_install_is_idempotent(): void {
