@@ -1,28 +1,87 @@
 <?xml version="1.0"?>
-<ruleset name="Facture PDF Lumia">
-	<description>Standards de code du plugin.</description>
+<ruleset name="Lümia Factures">
+	<description>WordPress coding standards (WPCS) and PHP 8.1+ compatibility for the plugin.</description>
 
+	<!-- Files analysed -->
 	<file>.</file>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/dist/*</exclude-pattern>
+	<exclude-pattern>*/.superpowers/*</exclude-pattern>
+	<exclude-pattern>*/assets/*</exclude-pattern>
+	<!-- Claude Code folder, including the agent worktrees nested under .claude/worktrees/: a full copy of
+	     the plugin there gave "Duplicate class name" warnings. Relative (anchored at the scanned root),
+	     since a worktree's own absolute path contains /.claude/ and would exclude everything. -->
+	<exclude-pattern type="relative">^\.claude/*</exclude-pattern>
 
-	<exclude-pattern>/vendor/*</exclude-pattern>
-	<exclude-pattern>/node_modules/*</exclude-pattern>
-	<exclude-pattern>/assets/admin/alpine.min.js</exclude-pattern>
-
+	<!-- Options: PHP only, relative paths, parallelism, colors -->
 	<arg name="extensions" value="php"/>
+	<arg name="basepath" value="."/>
+	<arg name="parallel" value="8"/>
 	<arg name="colors"/>
-	<arg value="ps"/>
+	<arg value="sp"/>
 
+	<!-- Full WordPress standard (Core + Docs + Extra) -->
 	<rule ref="WordPress">
-		<exclude name="WordPress.Files.FileName.InvalidClassFileName"/>
-		<exclude name="WordPress.Files.FileName.NotHyphenatedLowercase"/>
+		<!-- Docblocks are not systematic: the CI is not blocked on them. -->
+		<exclude name="Squiz.Commenting"/>
+		<exclude name="Generic.Commenting"/>
+		<!-- File names follow PSR-4 (Module.php, RateLimiter.php), not class-xxx.php. -->
+		<exclude name="WordPress.Files.FileName"/>
+		<!-- Forbids single-line control structures without braces: already covered by Generic.ControlStructures. -->
+		<exclude name="Universal.ControlStructures.DisallowLonelyIf"/>
+		<!-- Short arrays [] are used everywhere. -->
+		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
+		<!-- Git normalizes line endings (autocrlf): a Windows machine would see 45 false positives. -->
+		<exclude name="Generic.Files.LineEndings"/>
+		<!-- The properties read belong to WordPress and DOM objects (WP_Post, DOMNode...): their casing is not ours. -->
+		<exclude name="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase"/>
 	</rule>
 
-	<config name="minimum_wp_version" value="6.4"/>
-	<config name="testVersion" value="8.1-"/>
+	<!-- Templates are included from an Admin method: their variables are not globals. -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+		<exclude-pattern>*/settings-template.php</exclude-pattern>
+		<exclude-pattern>*/uninstall.php</exclude-pattern>
+	</rule>
 
+	<!-- Same reason: $tab or $wp_version are locals of the method there, and $this is the Admin instance. -->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+	</rule>
+	<rule ref="PHPCompatibility.FunctionDeclarations.NewClosure.ThisFoundOutsideClass">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+	</rule>
+
+	<!-- uninstall.php is procedural by WordPress contract: its loop variables are not globals to protect. -->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>*/uninstall.php</exclude-pattern>
+	</rule>
+
+	<!-- Text domain -->
 	<rule ref="WordPress.WP.I18n">
 		<properties>
-			<property name="text_domain" type="array" value="facture-pdf-lumia"/>
+			<property name="text_domain" type="array">
+				<element value="lumia-factures"/>
+			</property>
 		</properties>
 	</rule>
+
+	<!-- Expected prefixes for anything that lands in the global namespace -->
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="lumia_factures"/>
+				<element value="LUMIA_FACTURES"/>
+				<element value="Lumia\Factures"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- PHP compatibility: minimum version declared in the header -->
+	<config name="testVersion" value="8.1-"/>
+	<rule ref="PHPCompatibilityWP"/>
+
+	<!-- Minimum WordPress version (deprecated functions) -->
+	<config name="minimum_wp_version" value="6.9"/>
 </ruleset>

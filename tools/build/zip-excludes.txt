@@ -1,0 +1,31 @@
+# rsync --exclude-from list: what never ships in the release zip.
+# Read by tools/build/build-zip.sh (release workflows).
+# Anchored at the root: an unanchored name would also drop nested folders of the same name.
+# /vendor is NOT listed: the runtime dependencies are installed by build-zip.sh (composer --no-dev)
+# and the dev vendor/ of the working tree is kept out by an explicit rsync exclude there.
+/.git
+/.github
+/.vscode
+/node_modules
+/dist
+/.claude
+/.mcp.json
+/.gitignore
+/composer.json
+/composer.lock
+/phpcs.xml.dist
+/phpstan.neon.dist
+/phpstan-baseline.neon
+/phpcs.baseline.xml
+/.phpcs.cache
+/tools
+/tests
+/package.json
+/package-lock.json
+/.wp-env.json
+/phpunit.xml.dist
+/CLAUDE.md
+/docs
+/.superpowers
+# Unanchored on purpose: macOS drops one in every folder, at any depth.
+.DS_Store

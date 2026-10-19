@@ -1,34 +1,21 @@
-# Systèmes d'exploitation
-.DS_Store
-._*
-Thumbs.db
-desktop.ini
-
-# Éditeurs / IDE
-.vscode/
-.idea/
-*.swp
-*~
-
-# Outils IA / environnement local (ne doivent pas être publiés)
-.claude/
-CLAUDE.md
+# Local dev environment (Claude Code, MCP) - never shipped
+.claude/settings.local.json
 .mcp.json
-.env
-.env.*
-
-# Dépendances de développement (vendor/ est versionné, mais seulement
-# les dépendances d'exécution : voir `composer install --no-dev`)
-vendor/bin/
-vendor/squizlabs/
-vendor/wp-coding-standards/
-vendor/phpcsstandards/
-vendor/phpcompatibility/
-vendor/dealerdirect/
+.vscode/
 node_modules/
+dist/
 
-# Artefacts de build / logs
-/build/
-*.zip
-*.log
-.phpcs-cache
+# Composer tooling (development only, never shipped)
+/vendor/
+.phpcs.cache
+
+# Language tooling: WP-CLI phar downloaded on demand (tools/i18n/wp.sh)
+tools/i18n/.cache/
+
+# Dependencies and build output
+vendor/
+node_modules/
+/dist/
+
+# Subagent-driven development workspace (plans, briefs, reports)
+.superpowers/
