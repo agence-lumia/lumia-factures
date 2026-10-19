@@ -1114,3 +1114,28 @@ msgstr "Augmenter le compteur"
 
 msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
 msgstr "Le compteur %1$s passe de %2$s à %3$s. Les numéros intermédiaires ne seront jamais utilisés, et un compteur ne peut jamais être diminué."
+
+msgid "This order does not exist."
+msgstr "Cette commande n'existe pas."
+
+msgid "Create a first order to preview the invoice."
+msgstr "Créez une première commande pour prévisualiser la facture."
+
+msgid "The preview could not be generated."
+msgstr "L'aperçu n'a pas pu être généré."
+
+msgid "Preview"
+msgstr "Aperçu"
+
+msgid "Latest order"
+msgstr "Dernière commande"
+
+msgid "Order ID"
+msgstr "N° de commande"
+
+msgid "Refresh"
+msgstr "Actualiser"
+
+msgctxt "watermark printed on the invoice preview"
+msgid "Preview"
+msgstr "Aperçu"

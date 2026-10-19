@@ -13,6 +13,7 @@ use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
+use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
@@ -43,6 +44,7 @@ class Module extends AbstractModule {
 			OrderTools::register();
 			Download::register();
 			Counters::register();
+			Preview::register();
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
 	}
@@ -121,6 +123,7 @@ class Module extends AbstractModule {
 				'logoFrameTitle'  => __( 'Choose a logo', 'lumia-factures' ),
 				'logoFrameButton' => __( 'Use this image', 'lumia-factures' ),
 				'sampleInvalid'   => __( 'Invalid format', 'lumia-factures' ),
+				'previewFailed'   => __( 'The preview could not be generated.', 'lumia-factures' ),
 				'raiseTitle'      => __( 'Raise this counter?', 'lumia-factures' ),
 				'raiseConfirm'    => __( 'Raise the counter', 'lumia-factures' ),
 				/* translators: 1: counter key, 2: current value, 3: new value. */

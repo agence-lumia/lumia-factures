@@ -1,6 +1,6 @@
 /**
  * Lümia Factures - Invoices settings screen.
- * Logo picker (wp.media), live number sample, color read-out, tab from the URL hash.
+ * Logo picker (wp.media), live number sample, color read-out, live PDF preview, tab from the URL hash.
  * Data comes from PHP: lumiaFacturesAdmin.invoices (see Modules\Invoices\Module::get_admin_js_data()).
  */
 (function () {
@@ -203,6 +203,116 @@
     });
   }
 
+  /* ---------------- Live preview ---------------- */
+
+  /**
+   * Renders the unsaved form against a real order (Admin\Preview, nothing is saved or numbered).
+   * The whole module form is posted as FormData, like a save. Requests are debounced, and only the
+   * latest response is shown.
+   */
+  function initPreview() {
+    var root = document.querySelector("[data-lumia-factures-preview]");
+    var form = document.getElementById("lumia-factures-module-form");
+    var admin = window.lumiaFacturesAdmin || {};
+    if (!root || !form || !admin.ajaxUrl) return;
+
+    var frame = root.querySelector("[data-lumia-factures-preview-frame]");
+    var errorBox = root.querySelector("[data-lumia-factures-preview-error]");
+    var orderInput = root.querySelector("[data-lumia-factures-preview-order]");
+    var refresh = root.querySelector("[data-lumia-factures-preview-refresh]");
+    var panel = document.querySelector('[data-lumia-tab-panel="design"]');
+    var counter = 0;
+    var timer = null;
+    var blobUrl = "";
+    var loaded = false;
+
+    function showError(message) {
+      errorBox.textContent = message;
+      errorBox.hidden = !message;
+    }
+
+    function setBusy(busy) {
+      refresh.disabled = busy;
+      root.setAttribute("aria-busy", busy ? "true" : "false");
+    }
+
+    function show(base64) {
+      var binary = window.atob(base64);
+      var bytes = new Uint8Array(binary.length);
+      for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+
+      var previous = blobUrl;
+      blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      frame.src = blobUrl;
+      if (previous) URL.revokeObjectURL(previous);
+    }
+
+    function request() {
+      window.clearTimeout(timer);
+      var current = ++counter;
+      var body = new FormData(form);
+      // The form carries its own save action: override it.
+      body.set("action", "lumia_factures_invoices_preview");
+      body.set("nonce", admin.nonce || "");
+      body.set("order_id", orderInput.value || "0");
+
+      loaded = true;
+      setBusy(true);
+
+      window
+        .fetch(admin.ajaxUrl, { method: "POST", credentials: "same-origin", body: body })
+        .then(function (response) {
+          return response.json();
+        })
+        .then(function (json) {
+          if (current !== counter) return; // A newer request is on its way.
+          if (json && json.success && json.data && json.data.pdf) {
+            showError("");
+            show(json.data.pdf);
+          } else {
+            showError((json && json.data && json.data.message) || t("previewFailed"));
+          }
+        })
+        .catch(function () {
+          if (current === counter) showError(t("previewFailed"));
+        })
+        .then(function () {
+          if (current === counter) setBusy(false);
+        });
+    }
+
+    function schedule() {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(request, 600);
+    }
+
+    ["design", "content"].forEach(function (name) {
+      var target = document.querySelector('[data-lumia-tab-panel="' + name + '"]');
+      if (!target) return;
+      ["input", "change"].forEach(function (type) {
+        target.addEventListener(type, function (event) {
+          // The preview's own order field sits in the design panel.
+          if (!root.contains(event.target)) schedule();
+        });
+      });
+    });
+
+    refresh.addEventListener("click", request);
+    orderInput.addEventListener("change", request);
+
+    // Nothing is rendered until the Design tab is first shown.
+    var tab = document.querySelector('[data-lumia-tabs="invoices"] [data-lumia-tab="design"]');
+    function first() {
+      if (!loaded && panel && !panel.hidden) request();
+    }
+    if (tab) {
+      tab.addEventListener("click", function () {
+        window.setTimeout(first, 0);
+      });
+    }
+    window.setTimeout(first, 0);
+  }
+
   /* ---------------- Tab from the URL hash ---------------- */
 
   function initHash() {
@@ -218,5 +328,6 @@
     initColors();
     initCounters();
     initHash();
+    initPreview();
   });
 })();

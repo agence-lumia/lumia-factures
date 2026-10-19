@@ -85,6 +85,14 @@ $design_fonts = [
 		</div>
 	</div>
 
-	<?php // PREVIEW PANE (Task 10): the live PDF preview is mounted in this container. ?>
-	<aside class="lumia-factures-inv-design__preview" id="lumia-factures-invoices-preview" data-lumia-factures-preview aria-label="<?php esc_attr_e( 'Invoice preview', 'lumia-factures' ); ?>"></aside>
+	<aside class="lumia-factures-inv-design__preview lumia-factures-inv-preview" id="lumia-factures-invoices-preview" data-lumia-factures-preview aria-label="<?php esc_attr_e( 'Invoice preview', 'lumia-factures' ); ?>">
+		<div class="lumia-factures-inv-preview__bar">
+			<h2 class="lumia-section__title"><?php echo esc_html__( 'Preview', 'lumia-factures' ); ?></h2>
+			<?php // No name attribute: this field is never saved and never marks the form as unsaved. ?>
+			<input type="number" min="1" step="1" class="lumia-input lumia-input--sm" id="lumia-factures-preview-order" data-lumia-factures-preview-order placeholder="<?php esc_attr_e( 'Latest order', 'lumia-factures' ); ?>" aria-label="<?php esc_attr_e( 'Order ID', 'lumia-factures' ); ?>">
+			<button type="button" class="lumia-btn lumia-btn--secondary lumia-btn--sm" data-lumia-factures-preview-refresh><?php echo esc_html__( 'Refresh', 'lumia-factures' ); ?></button>
+		</div>
+		<div class="lumia-notice lumia-notice--error" role="alert" data-lumia-factures-preview-error hidden></div>
+		<iframe class="lumia-factures-inv-preview__frame" data-lumia-factures-preview-frame title="<?php esc_attr_e( 'Invoice preview', 'lumia-factures' ); ?>"></iframe>
+	</aside>
 </div>

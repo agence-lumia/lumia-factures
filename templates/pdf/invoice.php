@@ -20,6 +20,7 @@
  * @var array<int, array<string, string>>        $notes
  * @var array<string, mixed>                     $footer
  * @var string                                   $legal_text
+ * @var \Lumia\Factures\Modules\Invoices\Rendering\DocumentData $doc Document.
  */
 
 use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
@@ -36,6 +37,9 @@ $lumia_factures_vars = get_defined_vars();
 	<style><?php echo wp_strip_all_tags( $css ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Stylesheet compiled from validated settings, tags stripped. ?></style>
 </head>
 <body>
+<?php if ( ! empty( $doc->preview ) ) : ?>
+<div class="lf-watermark"><?php echo esc_html_x( 'Preview', 'watermark printed on the invoice preview', 'lumia-factures' ); ?></div>
+<?php endif; ?>
 <?php
 Renderer::partial( 'partials/header.php', $lumia_factures_vars );
 Renderer::partial( 'partials/parties.php', $lumia_factures_vars );

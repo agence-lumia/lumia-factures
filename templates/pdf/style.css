@@ -370,3 +370,18 @@ p {
 .lf-footer__line {
 	margin: 0 var(--lf-space-sm);
 }
+
+/* Preview watermark (never on an issued invoice) --------------------- */
+.lf-watermark {
+	position: fixed;
+	top: 330pt;
+	left: 0;
+	right: 0;
+	text-align: center;
+	font-size: 110pt;
+	font-weight: bold;
+	letter-spacing: 0.1em;
+	color: #e4e4e7;
+	transform: rotate(-35deg);
+	z-index: -1;
+}

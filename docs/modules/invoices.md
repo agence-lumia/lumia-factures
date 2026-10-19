@@ -40,3 +40,11 @@ Tab `module_invoices` of the plugin page. `includes/Modules/Invoices/settings-te
 - **Live number sample.** Computed in `invoices.js` from `lumiaFacturesAdmin.invoices` (today's date in the site timezone, order `14243`, customer `27`, the counters by key, the known tags). It mirrors `NumberFormat::preview()` and `Sequences::key()`; there is no AJAX.
 - **Logo.** `wp_enqueue_media()` only on this tab (`Module::enqueue_media()`), script dependency `media-editor`. The value is the attachment id (`company[logo_id]`).
 - **Design tab.** `#lumia-factures-invoices-preview` is the empty container reserved for the live PDF preview.
+
+## Live preview
+
+`Admin\Preview` (AJAX `wp_ajax_lumia_factures_invoices_preview`, nonce `lumia_factures_admin_nonce`, `manage_woocommerce`) renders the **unsaved** form against a real order (the given `order_id`, else the latest order; a refund or unknown id is refused).
+
+- **Input.** `invoices.js` posts a `FormData` of the whole module form (nested `lumia_factures_module_settings[group][key]`, same shape as a save) with `action`, `nonce` and `order_id` overridden. Never post the form's own `action`: it is the save action.
+- **No side effect.** The settings go through `Schema::sanitize()` against the stored ones and are never saved. The preview never calls `Issuer`, `Register`, `Sequences::next()` or `Archive::store()`; the number is `NumberFormat::preview()` of the next counter value, read with `Sequences::current()`. `DocumentData::$preview` is true, which prints the translated "Preview" watermark (`.lf-watermark`, `position: fixed`, rotated) in `templates/pdf/invoice.php`. The Dompdf font cache still writes under the archive root `fonts/`, which is not an invoice file.
+- **JS.** Debounce 600 ms on `input`/`change` of the Design and Content panels, a request counter so only the latest response is shown, the PDF base64 becomes a Blob URL in an `<iframe>` (the previous URL is revoked). The order field has no `name`, so it is never saved and never marks the form as unsaved. Nothing is requested before the Design tab is first shown.

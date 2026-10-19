@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T15:42:29+00:00\n"
+"POT-Creation-Date: 2026-10-19T16:07:39+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -204,6 +204,7 @@ msgstr ""
 
 #: includes/Modules/Invoices/Admin/Counters.php:70
 #: includes/Modules/Invoices/Admin/OrderTools.php:284
+#: includes/Modules/Invoices/Admin/Preview.php:52
 msgid "You are not allowed to do this."
 msgstr ""
 
@@ -262,6 +263,19 @@ msgstr ""
 
 #: includes/Modules/Invoices/Admin/OrderTools.php:272
 msgid "The invoice PDF could not be rebuilt."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Preview.php:87
+msgid "This order does not exist."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Preview.php:88
+msgid "Create a first order to preview the invoice."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Preview.php:104
+#: includes/Modules/Invoices/Module.php:126
+msgid "The preview could not be generated."
 msgstr ""
 
 #: includes/Modules/Invoices/Amounts/StatementBuilder.php:72
@@ -345,29 +359,29 @@ msgstr ""
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:121
+#: includes/Modules/Invoices/Module.php:123
 #: templates/admin/invoices/company.php:35
 msgid "Choose a logo"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:122
+#: includes/Modules/Invoices/Module.php:124
 msgid "Use this image"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:123
+#: includes/Modules/Invoices/Module.php:125
 msgid "Invalid format"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:124
+#: includes/Modules/Invoices/Module.php:127
 msgid "Raise this counter?"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:125
+#: includes/Modules/Invoices/Module.php:128
 msgid "Raise the counter"
 msgstr ""
 
 #. translators: 1: counter key, 2: current value, 3: new value.
-#: includes/Modules/Invoices/Module.php:127
+#: includes/Modules/Invoices/Module.php:130
 #, php-format
 msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
 msgstr ""
@@ -1040,8 +1054,25 @@ msgstr ""
 msgid "Side margins (mm)"
 msgstr ""
 
-#: templates/admin/invoices/design.php:89
+#: templates/admin/invoices/design.php:88
+#: templates/admin/invoices/design.php:96
 msgid "Invoice preview"
+msgstr ""
+
+#: templates/admin/invoices/design.php:90
+msgid "Preview"
+msgstr ""
+
+#: templates/admin/invoices/design.php:92
+msgid "Latest order"
+msgstr ""
+
+#: templates/admin/invoices/design.php:92
+msgid "Order ID"
+msgstr ""
+
+#: templates/admin/invoices/design.php:93
+msgid "Refresh"
 msgstr ""
 
 #: templates/admin/invoices/general.php:33
@@ -1325,4 +1356,9 @@ msgstr ""
 
 #: templates/components/sidebar.php:55
 msgid "Navigation"
+msgstr ""
+
+#: templates/pdf/invoice.php:41
+msgctxt "watermark printed on the invoice preview"
+msgid "Preview"
 msgstr ""
