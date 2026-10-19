@@ -13,8 +13,14 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
+use LumiaFacturesModulesInvoicesDocumentsRegister;
+use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
+use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
+use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
+use LumiaFacturesModulesInvoicesRenderingDocumentData;
+use LumiaFacturesModulesInvoicesRenderingRenderer;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
@@ -24,6 +30,13 @@ use WPDieException;
  * The preview renders the posted settings against an order and leaves no trace.
  */
 class PreviewTest extends TestCase {
+
+	/**
+	 * Archived files written by a test, removed in tear_down.
+	 *
+	 * @var string[]
+	 */
+	private array $written = [];
 
 	public function set_up(): void {
 		parent::set_up();
@@ -41,6 +54,11 @@ class PreviewTest extends TestCase {
 
 	public function tear_down(): void {
 		unset( $_REQUEST['nonce'], $_POST['nonce'], $_POST['order_id'], $_POST['lumia_factures_module_settings'] );
+		foreach ( $this->written as $path ) {
+			if ( is_file( $path ) ) {
+				wp_delete_file( $path );
+			}
+		}
 		parent::tear_down();
 	}
 
@@ -59,6 +77,15 @@ class PreviewTest extends TestCase {
 		$out = (string) ob_get_clean();
 
 		return (array) json_decode( $out, true );
+	}
+
+	/**
+	 * The markup of the document, without the inlined stylesheet (which always defines `.lf-watermark`).
+	 *
+	 * @param string $html Complete document.
+	 */
+	private function body( string $html ): string {
+		return (string) preg_replace( '#<style>.*?</style>#s', '', $html );
 	}
 
 	/**
@@ -101,6 +128,7 @@ class PreviewTest extends TestCase {
 		$_REQUEST['nonce'] = $nonce;
 		$json              = $this->call();
 		$this->assertFalse( $json['success'] );
+		$this->assertArrayNotHasKey( 'pdf', (array) $json['data'] );
 	}
 
 	public function test_preview_returns_pdf_without_side_effects(): void {
@@ -140,6 +168,42 @@ class PreviewTest extends TestCase {
 		$this->assertStringContainsString( 'Proforma', $html );
 		$this->assertStringContainsString( 'lf-watermark', $html );
 		$this->assertSame( $before, Module::settings() );
+	}
+
+	public function test_issued_invoice_has_no_preview_watermark(): void {
+		$captured = '';
+		add_filter(
+			'lumia_factures_invoice_html',
+			static function ( $html ) use ( &$captured ) {
+				$captured = (string) $html;
+
+				return $html;
+			}
+		);
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->update_status( 'processing' );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertNotNull( $doc );
+		if ( null !== $doc->file ) {
+			$this->written[] = Archive::root() . '/' . $doc->file;
+		}
+
+		$this->assertNotSame( '', $captured, 'The issuing path rendered no HTML.' );
+		$this->assertStringContainsString( $doc->number, $captured );
+		$captured = $this->body( $captured );
+		$this->assertStringNotContainsString( 'lf-watermark', $captured );
+		$this->assertStringNotContainsString( 'Preview', $captured );
+	}
+
+	public function test_renderer_without_preview_flag_has_no_watermark(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$html  = Renderer::html( $order, new DocumentData( '', 'FA-1', time(), false ), Module::settings() );
+
+		$html = $this->body( $html );
+		$this->assertStringNotContainsString( 'lf-watermark', $html );
+		$this->assertStringNotContainsString( 'Preview', $html );
 	}
 
 	public function test_preview_number_is_the_next_sample_without_consuming_it(): void {
