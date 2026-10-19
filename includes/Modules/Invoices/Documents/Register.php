@@ -169,4 +169,25 @@ final class Register {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
 		$wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE id = %d AND status = 'reserved' AND number IS NULL", $id ) );
 	}
+
+	/**
+	 * Deletes a reserved row left behind by a request that died between reserve() and assign().
+	 *
+	 * Only a row still without number and older than the given age is deleted, so a call
+	 * in progress is never disturbed.
+	 *
+	 * @param int $id         Row id.
+	 * @param int $older_than Minimum age in seconds.
+	 * @return bool True when the row was deleted.
+	 */
+	public static function release_stale( int $id, int $older_than ): bool {
+		global $wpdb;
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		$affected = $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE id = %d AND status = 'reserved' AND number IS NULL AND created_at < %s", $id, gmdate( 'Y-m-d H:i:s', time() - $older_than ) ) );
+
+		return 1 === $affected;
+	}
 }

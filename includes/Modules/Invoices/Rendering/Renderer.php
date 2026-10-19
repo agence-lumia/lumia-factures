@@ -36,7 +36,20 @@ final class Renderer {
 		$found = self::include_template( 'invoice.php', $vars );
 		$html  = (string) ob_get_clean();
 
-		return $found ? $html : '';
+		if ( ! $found ) {
+			return '';
+		}
+
+		/**
+		 * Filters the final invoice HTML, before it is turned into a PDF.
+		 *
+		 * @param string       $html  Complete HTML document.
+		 * @param WC_Order     $order Order.
+		 * @param DocumentData $doc   Document.
+		 */
+		$filtered = apply_filters( 'lumia_factures_invoice_html', $html, $order, $doc );
+
+		return is_string( $filtered ) ? $filtered : $html;
 	}
 
 	/**

@@ -565,30 +565,42 @@ msgstr "BIC"
 msgid "Page %1$s / %2$s"
 msgstr "Page %1$s / %2$s"
 
-#: includes/Modules/Invoices/Documents/Issuer.php:117
+#: includes/Modules/Invoices/Documents/Issuer.php:124
 msgid "Invoice could not be numbered."
 msgstr "La facture n'a pas pu être numérotée."
 
+#. translators: %d: sequence value
+#: includes/Modules/Invoices/Documents/Issuer.php:136
+#, php-format
+msgid "Invoice sequence value %d could not be turned into a number; this sequence value is skipped."
+msgstr "La valeur de séquence %d n'a pas pu être transformée en numéro de facture ; cette valeur de séquence est sautée."
+
 #. translators: 1: invoice number, 2: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:129
+#: includes/Modules/Invoices/Documents/Issuer.php:149
 #, php-format
 msgid "Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
 msgstr "Le numéro de facture %1$s (séquence %2$d) n'a pas pu être enregistré ; cette valeur de séquence est sautée."
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:156
+#: includes/Modules/Invoices/Documents/Issuer.php:264
 #, php-format
 msgid "Invoice %s issued."
 msgstr "Facture %s émise."
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:167
+#: includes/Modules/Invoices/Documents/Issuer.php:269
+#, php-format
+msgid "Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download."
+msgstr "Facture %s émise. Son PDF n'a pas pu être enregistré ; le PDF sera créé au premier téléchargement."
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Documents/Issuer.php:273
 #, php-format
 msgid "Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download."
 msgstr "Facture %s émise. Son PDF n'a pas pu être généré ; le PDF sera créé au premier téléchargement."
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:225
+#: includes/Modules/Invoices/Documents/Issuer.php:333
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr "Le PDF de la facture %s était manquant ou endommagé : il a été reconstruit à partir des données actuelles de la commande."

@@ -17,8 +17,6 @@ use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
-use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
-use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
@@ -241,15 +239,154 @@ class IssuerTest extends TestCase {
 	}
 
 	public function test_rendered_pdf_contains_number(): void {
+		$captured = [];
+		$capture  = static function ( string $html ) use ( &$captured ): string {
+			$captured[] = $html;
+			return $html;
+		};
+		add_filter( 'lumia_factures_invoice_html', $capture );
+
 		$order = $this->order();
 		$order->update_status( 'processing' );
+
+		remove_filter( 'lumia_factures_invoice_html', $capture );
 
 		$doc = Register::find( 'invoice', $order->get_id() );
 		$this->track( $doc );
 
-		$html = Renderer::html( wc_get_order( $order->get_id() ), new DocumentData( '', (string) $doc->number, $doc->issued_at ), Module::settings() );
+		// The HTML rendered by issue() itself carries the number (legacy bug C2).
+		$this->assertCount( 1, $captured );
+		$this->assertStringContainsString( (string) $doc->number, $captured[0] );
+	}
 
-		$this->assertStringContainsString( (string) $doc->number, $html );
+	public function test_exception_after_assign_keeps_number_and_meta_is_backfilled(): void {
+		$throw = static function ( WC_Order $saved ): void {
+			if ( '' !== (string) $saved->get_meta( '_lumia_factures_invoice_number' ) ) {
+				throw new RuntimeException( 'Third-party save hook failure.' );
+			}
+		};
+		add_action( 'woocommerce_before_order_object_save', $throw );
+
+		$fired = 0;
+		$count = static function () use ( &$fired ): void {
+			++$fired;
+		};
+		add_action( 'lumia_factures_invoice_issued', $count );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_action( 'woocommerce_before_order_object_save', $throw );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->track( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertNotEmpty( $doc->number );
+		$this->assertTrue( Archive::verify( $doc ) );
+		$this->assertTrue( $this->has_note( $order, sprintf( 'Invoice %s issued.', $doc->number ) ) );
+		$this->assertSame( 1, $fired );
+		$this->assertSame( '', wc_get_order( $order->get_id() )->get_meta( '_lumia_factures_invoice_number' ) );
+
+		// A later call repairs the missing meta, without a second number.
+		$again = Issuer::issue( wc_get_order( $order->get_id() ) );
+		$this->assertSame( $doc->number, $again->number );
+		$this->assertSame( $doc->number, wc_get_order( $order->get_id() )->get_meta( '_lumia_factures_invoice_number' ) );
+		$this->assertSame( (string) $doc->issued_at, (string) wc_get_order( $order->get_id() )->get_meta( '_lumia_factures_invoice_date' ) );
+		$this->assertSame( 1, $fired );
+
+		remove_action( 'lumia_factures_invoice_issued', $count );
+	}
+
+	public function test_number_build_failure_burns_sequence_with_note(): void {
+		update_option( 'lumia_factures_module_invoices', [ 'numbering' => [ 'format' => 'FA-{boom}-{number}' ] ] );
+		$throw = static function (): string {
+			throw new RuntimeException( 'Broken tag.' );
+		};
+		add_filter( 'lumia_factures_number_tag', $throw );
+
+		$key   = $this->key();
+		$next  = Sequences::current( $key ) + 1;
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_filter( 'lumia_factures_number_tag', $throw );
+
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( $next, Sequences::current( $key ) );
+		$this->assertTrue(
+			$this->has_note(
+				$order,
+				sprintf( 'Invoice sequence value %d could not be turned into a number; this sequence value is skipped.', $next )
+			)
+		);
+	}
+
+	public function test_stale_reservation_is_released_and_order_issued(): void {
+		global $wpdb;
+
+		$order = $this->order();
+		$stale = (int) Register::reserve( 'invoice', $order->get_id() );
+		$wpdb->update( Installer::documents_table(), [ 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 700 ) ], [ 'id' => $stale ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		$order->update_status( 'processing' );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->track( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertNotEmpty( $doc->number );
+	}
+
+	public function test_fresh_reservation_is_left_alone(): void {
+		global $wpdb;
+
+		$order = $this->order();
+		$fresh = (int) Register::reserve( 'invoice', $order->get_id() );
+		$wpdb->update( Installer::documents_table(), [ 'created_at' => gmdate( 'Y-m-d H:i:s', time() - 300 ) ], [ 'id' => $fresh ] ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+
+		$order->update_status( 'processing' );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertSame( $fresh, $doc->id );
+		$this->assertSame( 'reserved', $doc->status );
+		$this->assertFalse( Register::release_stale( $fresh, 600 ) );
+	}
+
+	public function test_store_failure_keeps_number_and_restore_attaches_later(): void {
+		// Uploads pointing below a file: no folder can be created there, even as root.
+		$broken = static function ( array $dirs ): array {
+			$dirs['basedir'] = '/dev/null/uploads';
+			return $dirs;
+		};
+		// Dompdf keeps a working font cache, so only the archive fails.
+		$fonts = trailingslashit( get_temp_dir() ) . 'lf-test-fonts';
+		wp_mkdir_p( $fonts );
+		$font_dir = static function ( $options ) use ( $fonts ) {
+			$options->setFontDir( $fonts );
+			$options->setFontCache( $fonts );
+			return $options;
+		};
+		add_filter( 'upload_dir', $broken );
+		add_filter( 'lumia_factures_dompdf_options', $font_dir );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_filter( 'upload_dir', $broken );
+		remove_filter( 'lumia_factures_dompdf_options', $font_dir );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertNotEmpty( $doc->number );
+		$this->assertNull( $doc->file );
+		$this->assertTrue(
+			$this->has_note( $order, sprintf( 'Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download.', $doc->number ) )
+		);
+
+		$this->assertTrue( Issuer::restore( $doc, wc_get_order( $order->get_id() ) ) );
+		$restored = Register::find( 'invoice', $order->get_id() );
+		$this->track( $restored );
+		$this->assertSame( $doc->number, $restored->number );
+		$this->assertTrue( Archive::verify( $restored ) );
 	}
 
 	public function test_render_failure_keeps_number(): void {

@@ -53,12 +53,14 @@ final class Archive {
 		$month  = gmdate( 'm', $issued_at );
 		$folder = $root . '/' . $year . '/' . $month;
 
+		self::ensure_root();
+
 		if ( ! wp_mkdir_p( $folder ) ) {
 			self::log( 'Could not create the archive folder ' . $folder . '.' );
 			return null;
 		}
 
-		foreach ( [ $root, $root . '/' . $year, $folder ] as $dir ) {
+		foreach ( [ $root . '/' . $year, $folder ] as $dir ) {
 			self::protect( $dir );
 		}
 
@@ -142,18 +144,53 @@ final class Archive {
 	}
 
 	/**
+	 * Creates the storage root and the Dompdf `fonts/` folder with their web-access guards.
+	 *
+	 * Called before any render or store, so nothing lands in an unprotected folder.
+	 *
+	 * @return bool False when a folder or a guard file could not be written (logged).
+	 */
+	public static function ensure_root(): bool {
+		$ok = true;
+
+		foreach ( [ self::root(), self::root() . '/fonts' ] as $dir ) {
+			if ( ! wp_mkdir_p( $dir ) ) {
+				self::log( 'Could not create the storage folder ' . $dir . '.' );
+				return false;
+			}
+
+			$ok = self::protect( $dir ) && $ok;
+		}
+
+		return $ok;
+	}
+
+	/**
 	 * Puts the web-access guards in a folder: `.htaccess` (Apache) and an empty `index.php`.
 	 *
 	 * @param string $dir Absolute folder path.
+	 * @return bool False when a guard file could not be written (logged).
 	 */
-	private static function protect( string $dir ): void {
-		if ( ! file_exists( $dir . '/.htaccess' ) ) {
-			file_put_contents( $dir . '/.htaccess', self::HTACCESS ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Access guard.
+	private static function protect( string $dir ): bool {
+		$guards = [
+			'.htaccess' => self::HTACCESS,
+			'index.php' => '<?php // Silence is golden.',
+		];
+		$ok     = true;
+
+		foreach ( $guards as $name => $content ) {
+			if ( file_exists( $dir . '/' . $name ) ) {
+				continue;
+			}
+
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Access guard.
+			if ( false === file_put_contents( $dir . '/' . $name, $content ) ) {
+				self::log( 'Could not write the guard file ' . $dir . '/' . $name . '.' );
+				$ok = false;
+			}
 		}
 
-		if ( ! file_exists( $dir . '/index.php' ) ) {
-			file_put_contents( $dir . '/index.php', '<?php // Silence is golden.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Directory listing guard.
-		}
+		return $ok;
 	}
 
 	/**

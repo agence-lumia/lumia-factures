@@ -11,6 +11,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Dompdf\Dompdf;
 use Dompdf\Options;
+use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Throwable;
 
 /**
@@ -67,10 +68,9 @@ final class PdfEngine {
 	 */
 	public static function options(): Options {
 		// In uploads, not in the system temp dir: shared hosts share /tmp between tenants.
-		$cache = trailingslashit( (string) wp_upload_dir()['basedir'] ) . 'lumia-factures/fonts';
-		if ( wp_mkdir_p( $cache ) && ! file_exists( $cache . '/index.php' ) ) {
-			file_put_contents( $cache . '/index.php', '<?php // Silence is golden.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Directory listing guard.
-		}
+		// The storage root and fonts/ get their web-access guards before anything is written.
+		Archive::ensure_root();
+		$cache = Archive::root() . '/fonts';
 
 		$options = new Options();
 		// Every image is a data URI: nothing may be fetched, which also closes the SSRF door.

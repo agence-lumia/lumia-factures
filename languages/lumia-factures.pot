@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T14:09:57+00:00\n"
+"POT-Creation-Date: 2026-10-19T14:24:09+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -231,30 +231,42 @@ msgstr ""
 msgid "VAT %s"
 msgstr ""
 
-#: includes/Modules/Invoices/Documents/Issuer.php:117
+#: includes/Modules/Invoices/Documents/Issuer.php:124
 msgid "Invoice could not be numbered."
 msgstr ""
 
+#. translators: %d: sequence value
+#: includes/Modules/Invoices/Documents/Issuer.php:136
+#, php-format
+msgid "Invoice sequence value %d could not be turned into a number; this sequence value is skipped."
+msgstr ""
+
 #. translators: 1: invoice number, 2: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:129
+#: includes/Modules/Invoices/Documents/Issuer.php:149
 #, php-format
 msgid "Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:156
+#: includes/Modules/Invoices/Documents/Issuer.php:264
 #, php-format
 msgid "Invoice %s issued."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:167
+#: includes/Modules/Invoices/Documents/Issuer.php:269
+#, php-format
+msgid "Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download."
+msgstr ""
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Documents/Issuer.php:273
 #, php-format
 msgid "Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:225
+#: includes/Modules/Invoices/Documents/Issuer.php:333
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""

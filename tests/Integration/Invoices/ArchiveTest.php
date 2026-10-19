@@ -12,6 +12,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
+use Lumia\Factures\Modules\Invoices\Rendering\PdfEngine;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\TestCase;
 
@@ -85,6 +86,25 @@ class ArchiveTest extends TestCase {
 			$htaccess = (string) file_get_contents( $dir . '/.htaccess' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			$this->assertStringContainsString( 'Require all denied', $htaccess );
 			$this->assertStringContainsString( 'Deny from all', $htaccess );
+		}
+	}
+
+	public function test_render_alone_protects_root_and_fonts(): void {
+		foreach ( [ Archive::root(), Archive::root() . '/fonts' ] as $dir ) {
+			foreach ( [ '.htaccess', 'index.php' ] as $guard ) {
+				if ( is_file( $dir . '/' . $guard ) ) {
+					wp_delete_file( $dir . '/' . $guard );
+				}
+			}
+		}
+
+		$pdf = PdfEngine::render( '<html><body><p>Guard test</p></body></html>', [], false );
+		$this->assertStringStartsWith( '%PDF', $pdf );
+
+		foreach ( [ Archive::root(), Archive::root() . '/fonts' ] as $dir ) {
+			$this->assertFileExists( $dir . '/.htaccess', $dir );
+			$this->assertFileExists( $dir . '/index.php', $dir );
+			$this->assertStringContainsString( 'Require all denied', (string) file_get_contents( $dir . '/.htaccess' ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		}
 	}
 

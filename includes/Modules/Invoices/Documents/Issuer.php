@@ -34,6 +34,11 @@ final class Issuer {
 	public const TYPE = 'invoice';
 
 	/**
+	 * Age in seconds after which a reservation that never got a number is a crash leftover.
+	 */
+	public const STALE_AFTER = 600;
+
+	/**
 	 * Hook `woocommerce_order_status_changed`: issues the invoice when the new status is a trigger.
 	 *
 	 * An invoice failure never breaks the status change: everything is caught and logged.
@@ -91,6 +96,8 @@ final class Issuer {
 
 		$existing = Register::find( self::TYPE, $order_id );
 		if ( null !== $existing && 'issued' === $existing->status ) {
+			// Repairs the order meta when an earlier call failed after numbering.
+			self::guard( 'order meta back-fill', $order_id, static fn() => self::sync_meta( $existing, $order ) );
 			return $existing;
 		}
 
@@ -98,7 +105,7 @@ final class Issuer {
 			return null;
 		}
 
-		$id = Register::reserve( self::TYPE, $order_id );
+		$id = self::reserve( $order_id );
 		if ( null === $id ) {
 			// Another call holds the row: return its invoice once issued, never number twice.
 			$current = Register::find( self::TYPE, $order_id );
@@ -118,7 +125,20 @@ final class Issuer {
 			return null;
 		}
 
-		$number = NumberFormat::build( (string) $numbering['format'], $sequence, $order, $now );
+		try {
+			$number = NumberFormat::build( (string) $numbering['format'], $sequence, $order, $now );
+		} catch ( Throwable $e ) {
+			Register::release( $id );
+			self::log( 'Invoice number of order ' . $order_id . ' could not be built from sequence ' . $key . ' = ' . $sequence . '; this sequence value is skipped: ' . $e->getMessage() );
+			$order->add_order_note(
+				sprintf(
+					/* translators: %d: sequence value */
+					__( 'Invoice sequence value %d could not be turned into a number; this sequence value is skipped.', 'lumia-factures' ),
+					$sequence
+				)
+			);
+			return null;
+		}
 
 		if ( ! Register::assign( $id, $number, $key, $sequence, $now ) ) {
 			Register::release( $id );
@@ -134,53 +154,138 @@ final class Issuer {
 			return null;
 		}
 
-		$order->update_meta_data( '_lumia_factures_invoice_number', $number );
-		$order->update_meta_data( '_lumia_factures_invoice_date', (string) $now );
-		$order->save();
+		// The number is recorded: from here on every step is attempted even when an earlier one
+		// fails (a third-party hook throwing on save, a broken render), and each failure is logged.
+		$doc = new IssuedDocument( $id, self::TYPE, $order_id, 'issued', $number, $key, $sequence, $now, null, null );
 
-		$doc = Register::find( self::TYPE, $order_id );
-		if ( null === $doc ) {
-			self::log( 'Invoice ' . $number . ' of order ' . $order_id . ' vanished from the register after numbering.' );
-			return null;
-		}
+		self::guard( 'order meta', $order_id, static fn() => self::sync_meta( $doc, $order ) );
 
-		// Rendered from a fresh order: the one in hand may predate the number (legacy bug C2).
-		$fresh  = wc_get_order( $order_id );
-		$fresh  = $fresh instanceof WC_Order ? $fresh : $order;
-		$stored = self::render_and_store( $doc, $fresh, $settings );
+		$outcome = 'render_failed';
+		self::guard(
+			'PDF',
+			$order_id,
+			static function () use ( $doc, $order, $order_id, $settings, &$outcome ): void {
+				// Rendered from a fresh order: the one in hand may predate the number (legacy bug C2).
+				$fresh = wc_get_order( $order_id );
+				$pdf   = self::render( $doc, $fresh instanceof WC_Order ? $fresh : $order, $settings );
+				if ( '' === $pdf ) {
+					return;
+				}
 
-		if ( null !== $stored && Register::attach_file( $doc->id, $stored['file'], $stored['checksum'] ) ) {
-			$order->add_order_note(
-				sprintf(
-					/* translators: %s: invoice number */
-					__( 'Invoice %s issued.', 'lumia-factures' ),
-					$number
-				)
-			);
-		} else {
-			if ( null !== $stored ) {
-				self::log( 'Archived PDF ' . $stored['file'] . ' of invoice ' . $number . ' could not be recorded in the register.' );
+				$outcome = 'store_failed';
+				$stored  = Archive::store( $pdf, (string) $doc->number, $doc->issued_at );
+				if ( null === $stored ) {
+					return;
+				}
+
+				if ( Register::attach_file( $doc->id, $stored['file'], $stored['checksum'] ) ) {
+					$outcome = 'stored';
+				} else {
+					self::log( 'Archived PDF ' . $stored['file'] . ' of invoice ' . $doc->number . ' could not be recorded in the register.' );
+				}
 			}
-			$order->add_order_note(
-				sprintf(
-					/* translators: %s: invoice number */
-					__( 'Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download.', 'lumia-factures' ),
-					$number
-				)
-			);
-		}
+		);
+
+		self::guard( 'order note', $order_id, static fn() => $order->add_order_note( self::issued_note( $outcome, $number ) ) );
 
 		$doc = Register::find( self::TYPE, $order_id ) ?? $doc;
 
-		/**
-		 * Fires once, when an invoice has been numbered (its PDF may be missing if rendering failed).
-		 *
-		 * @param IssuedDocument $doc   Issued document.
-		 * @param WC_Order       $order Order.
-		 */
-		do_action( 'lumia_factures_invoice_issued', $doc, $order );
+		self::guard(
+			'issued action',
+			$order_id,
+			static function () use ( $doc, $order ): void {
+				/**
+				 * Fires once, when an invoice has been numbered (its PDF may be missing if rendering failed).
+				 *
+				 * @param IssuedDocument $doc   Issued document.
+				 * @param WC_Order       $order Order.
+				 */
+				do_action( 'lumia_factures_invoice_issued', $doc, $order );
+			}
+		);
 
 		return $doc;
+	}
+
+	/**
+	 * Reserves the order's row, first releasing a stale reservation left by a crashed request.
+	 *
+	 * @param int $order_id Order id.
+	 * @return int|null Row id, null when another call holds the row.
+	 */
+	private static function reserve( int $order_id ): ?int {
+		$id = Register::reserve( self::TYPE, $order_id );
+		if ( null !== $id ) {
+			return $id;
+		}
+
+		$current = Register::find( self::TYPE, $order_id );
+		if ( null === $current || 'reserved' !== $current->status || null !== $current->number ) {
+			return null;
+		}
+
+		if ( ! Register::release_stale( $current->id, self::STALE_AFTER ) ) {
+			return null;
+		}
+
+		self::log( 'Released the stale invoice reservation ' . $current->id . ' of order ' . $order_id . ' (older than ' . self::STALE_AFTER . ' seconds, never numbered).' );
+
+		return Register::reserve( self::TYPE, $order_id );
+	}
+
+	/**
+	 * Writes the invoice number and date on the order when they are absent or different.
+	 *
+	 * @param IssuedDocument $doc   Issued document.
+	 * @param WC_Order       $order Order.
+	 */
+	private static function sync_meta( IssuedDocument $doc, WC_Order $order ): void {
+		$number = (string) $doc->number;
+		$date   = (string) $doc->issued_at;
+
+		if ( (string) $order->get_meta( '_lumia_factures_invoice_number' ) === $number && (string) $order->get_meta( '_lumia_factures_invoice_date' ) === $date ) {
+			return;
+		}
+
+		$order->update_meta_data( '_lumia_factures_invoice_number', $number );
+		$order->update_meta_data( '_lumia_factures_invoice_date', $date );
+		$order->save();
+	}
+
+	/**
+	 * Order note written once the invoice is numbered.
+	 *
+	 * @param string $outcome `stored`, `store_failed` or `render_failed`.
+	 * @param string $number  Invoice number.
+	 */
+	private static function issued_note( string $outcome, string $number ): string {
+		if ( 'stored' === $outcome ) {
+			/* translators: %s: invoice number */
+			return sprintf( __( 'Invoice %s issued.', 'lumia-factures' ), $number );
+		}
+
+		if ( 'store_failed' === $outcome ) {
+			/* translators: %s: invoice number */
+			return sprintf( __( 'Invoice %s issued. Its PDF could not be stored; the PDF will be built on first download.', 'lumia-factures' ), $number );
+		}
+
+		/* translators: %s: invoice number */
+		return sprintf( __( 'Invoice %s issued. Its PDF could not be generated; the PDF will be built on first download.', 'lumia-factures' ), $number );
+	}
+
+	/**
+	 * Runs a step, logging instead of propagating a failure.
+	 *
+	 * @param string   $step     Step name for the log.
+	 * @param int      $order_id Order id.
+	 * @param callable $run      Step.
+	 */
+	private static function guard( string $step, int $order_id, callable $run ): void {
+		try {
+			$run();
+		} catch ( Throwable $e ) {
+			self::log( 'Invoice step "' . $step . '" failed for order ' . $order_id . ': ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+		}
 	}
 
 	/**
@@ -202,10 +307,13 @@ final class Issuer {
 			return false;
 		}
 
-		$fresh  = wc_get_order( $doc->order_id );
-		$fresh  = $fresh instanceof WC_Order ? $fresh : $order;
-		$stored = self::render_and_store( $doc, $fresh, Module::settings() );
+		$fresh = wc_get_order( $doc->order_id );
+		$pdf   = self::render( $doc, $fresh instanceof WC_Order ? $fresh : $order, Module::settings() );
+		if ( '' === $pdf ) {
+			return false;
+		}
 
+		$stored = Archive::store( $pdf, (string) $doc->number, $doc->issued_at );
 		if ( null === $stored ) {
 			return false;
 		}
@@ -231,27 +339,26 @@ final class Issuer {
 	}
 
 	/**
-	 * Renders the document's PDF and archives it.
+	 * Renders the document's PDF with its recorded number and date.
 	 *
-	 * @param IssuedDocument       $doc      Issued document (number and date).
+	 * @param IssuedDocument       $doc      Issued document.
 	 * @param WC_Order             $order    Order, freshly loaded.
 	 * @param array<string, mixed> $settings Invoice settings.
-	 * @return array{file: string, checksum: string}|null Null when rendering or storage failed.
+	 * @return string PDF bytes, '' on failure (logged).
 	 */
-	private static function render_and_store( IssuedDocument $doc, WC_Order $order, array $settings ): ?array {
+	private static function render( IssuedDocument $doc, WC_Order $order, array $settings ): string {
 		try {
 			$pdf = Renderer::pdf( $order, new DocumentData( '', (string) $doc->number, $doc->issued_at ), $settings );
 		} catch ( Throwable $e ) {
 			self::log( 'PDF of invoice ' . $doc->number . ' could not be rendered: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
-			return null;
+			return '';
 		}
 
 		if ( '' === $pdf ) {
 			self::log( 'PDF of invoice ' . $doc->number . ' could not be rendered.' );
-			return null;
 		}
 
-		return Archive::store( $pdf, (string) $doc->number, $doc->issued_at );
+		return $pdf;
 	}
 
 	/**
