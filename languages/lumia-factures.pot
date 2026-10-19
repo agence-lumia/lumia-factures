@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T10:48:44+00:00\n"
+"POT-Creation-Date: 2026-10-19T12:12:43+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -26,7 +26,7 @@ msgstr ""
 
 #. Description of the plugin
 #: lumia-factures.php
-#: includes/Core/Modules.php:58
+#: includes/Core/Modules.php:61
 #: includes/Core/Updater.php:320
 #: templates/admin/dashboard.php:45
 msgid "PDF invoices for WooCommerce orders."
@@ -44,8 +44,8 @@ msgstr ""
 
 #: includes/Admin/Admin.php:103
 #: includes/Admin/Admin.php:104
-#: includes/Core/Modules.php:57
-#: includes/Core/Modules.php:59
+#: includes/Core/Modules.php:60
+#: includes/Core/Modules.php:62
 msgid "Invoices"
 msgstr ""
 
@@ -70,12 +70,12 @@ msgid "Are you sure?"
 msgstr ""
 
 #: includes/Admin/Admin.php:180
-#: includes/Admin/Admin.php:308
+#: includes/Admin/Admin.php:318
 msgid "Confirm"
 msgstr ""
 
 #: includes/Admin/Admin.php:181
-#: includes/Admin/Admin.php:307
+#: includes/Admin/Admin.php:317
 msgid "Cancel"
 msgstr ""
 
@@ -116,7 +116,7 @@ msgstr ""
 msgid "Update check completed."
 msgstr ""
 
-#: includes/Admin/Admin.php:312
+#: includes/Admin/Admin.php:322
 msgid "Notifications"
 msgstr ""
 
@@ -131,20 +131,20 @@ msgstr ""
 msgid "Insufficient permissions."
 msgstr ""
 
-#: includes/Core/Modules.php:60
+#: includes/Core/Modules.php:63
 msgid "Generate the invoices"
 msgstr ""
 
-#: includes/Core/Modules.php:66
-#: includes/Core/Modules.php:68
+#: includes/Core/Modules.php:69
+#: includes/Core/Modules.php:71
 msgid "Bricks"
 msgstr ""
 
-#: includes/Core/Modules.php:67
+#: includes/Core/Modules.php:70
 msgid "Dynamic tags to display invoice data in Bricks."
 msgstr ""
 
-#: includes/Core/Modules.php:69
+#: includes/Core/Modules.php:72
 msgid "Bricks dynamic tags"
 msgstr ""
 
@@ -180,7 +180,13 @@ msgstr ""
 msgid "The PDF engine (Dompdf) cannot be loaded: the vendor/ folder of Lümia Factures is missing or damaged. Reinstall the plugin from its release ZIP."
 msgstr ""
 
-#: includes/Core/Requirements.php:92
+#. translators: %s: comma-separated list of missing PHP extensions.
+#: includes/Core/Requirements.php:99
+#, php-format
+msgid "Lümia Factures requires the following PHP extensions: %s. Ask your host to enable them."
+msgstr ""
+
+#: includes/Core/Requirements.php:107
 msgid "The legacy \"Facture PDF Lumia\" plugin is still active: deactivate it so that Lümia Factures can start. Both cannot run at the same time."
 msgstr ""
 
@@ -258,7 +264,7 @@ msgstr ""
 msgid "Save"
 msgstr ""
 
-#: templates/admin/module-settings.php:75
+#: templates/admin/module-settings.php:76
 msgid "This module has no settings yet."
 msgstr ""
 

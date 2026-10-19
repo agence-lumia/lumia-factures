@@ -46,13 +46,16 @@ class Modules {
 	}
 
 	/**
-	 * Registers the default modules through a filter plus an imperative hook.
-	 * Must be called on the init hook or later (just-in-time i18n of WP 6.7+).
+	 * Built-in module definitions, before the `lumia_factures_module_definitions` filter.
 	 *
-	 * @param bool $only_active Skip the inactive modules (locked ones are always registered).
+	 * The single source of the definitions: the registry and the Activator
+	 * (initial state of the locked modules) both read it. Translates labels, so
+	 * it must be called on `init` or later.
+	 *
+	 * @return array<string, array<string, mixed>>
 	 */
-	public function register_default_modules( bool $only_active = false ): void {
-		$defaults = [
+	public static function default_definitions(): array {
+		return [
 			'invoices' => [
 				'name'        => __( 'Invoices', 'lumia-factures' ),
 				'description' => __( 'PDF invoices for WooCommerce orders.', 'lumia-factures' ),
@@ -71,6 +74,16 @@ class Modules {
 				'icon'        => 'blocks',
 			],
 		];
+	}
+
+	/**
+	 * Registers the default modules through a filter plus an imperative hook.
+	 * Must be called on the init hook or later (just-in-time i18n of WP 6.7+).
+	 *
+	 * @param bool $only_active Skip the inactive modules (locked ones are always registered).
+	 */
+	public function register_default_modules( bool $only_active = false ): void {
+		$defaults = self::default_definitions();
 
 		/**
 		 * Allows adding/overriding modules from other plugins/themes.

@@ -27,6 +27,7 @@ plugins_loaded -> Plugin::instance() (singleton)
 | `php` | PHP < 8.1 |
 | `wp` | WordPress < 6.9 |
 | `woocommerce` | WooCommerce missing, or < 9.0 |
+| `extensions` | a PHP extension of `['dom', 'mbstring', 'gd']` is not loaded (list filterable through `lumia_factures_required_extensions`) |
 | `dompdf` | `Dompdf\Dompdf` cannot be loaded (`vendor/` missing or damaged in the installed ZIP) |
 | `legacy_active` | the old `facture-pdf-lumia` plugin is active (it defines `FPL_VERSION`) |
 
@@ -54,7 +55,7 @@ Unlike lumia-tools, `Settings` keeps no copy of the option on the instance: ever
 
 ## Module system
 
-Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `init()` (register hooks here), `get_settings()`, `save_settings()` (sanitize and persist yourself, the core applies nothing), `static get_defaults()`, `static get_uninstall_keys()`. Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
+Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `init()` (register hooks here), `get_settings()`, `save_settings()` (the base implementation sanitizes the payload against `get_defaults()`: unknown keys dropped, values coerced to the type of their default, an empty-array default accepting a list or a keyed map of scalars; a module with richer settings overrides it), `static get_defaults()`, `static get_uninstall_keys()`. Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 
 **`init()` timing.** A module `init()` runs inside the `init` action at priority 10. `woocommerce_init`, `woocommerce_loaded` and `before_woocommerce_init` have therefore already fired: a callback hooked on them from a module never runs. Likewise, an `init` callback added from a module at priority <= 10 never runs (that priority is being dispatched); use a later priority.
 
@@ -89,7 +90,7 @@ Assets load on the plugin page only (`$hook === hook_suffix`): `tokens.css` firs
 
 ### Forms
 
-All forms post to `admin-post.php`; `SaveHandler` verifies a nonce and `manage_woocommerce`, then redirects with `lumia_notice` (shown as a toast):
+All forms post to `admin-post.php`; `SaveHandler` verifies a nonce and `manage_woocommerce`, then redirects with `lumia_factures_notice` (shown as a toast; modules add their own codes through the `lumia_factures_admin_notices` filter):
 
 | Action | Nonce field | Purpose |
 |---|---|---|

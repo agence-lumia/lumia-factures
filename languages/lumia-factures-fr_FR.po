@@ -178,6 +178,12 @@ msgstr "Lümia Factures nécessite WooCommerce %s ou supérieur, installé et ac
 msgid "Lümia Factures requires WooCommerce %1$s or later (current version: %2$s)."
 msgstr "Lümia Factures nécessite WooCommerce %1$s ou supérieur (version actuelle : %2$s)."
 
+#. translators: %s: comma-separated list of missing PHP extensions.
+#: includes/Core/Requirements.php:99
+#, php-format
+msgid "Lümia Factures requires the following PHP extensions: %s. Ask your host to enable them."
+msgstr "Lümia Factures nécessite les extensions PHP suivantes : %s. Demandez à votre hébergeur de les activer."
+
 #: includes/Core/Requirements.php:86
 msgid "The PDF engine (Dompdf) cannot be loaded: the vendor/ folder of Lümia Factures is missing or damaged. Reinstall the plugin from its release ZIP."
 msgstr "Le moteur PDF (Dompdf) ne peut pas être chargé : le dossier vendor/ de Lümia Factures est manquant ou endommagé. Réinstallez le plugin à partir de son ZIP de release."
