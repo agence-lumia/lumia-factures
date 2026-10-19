@@ -19,3 +19,6 @@ node_modules/
 
 # Subagent-driven development workspace (plans, briefs, reports)
 .superpowers/
+
+# PHPUnit run cache
+.phpunit.result.cache
