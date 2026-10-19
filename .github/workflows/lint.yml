@@ -42,6 +42,23 @@ jobs:
       - name: PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=2G --no-progress --error-format=github
 
+  language:
+    name: English only
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # French lives in languages/ only. "Lümia" is the one accented word allowed.
+      - name: No accented French outside languages/
+        run: |
+          export LC_ALL=C.UTF-8
+          if grep -rnP '[\x{00C0}-\x{00FF}]' includes templates assets/admin docs/*.md docs/modules README.md CLAUDE.md .github | grep -v 'Lümia'; then
+            echo '::error::Accented French characters found outside languages/ (see above).'
+            exit 1
+          fi
+
   i18n:
     name: Language files
     runs-on: ubuntu-latest
