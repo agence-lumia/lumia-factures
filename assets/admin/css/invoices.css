@@ -1,0 +1,164 @@
+/*
+ * Lümia Factures - Invoices settings screen
+ * Layout helpers for the Invoices module only. Every selector is scoped under
+ * .lumia-factures-admin; the components themselves stay in components.css.
+ */
+
+.lumia-factures-admin .lumia-factures-inv-body {
+  padding: 24px 28px 40px;
+  max-width: 1100px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-body .lumia-notice p {
+  margin: 0;
+}
+
+.lumia-factures-admin .lumia-factures-inv-body .lumia-notice p + p {
+  margin-top: 4px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-body .lumia-section {
+  margin-bottom: 28px;
+}
+
+/* Two-column grid of compact fields. */
+.lumia-factures-admin .lumia-factures-inv-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px 24px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-grid > .lumia-form__group {
+  margin-bottom: 0;
+}
+
+/* Text field with its on/off switch above it. */
+.lumia-factures-admin .lumia-factures-inv-toggled__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-toggled__head .lumia-form__label {
+  margin-bottom: 0;
+}
+
+/* Color picker. */
+.lumia-factures-admin input[type="color"].lumia-factures-inv-color {
+  width: 56px;
+  min-height: 42px;
+  height: 42px;
+  padding: 4px;
+  cursor: pointer;
+}
+
+.lumia-factures-admin .lumia-factures-inv-color__hex {
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+  background: none;
+  padding: 0;
+}
+
+/* Logo picker. */
+.lumia-factures-admin .lumia-factures-inv-logo {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-logo__thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 160px;
+  min-height: 80px;
+  max-width: 320px;
+  padding: 12px;
+  border: 1px dashed var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-n50);
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+}
+
+.lumia-factures-admin .lumia-factures-inv-logo__thumb img {
+  display: block;
+  max-width: 100%;
+  max-height: 120px;
+  height: auto;
+}
+
+/* Live number sample. */
+.lumia-factures-admin .lumia-factures-inv-sample {
+  display: inline-block;
+  min-width: 200px;
+  padding: 10px 16px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-accent-light);
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--lumia-text);
+}
+
+.lumia-factures-admin .lumia-factures-inv-sample.is-invalid {
+  background: var(--lumia-danger-bg);
+  color: var(--lumia-danger);
+}
+
+.lumia-factures-admin .lumia-factures-inv-tags {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--lumia-text-muted);
+}
+
+.lumia-factures-admin .lumia-factures-inv-tags li {
+  margin: 0 0 4px;
+}
+
+/* Counters and columns tables. */
+.lumia-factures-admin .lumia-factures-inv-counters th,
+.lumia-factures-admin .lumia-factures-inv-columns th {
+  padding: 8px 12px 8px 0;
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  color: var(--lumia-text-muted);
+  border-bottom: 1px solid var(--lumia-border);
+}
+
+.lumia-factures-admin .lumia-factures-inv-counters td,
+.lumia-factures-admin .lumia-factures-inv-columns td {
+  padding-right: 12px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-columns .lumia-server-table__label {
+  width: 30%;
+}
+
+/* The standalone "Raise counter" forms hold hidden inputs only. */
+.lumia-factures-admin .lumia-factures-inv-raise-form {
+  display: none;
+}
+
+/* Design tab: fields on the left, preview pane (Task 10) on the right. */
+.lumia-factures-admin .lumia-factures-inv-design {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-design__preview:empty {
+  display: none;
+}
+
+/* .lumia-btn sets display and would win over the hidden attribute. */
+.lumia-factures-admin .lumia-factures-inv-logo [hidden] {
+  display: none;
+}

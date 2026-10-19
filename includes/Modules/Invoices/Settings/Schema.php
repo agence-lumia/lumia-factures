@@ -198,7 +198,7 @@ final class Schema {
 	 *
 	 * @return array<string, array<string, array<string, mixed>>>
 	 */
-	private static function fields(): array {
+	public static function fields(): array {
 		if ( null === self::$fields ) {
 			self::$fields = [
 				'general'   => self::general(),

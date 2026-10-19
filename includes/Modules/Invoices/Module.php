@@ -10,11 +10,14 @@ namespace Lumia\Factures\Modules\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\AbstractModule;
+use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
+use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 /**
@@ -39,7 +42,87 @@ class Module extends AbstractModule {
 		if ( is_admin() ) {
 			OrderTools::register();
 			Download::register();
+			Counters::register();
+			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
+	}
+
+	/**
+	 * Loads the media library on the Invoices tab only (logo picker).
+	 *
+	 * @param string $hook Hook suffix of the admin page.
+	 */
+	public static function enqueue_media( $hook ): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
+
+		if ( 'module_invoices' === $tab && is_string( $hook ) && str_ends_with( $hook, '_page_lumia-factures' ) ) {
+			wp_enqueue_media();
+		}
+	}
+
+	/**
+	 * Script of the settings screen.
+	 *
+	 * @return string[]
+	 */
+	public function get_admin_js(): array {
+		return [ LUMIA_FACTURES_ASSETS_URL . 'admin/js/invoices.js' ];
+	}
+
+	/**
+	 * Stylesheet of the settings screen.
+	 *
+	 * @return string[]
+	 */
+	public function get_admin_css(): array {
+		return [ LUMIA_FACTURES_ASSETS_URL . 'admin/css/invoices.css' ];
+	}
+
+	/**
+	 * The logo picker needs the media editor scripts.
+	 *
+	 * @return string[]
+	 */
+	public function get_admin_js_deps(): array {
+		return [ 'media-editor' ];
+	}
+
+	/**
+	 * Data of the settings screen, merged into `lumiaFacturesAdmin`.
+	 *
+	 * The live number sample is computed in JS from these values (it mirrors `NumberFormat::preview()`):
+	 * today's date in the site timezone, the sample order 14243 and customer 27, the counters by key
+	 * and the tags a format may use.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function get_admin_js_data(): array {
+		$counters = [];
+		foreach ( Sequences::all() as $sequence ) {
+			$counters[ $sequence['key'] ] = $sequence['value'];
+		}
+
+		return [
+			'invoices' => [
+				'type'     => 'invoice',
+				'sample'   => [
+					'year'        => (string) wp_date( 'Y' ),
+					'month'       => (string) wp_date( 'm' ),
+					'day'         => (string) wp_date( 'd' ),
+					'orderNumber' => '14243',
+					'orderId'     => '14243',
+					'customerId'  => '27',
+				],
+				'counters' => $counters,
+				'tags'     => NumberFormat::known_tags(),
+			],
+			'i18n'     => [
+				'logoFrameTitle'  => __( 'Choose a logo', 'lumia-factures' ),
+				'logoFrameButton' => __( 'Use this image', 'lumia-factures' ),
+				'sampleInvalid'   => __( 'Invalid format', 'lumia-factures' ),
+			],
+		];
 	}
 
 	/**

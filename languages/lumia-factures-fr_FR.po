@@ -640,3 +640,468 @@ msgstr "Le PDF de la facture n'a pas pu être reconstruit."
 
 msgid "You are not allowed to do this."
 msgstr "Vous n'êtes pas autorisé à effectuer cette action."
+
+msgid "General"
+msgstr "Général"
+
+msgid "Company"
+msgstr "Société"
+
+msgid "Numbering"
+msgstr "Numérotation"
+
+msgid "Content"
+msgstr "Contenu"
+
+msgid "Design"
+msgstr "Apparence"
+
+msgid "Logo"
+msgstr "Logo"
+
+msgid "Printed at the top of the invoice. PNG or JPEG is the safest choice."
+msgstr "Imprimé en haut de la facture. Le PNG ou le JPEG sont les formats les plus sûrs."
+
+msgid "Show the logo"
+msgstr "Afficher le logo"
+
+msgid "Logo image"
+msgstr "Image du logo"
+
+msgid "No logo"
+msgstr "Aucun logo"
+
+msgid "Remove"
+msgstr "Retirer"
+
+msgid "Logo width (pixels)"
+msgstr "Largeur du logo (pixels)"
+
+msgid "The height follows the proportions of the image."
+msgstr "La hauteur suit les proportions de l'image."
+
+msgid "Identity"
+msgstr "Identité"
+
+msgid "Use the switch of a field to show or hide it on the invoice."
+msgstr "Utilisez l'interrupteur d'un champ pour l'afficher ou le masquer sur la facture."
+
+msgid "Shop name"
+msgstr "Nom de la boutique"
+
+msgid "Legal name"
+msgstr "Raison sociale"
+
+msgid "Legal form"
+msgstr "Forme juridique"
+
+msgid "Manager"
+msgstr "Gérant"
+
+msgid "Address"
+msgstr "Adresse"
+
+msgid "Contact"
+msgstr "Contact"
+
+msgid "Phone"
+msgstr "Téléphone"
+
+msgid "Mobile"
+msgstr "Mobile"
+
+msgid "Email"
+msgstr "E-mail"
+
+msgid "Website"
+msgstr "Site web"
+
+msgid "Legal and bank details"
+msgstr "Mentions légales et coordonnées bancaires"
+
+msgid "Printed in the footer when the matching switch is on in the Content tab."
+msgstr "Imprimé dans le pied de page lorsque l'interrupteur correspondant est activé dans l'onglet Contenu."
+
+msgid "VAT number"
+msgstr "Numéro de TVA"
+
+msgid "APE code"
+msgstr "Code APE"
+
+msgid "Tags replaced on each invoice: %s"
+msgstr "Balises remplacées sur chaque facture : %s"
+
+msgid "Image"
+msgstr "Image"
+
+msgid "Product name"
+msgstr "Nom du produit"
+
+msgid "Quantity"
+msgstr "Quantité"
+
+msgid "Tax rate"
+msgstr "Taux de TVA"
+
+msgid "Line total"
+msgstr "Total de la ligne"
+
+msgid "Document"
+msgstr "Document"
+
+msgid "Document title"
+msgstr "Titre du document"
+
+msgid "Prices shown"
+msgstr "Prix affichés"
+
+msgid "Including tax"
+msgstr "TTC"
+
+msgid "Excluding tax"
+msgstr "HT"
+
+msgid "The grand total always equals the WooCommerce order total."
+msgstr "Le total général est toujours égal au total de la commande WooCommerce."
+
+msgid "Show the invoice number"
+msgstr "Afficher le numéro de facture"
+
+msgid "Show the invoice date"
+msgstr "Afficher la date de facture"
+
+msgid "Show the order number"
+msgstr "Afficher le numéro de commande"
+
+msgid "Show the order date"
+msgstr "Afficher la date de commande"
+
+msgid "Show the payment method"
+msgstr "Afficher le mode de paiement"
+
+msgid "Addresses"
+msgstr "Adresses"
+
+msgid "Billing block title"
+msgstr "Titre du bloc de facturation"
+
+msgid "Show the billing address"
+msgstr "Afficher l'adresse de facturation"
+
+msgid "Show the billing email"
+msgstr "Afficher l'e-mail de facturation"
+
+msgid "Show the billing phone"
+msgstr "Afficher le téléphone de facturation"
+
+msgid "Show the shipping block"
+msgstr "Afficher le bloc de livraison"
+
+msgid "Shipping block title"
+msgstr "Titre du bloc de livraison"
+
+msgid "Hide it when it equals the billing address"
+msgstr "Le masquer s'il est identique à l'adresse de facturation"
+
+msgid "Hide it for orders without shipping"
+msgstr "Le masquer pour les commandes sans livraison"
+
+msgid "Show the shipping phone"
+msgstr "Afficher le téléphone de livraison"
+
+msgid "Message"
+msgstr "Message"
+
+msgid "A free text printed before the product table."
+msgstr "Un texte libre imprimé avant le tableau des produits."
+
+msgid "Show the message"
+msgstr "Afficher le message"
+
+msgid "Message title"
+msgstr "Titre du message"
+
+msgid "Product table"
+msgstr "Tableau des produits"
+
+msgid "Columns, their label (empty keeps the default one) and their relative width."
+msgstr "Colonnes, leur libellé (vide : libellé par défaut) et leur largeur relative."
+
+msgid "Column"
+msgstr "Colonne"
+
+msgid "Show"
+msgstr "Afficher"
+
+msgid "Label"
+msgstr "Libellé"
+
+msgid "Width (%)"
+msgstr "Largeur (%)"
+
+msgid "Show variation attributes and product options"
+msgstr "Afficher les attributs de variation et les options du produit"
+
+msgid "Show the parent product name for variations"
+msgstr "Afficher le nom du produit parent pour les variations"
+
+msgid "Totals"
+msgstr "Totaux"
+
+msgid "Rows of the totals block. The amounts always add up to the WooCommerce order total."
+msgstr "Lignes du bloc des totaux. Les montants s'additionnent toujours au total de la commande WooCommerce."
+
+msgid "Show the coupon code in the discount row"
+msgstr "Afficher le code promo dans la ligne de remise"
+
+msgid "Show the shipping row even when it is free"
+msgstr "Afficher la ligne de livraison même si elle est gratuite"
+
+msgid "Fees"
+msgstr "Frais"
+
+msgid "Tax"
+msgstr "TVA"
+
+msgid "Grand total"
+msgstr "Total général"
+
+msgid "Show the customer note"
+msgstr "Afficher la note du client"
+
+msgid "Customer note title"
+msgstr "Titre de la note du client"
+
+msgid "Footer"
+msgstr "Pied de page"
+
+msgid "The company details come from the Company tab."
+msgstr "Les coordonnées de la société viennent de l'onglet Société."
+
+msgid "Footer text"
+msgstr "Texte du pied de page"
+
+msgid "Show the page numbers"
+msgstr "Afficher la numérotation des pages"
+
+msgid "Legal text"
+msgstr "Texte légal"
+
+msgid "Primary"
+msgstr "Principale"
+
+msgid "Secondary"
+msgstr "Secondaire"
+
+msgid "Text"
+msgstr "Texte"
+
+msgid "Muted text"
+msgstr "Texte atténué"
+
+msgid "Table header background"
+msgstr "Fond de l'en-tête du tableau"
+
+msgid "Table header text"
+msgstr "Texte de l'en-tête du tableau"
+
+msgid "Alternate row"
+msgstr "Ligne alternée"
+
+msgid "Block background"
+msgstr "Fond des blocs"
+
+msgid "Borders"
+msgstr "Bordures"
+
+msgid "Page background"
+msgstr "Fond de page"
+
+msgid "Colors"
+msgstr "Couleurs"
+
+msgid "Typography"
+msgstr "Typographie"
+
+msgid "Heading font"
+msgstr "Police des titres"
+
+msgid "Body font"
+msgstr "Police du texte"
+
+msgid "Body font size (pt)"
+msgstr "Taille du texte (pt)"
+
+msgid "Heading size (times the body size)"
+msgstr "Taille des titres (multiple de la taille du texte)"
+
+msgid "Line height"
+msgstr "Hauteur de ligne"
+
+msgid "Bold headings"
+msgstr "Titres en gras"
+
+msgid "Layout"
+msgstr "Mise en page"
+
+msgid "Density"
+msgstr "Densité"
+
+msgid "Compact"
+msgstr "Compacte"
+
+msgid "Normal"
+msgstr "Normale"
+
+msgid "Airy"
+msgstr "Aérée"
+
+msgid "Corner radius (px)"
+msgstr "Rayon des angles (px)"
+
+msgid "Border width (px)"
+msgstr "Épaisseur des bordures (px)"
+
+msgid "Product image width (px)"
+msgstr "Largeur de l'image produit (px)"
+
+msgid "0 hides the image."
+msgstr "0 masque l'image."
+
+msgid "Top margin (mm)"
+msgstr "Marge haute (mm)"
+
+msgid "Bottom margin (mm)"
+msgstr "Marge basse (mm)"
+
+msgid "Side margins (mm)"
+msgstr "Marges latérales (mm)"
+
+msgid "Invoice preview"
+msgstr "Aperçu de la facture"
+
+msgid "Issuing"
+msgstr "Émission"
+
+msgid "The invoice is issued once, when an order reaches one of these statuses. An issued invoice never changes."
+msgstr "La facture est émise une seule fois, lorsqu'une commande atteint l'un de ces statuts. Une facture émise ne change jamais."
+
+msgid "Issue the invoice when the order status becomes"
+msgstr "Émettre la facture lorsque le statut de la commande devient"
+
+msgid "Emails"
+msgstr "E-mails"
+
+msgid "The issued invoice is attached to these WooCommerce emails."
+msgstr "La facture émise est jointe à ces e-mails WooCommerce."
+
+msgid "Attach the invoice to"
+msgstr "Joindre la facture à"
+
+msgid "Counter. {number:5} pads it with zeros to 5 digits. Required."
+msgstr "Compteur. {number:5} le complète avec des zéros sur 5 chiffres. Obligatoire."
+
+msgid "Year. {year:2} gives the last two digits."
+msgstr "Année. {year:2} donne les deux derniers chiffres."
+
+msgid "Month, two digits."
+msgstr "Mois, sur deux chiffres."
+
+msgid "Day, two digits."
+msgstr "Jour, sur deux chiffres."
+
+msgid "WooCommerce order number."
+msgstr "Numéro de commande WooCommerce."
+
+msgid "WooCommerce order id."
+msgstr "Identifiant de commande WooCommerce."
+
+msgid "Customer id."
+msgstr "Identifiant du client."
+
+msgid "Invoice number"
+msgstr "Numéro de facture"
+
+msgid "Numbers are continuous and never reused. Changing the format only affects the next invoices."
+msgstr "Les numéros se suivent sans interruption et ne sont jamais réutilisés. Changer le format n'affecte que les prochaines factures."
+
+msgid "Format"
+msgstr "Format"
+
+msgid "The {number} tag is required. The characters / \\ : * ? \" < > | are not allowed."
+msgstr "La balise {number} est obligatoire. Les caractères / \\ : * ? \" < > | ne sont pas autorisés."
+
+msgid "Next invoice number"
+msgstr "Prochain numéro de facture"
+
+msgid "Sample with today's date, order 14243 and customer 27."
+msgstr "Exemple avec la date du jour, la commande 14243 et le client 27."
+
+msgid "Available tags"
+msgstr "Balises disponibles"
+
+msgid "First number"
+msgstr "Premier numéro"
+
+msgid "Used when a counter starts. An existing counter is never changed by this setting."
+msgstr "Utilisé au démarrage d'un compteur. Un compteur existant n'est jamais modifié par ce réglage."
+
+msgid "Restart the counter each period"
+msgstr "Redémarrer le compteur à chaque période"
+
+msgid "When on, the format must contain the year (and the month for a monthly reset)."
+msgstr "Lorsque c'est activé, le format doit contenir l'année (et le mois pour une remise à zéro mensuelle)."
+
+msgid "Restart every"
+msgstr "Redémarrer chaque"
+
+msgid "Year"
+msgstr "Année"
+
+msgid "Month"
+msgstr "Mois"
+
+msgid "Counters"
+msgstr "Compteurs"
+
+msgid "A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices created elsewhere."
+msgstr "Un compteur ne peut qu'être augmenté, jamais diminué : un numéro déjà émis n'est jamais réémis. Augmentez-le pour poursuivre après des factures créées ailleurs."
+
+msgid "No counter yet. The first one is created with the first invoice."
+msgstr "Aucun compteur pour l'instant. Le premier est créé avec la première facture."
+
+msgid "Counter"
+msgstr "Compteur"
+
+msgid "Last number used"
+msgstr "Dernier numéro utilisé"
+
+msgid "Updated"
+msgstr "Mis à jour"
+
+msgid "Raise to"
+msgstr "Augmenter à"
+
+msgid "New last number used"
+msgstr "Nouveau dernier numéro utilisé"
+
+msgid "Raise"
+msgstr "Augmenter"
+
+msgid "The counter has been raised."
+msgstr "Le compteur a été augmenté."
+
+msgid "The counter was not raised: the new value must be higher than the current one."
+msgstr "Le compteur n'a pas été augmenté : la nouvelle valeur doit être supérieure à la valeur actuelle."
+
+msgid "Show \"%s\" on the invoice"
+msgstr "Afficher « %s » sur la facture"
+
+msgid "Choose a logo"
+msgstr "Choisir un logo"
+
+msgid "Use this image"
+msgstr "Utiliser cette image"
+
+msgid "Invalid format"
+msgstr "Format invalide"

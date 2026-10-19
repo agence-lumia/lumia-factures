@@ -23,6 +23,40 @@ use WC_Order;
 final class Placeholders {
 
 	/**
+	 * Tags shown as help in the settings screen. Every one is resolved by values().
+	 *
+	 * @var string[]
+	 */
+	public const TAGS = [
+		'order_number',
+		'order_date',
+		'order_total',
+		'payment_method',
+		'shipping_method',
+		'order_items_count',
+		'invoice_number',
+		'invoice_date',
+		'customer_first_name',
+		'customer_last_name',
+		'customer_full_name',
+		'customer_company',
+		'customer_email',
+		'customer_phone',
+		'shop_name',
+		'shop_legal_name',
+		'shop_manager',
+		'shop_address',
+		'shop_phone',
+		'shop_mobile',
+		'shop_email',
+		'shop_website',
+		'shop_siret',
+		'shop_vat',
+		'current_date',
+		'current_year',
+	];
+
+	/**
 	 * Resolves the tags of a text.
 	 *
 	 * @param string                    $text     Text with `{tag}` markers.
