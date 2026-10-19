@@ -17,7 +17,7 @@ if ( array() === $columns || array() === $items ) {
 	return;
 }
 ?>
-<table class="lf-items">
+<table class="lf-items" style="table-layout: fixed; width: 100%;">
 	<colgroup>
 		<?php foreach ( $columns as $column ) : ?>
 			<col style="width: <?php echo esc_attr( (string) $column['width'] ); ?>%;">
@@ -26,7 +26,7 @@ if ( array() === $columns || array() === $items ) {
 	<thead>
 		<tr>
 			<?php foreach ( $columns as $column ) : ?>
-				<th class="lf-col-<?php echo esc_attr( $column['align'] ); ?>"><?php echo esc_html( $column['label'] ); ?></th>
+				<th class="lf-col-<?php echo esc_attr( $column['align'] ); ?>" style="width: <?php echo esc_attr( (string) $column['width'] ); ?>%;"><?php echo esc_html( $column['label'] ); ?></th>
 			<?php endforeach; ?>
 		</tr>
 	</thead>
