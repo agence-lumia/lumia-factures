@@ -113,7 +113,33 @@ final class Register {
 	}
 
 	/**
-	 * Records the archived file of an issued document.
+	 * Replaces the archived file of an issued document.
+	 *
+	 * The only legitimate caller is the issuer's restore of a missing or damaged
+	 * archive: the number and the date are kept, only the file is re-recorded.
+	 *
+	 * @param int    $id       Row id.
+	 * @param string $old_file Currently recorded relative path (must match).
+	 * @param string $file     New relative path.
+	 * @param string $checksum SHA-256 of the new file.
+	 * @return bool True only when exactly one issued row changed.
+	 */
+	public static function replace_file( int $id, string $old_file, string $file, string $checksum ): bool {
+		global $wpdb;
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		$affected = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET file = %s, checksum = %s WHERE id = %d AND status = 'issued' AND file = %s", $file, $checksum, $id, $old_file ) );
+
+		return 1 === $affected;
+	}
+
+	/**
+	 * Records the archived file of an issued document, once.
+	 *
+	 * Refuses a reserved row and a row that already has a file: an issued
+	 * invoice's archived PDF never changes (see replace_file() for the restore).
 	 *
 	 * @param int    $id       Row id.
 	 * @param string $file     Relative path.
@@ -125,7 +151,7 @@ final class Register {
 		$table = Installer::documents_table();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
-		$affected = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET file = %s, checksum = %s WHERE id = %d", $file, $checksum, $id ) );
+		$affected = $wpdb->query( $wpdb->prepare( "UPDATE {$table} SET file = %s, checksum = %s WHERE id = %d AND status = 'issued' AND file IS NULL", $file, $checksum, $id ) );
 
 		return 1 === $affected;
 	}

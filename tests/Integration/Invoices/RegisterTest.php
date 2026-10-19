@@ -87,6 +87,50 @@ class RegisterTest extends TestCase {
 		$this->assertSame( str_repeat( 'a', 64 ), $doc->checksum );
 	}
 
+	public function test_attach_file_cannot_repoint_an_issued_invoice(): void {
+		$id = (int) Register::reserve( 'invoice', 511 );
+		Register::assign( $id, 'FA-A', 'invoice', 1, time() );
+
+		$this->assertTrue( Register::attach_file( $id, 'first.pdf', str_repeat( 'a', 64 ) ) );
+		$this->assertFalse( Register::attach_file( $id, 'second.pdf', str_repeat( 'b', 64 ) ) );
+
+		$doc = Register::find( 'invoice', 511 );
+		$this->assertSame( 'first.pdf', $doc->file );
+		$this->assertSame( str_repeat( 'a', 64 ), $doc->checksum );
+	}
+
+	public function test_attach_file_refuses_a_reserved_row(): void {
+		$id = (int) Register::reserve( 'invoice', 512 );
+
+		$this->assertFalse( Register::attach_file( $id, 'x.pdf', str_repeat( 'a', 64 ) ) );
+		$this->assertNull( Register::find( 'invoice', 512 )->file );
+	}
+
+	public function test_replace_file_with_matching_old_file(): void {
+		$id = (int) Register::reserve( 'invoice', 513 );
+		Register::assign( $id, 'FA-B', 'invoice', 1, time() );
+		Register::attach_file( $id, 'old.pdf', str_repeat( 'a', 64 ) );
+
+		$this->assertTrue( Register::replace_file( $id, 'old.pdf', 'new.pdf', str_repeat( 'c', 64 ) ) );
+
+		$doc = Register::find( 'invoice', 513 );
+		$this->assertSame( 'new.pdf', $doc->file );
+		$this->assertSame( str_repeat( 'c', 64 ), $doc->checksum );
+		$this->assertSame( 'FA-B', $doc->number );
+	}
+
+	public function test_replace_file_with_wrong_old_file_changes_nothing(): void {
+		$id = (int) Register::reserve( 'invoice', 514 );
+		Register::assign( $id, 'FA-C', 'invoice', 1, time() );
+		Register::attach_file( $id, 'old.pdf', str_repeat( 'a', 64 ) );
+
+		$this->assertFalse( Register::replace_file( $id, 'other.pdf', 'new.pdf', str_repeat( 'c', 64 ) ) );
+
+		$doc = Register::find( 'invoice', 514 );
+		$this->assertSame( 'old.pdf', $doc->file );
+		$this->assertSame( str_repeat( 'a', 64 ), $doc->checksum );
+	}
+
 	public function test_release_only_deletes_unnumbered_rows(): void {
 		$reserved = (int) Register::reserve( 'invoice', 509 );
 		Register::release( $reserved );
