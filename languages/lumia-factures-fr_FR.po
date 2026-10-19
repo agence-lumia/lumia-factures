@@ -1251,3 +1251,28 @@ msgstr "Télécharger ma facture"
 
 msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
 msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia : le module Bricks est activé, il les affiche comme avant."
+
+msgid "Lümia Factures: %d Facture PDF Lumia invoice was not imported (conflict)."
+msgid_plural "Lümia Factures: %d Facture PDF Lumia invoices were not imported (conflicts)."
+msgstr[0] "Lümia Factures : %d facture Facture PDF Lumia n'a pas été importée (conflit)."
+msgstr[1] "Lümia Factures : %d factures Facture PDF Lumia n'ont pas été importées (conflits)."
+
+msgid "These orders get no invoice until the conflict is handled by hand. Fix the cause, then run \"wp lumia-factures migrate --force\"."
+msgstr "Ces commandes ne reçoivent aucune facture tant que le conflit n'est pas réglé à la main. Corrigez la cause, puis lancez « wp lumia-factures migrate --force »."
+
+msgid "Order #%d"
+msgstr "Commande n° %d"
+
+msgid "and %d more order."
+msgid_plural "and %d more orders."
+msgstr[0] "et %d autre commande."
+msgstr[1] "et %d autres commandes."
+
+msgid "Dismiss"
+msgstr "Masquer"
+
+msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
+msgstr "Aucune facture ne peut être émise pour cette commande : sa facture Facture PDF Lumia n'a pas pu être importée (conflit). Consultez le rapport de migration."
+
+msgid "A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render."
+msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia, mais le module Bricks n'a pas pu être activé : activez-le dans l'onglet Modules de Lümia Factures, sinon les balises ne s'afficheront pas."

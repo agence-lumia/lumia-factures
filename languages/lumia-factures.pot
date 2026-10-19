@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T21:27:40+00:00\n"
+"POT-Creation-Date: 2026-10-19T23:03:30+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -148,7 +148,7 @@ msgstr ""
 msgid "Bricks dynamic tags"
 msgstr ""
 
-#: includes/Core/Plugin.php:160
+#: includes/Core/Plugin.php:167
 msgid "Lümia Factures is not running:"
 msgstr ""
 
@@ -194,16 +194,16 @@ msgstr ""
 msgid "No release notes available."
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:46
+#: includes/Modules/Bricks/Tags.php:47
 msgid "Invoice URL"
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:47
+#: includes/Modules/Bricks/Tags.php:48
 #: templates/admin/invoices/numbering.php:28
 msgid "Invoice number"
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:48
+#: includes/Modules/Bricks/Tags.php:49
 msgid "Invoice status"
 msgstr ""
 
@@ -216,8 +216,9 @@ msgid "The counter was not raised: the new value must be higher than the current
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/Counters.php:70
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:129
-#: includes/Modules/Invoices/Admin/OrderTools.php:293
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:127
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:232
+#: includes/Modules/Invoices/Admin/OrderTools.php:296
 #: includes/Modules/Invoices/Admin/Preview.php:52
 msgid "You are not allowed to do this."
 msgstr ""
@@ -240,70 +241,100 @@ msgstr ""
 msgid "Show \"%s\" on the invoice"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:54
+#. translators: %d: number of legacy invoices not imported
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:81
+#, php-format
+msgid "Lümia Factures: %d Facture PDF Lumia invoice was not imported (conflict)."
+msgid_plural "Lümia Factures: %d Facture PDF Lumia invoices were not imported (conflicts)."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:85
+msgid "These orders get no invoice until the conflict is handled by hand. Fix the cause, then run \"wp lumia-factures migrate --force\"."
+msgstr ""
+
+#. translators: %d: order id
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:94
+#, php-format
+msgid "Order #%d"
+msgstr ""
+
+#. translators: %d: number of orders not listed
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:104
+#, php-format
+msgid "and %d more order."
+msgid_plural "and %d more orders."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:117
+msgid "Dismiss"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:157
 msgid "Lümia Factures: no invoice is issued until the Facture PDF Lumia data is imported."
 msgstr ""
 
 #. translators: %s: import status
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:58
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:161
 #, php-format
 msgid "Import status: %s."
 msgstr ""
 
 #. translators: 1: invoices imported, 2: invoices already imported, 3: PDFs copied, 4: PDFs missing, 5: conflicts
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:67
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:170
 #, php-format
 msgid "Last run: %1$d invoices imported, %2$d already imported, %3$d PDFs copied, %4$d PDFs missing, %5$d conflicts."
 msgstr ""
 
 #. translators: %s: error message
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:81
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:184
 #, php-format
 msgid "Last error: %s"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:95
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:198
 msgid "Run the import now"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:156
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:259
 msgid "The Facture PDF Lumia data has been imported. Invoices are issued again."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:157
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:260
 msgid "The Facture PDF Lumia data has been imported, but some invoices were skipped: run \"wp lumia-factures migration-status\" or check the PHP error log."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:158
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:261
 msgid "The Facture PDF Lumia import failed. See the PHP error log, then try again."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:159
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:262
 msgid "The Facture PDF Lumia import is already running. Reload this page in a few minutes."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:160
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:263
 msgid "There is no Facture PDF Lumia data to import."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:181
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:284
 msgid "waiting to run"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:182
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:285
 msgid "running"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:183
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:286
 msgid "failed"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/MigrationNotice.php:184
+#: includes/Modules/Invoices/Admin/MigrationNotice.php:287
 msgid "not started"
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/OrderTools.php:58
-#: includes/Modules/Invoices/Admin/OrderTools.php:139
+#: includes/Modules/Invoices/Admin/OrderTools.php:142
 #: includes/Modules/Invoices/Rendering/Context.php:175
 #: templates/admin/invoices/content.php:40
 msgid "Invoice"
@@ -317,35 +348,39 @@ msgstr ""
 msgid "Rebuild missing PDF"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:110
+#: includes/Modules/Invoices/Admin/OrderTools.php:112
+msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:113
 msgid "No invoice can be issued for this order until the Facture PDF Lumia data is imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:118
+#: includes/Modules/Invoices/Admin/OrderTools.php:121
 msgid "No invoice has been issued for this order yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:120
+#: includes/Modules/Invoices/Admin/OrderTools.php:123
 msgid "Issue invoice now"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:127
+#: includes/Modules/Invoices/Admin/OrderTools.php:130
 msgid "The current order status does not allow an invoice yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:278
+#: includes/Modules/Invoices/Admin/OrderTools.php:281
 msgid "The invoice has been issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:279
+#: includes/Modules/Invoices/Admin/OrderTools.php:282
 msgid "The invoice could not be issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:280
+#: includes/Modules/Invoices/Admin/OrderTools.php:283
 msgid "The invoice PDF has been rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:281
+#: includes/Modules/Invoices/Admin/OrderTools.php:284
 msgid "The invoice PDF could not be rebuilt."
 msgstr ""
 
@@ -358,7 +393,7 @@ msgid "Create a first order to preview the invoice."
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/Preview.php:104
-#: includes/Modules/Invoices/Module.php:146
+#: includes/Modules/Invoices/Module.php:143
 msgid "The preview could not be generated."
 msgstr ""
 
@@ -451,7 +486,7 @@ msgstr ""
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""
 
-#: includes/Modules/Invoices/Front/CustomerDownload.php:251
+#: includes/Modules/Invoices/Front/CustomerDownload.php:253
 msgid "Invoice not found."
 msgstr ""
 
@@ -459,54 +494,58 @@ msgstr ""
 msgid "Download my invoice"
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:158
+#: includes/Modules/Invoices/Migration/Importer.php:186
+msgid "A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render."
+msgstr ""
+
+#: includes/Modules/Invoices/Migration/Importer.php:191
 msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:257
+#: includes/Modules/Invoices/Migration/Importer.php:287
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:264
+#: includes/Modules/Invoices/Migration/Importer.php:294
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:294
+#: includes/Modules/Invoices/Migration/Importer.php:337
 #, php-format
 msgid "Invoice %s imported from Facture PDF Lumia."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id, 3: file path
-#: includes/Modules/Invoices/Migration/Importer.php:356
+#: includes/Modules/Invoices/Migration/Importer.php:404
 #, php-format
 msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:430
+#: includes/Modules/Invoices/Migration/Importer.php:458
 msgid "An invoice is being issued for this order."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:434
+#: includes/Modules/Invoices/Migration/Importer.php:462
 #, php-format
 msgid "The order already has invoice %s."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:440
+#: includes/Modules/Invoices/Migration/Importer.php:468
 msgid "The number is already used by another invoice."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:446
+#: includes/Modules/Invoices/Migration/Importer.php:474
 msgid "The invoice could not be recorded (database error, see the PHP error log)."
 msgstr ""
 
 #. translators: %d: order id
-#: includes/Modules/Invoices/Migration/Importer.php:469
+#: includes/Modules/Invoices/Migration/Importer.php:497
 #, php-format
 msgid "Order %d: part of the import could not be written (see the PHP error log)."
 msgstr ""
@@ -531,29 +570,29 @@ msgstr[1] ""
 msgid "%s was set and is no longer supported: it was not imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:143
+#: includes/Modules/Invoices/Module.php:140
 #: templates/admin/invoices/company.php:35
 msgid "Choose a logo"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:144
+#: includes/Modules/Invoices/Module.php:141
 msgid "Use this image"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:145
+#: includes/Modules/Invoices/Module.php:142
 msgid "Invalid format"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:147
+#: includes/Modules/Invoices/Module.php:144
 msgid "Raise this counter?"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:148
+#: includes/Modules/Invoices/Module.php:145
 msgid "Raise the counter"
 msgstr ""
 
 #. translators: 1: counter key, 2: current value, 3: new value.
-#: includes/Modules/Invoices/Module.php:150
+#: includes/Modules/Invoices/Module.php:147
 #, php-format
 msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
 msgstr ""
