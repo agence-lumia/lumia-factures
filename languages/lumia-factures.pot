@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T13:07:10+00:00\n"
+"POT-Creation-Date: 2026-10-19T13:18:40+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -194,38 +194,38 @@ msgstr ""
 msgid "No release notes available."
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:62
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:72
 msgid "Subtotal"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:66
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:76
 msgid "Discount"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:73
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:83
 msgid "Coupon code"
 msgid_plural "Coupon codes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:86
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:96
 msgid "Shipping"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:95
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:104
 msgid "Total excl. VAT"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:105
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:114
 msgid "Rounding"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:108
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:117
 msgid "Total"
 msgstr ""
 
 #. translators: %s: formatted tax rate, e.g. "20 %"
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:255
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:324
 #, php-format
 msgid "VAT %s"
 msgstr ""

@@ -56,7 +56,7 @@ class StatementTest extends TestCase {
 		$this->assertSame( 3500, $statement->lines[0]->total );
 		$this->assertSame( 3500, $this->row( $statement, 'subtotal' )->amount );
 		$this->assertSame( -500, $this->row( $statement, 'discount' )->amount );
-		$this->assertSame( 'LECOMTE5', strtoupper( (string) $this->row( $statement, 'coupons' )->text ) );
+		$this->assertSame( 'LECOMTE5', $this->row( $statement, 'coupons' )->text );
 		$this->assertTrue( $this->row( $statement, 'coupons' )->informational );
 		$this->assertSame( 3000, $this->row( $statement, 'total' )->amount );
 		$this->assertTrue( $this->row( $statement, 'total' )->grand );
@@ -256,6 +256,13 @@ class StatementTest extends TestCase {
 		$this->assertSame( 1200, $line->unit );
 		$this->assertSame( '', $line->sku );
 		$this->assertSame( 0, $line->image_id );
+		$this->assertContains(
+			[
+				'label' => 'Conditionnement',
+				'value' => '500 g',
+			],
+			$line->attributes
+		);
 		$this->assertAddsUp( $statement );
 	}
 
@@ -326,11 +333,99 @@ class StatementTest extends TestCase {
 		$this->assertSame( "2,1\u{00A0}%", StatementBuilder::format_rate( 2.1 ) );
 	}
 
-	public function test_custom_label_replaces_default(): void {
-		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+	public function test_incl_amounts_are_rounded_once(): void {
+		update_option( 'woocommerce_tax_round_at_subtotal', 'yes' );
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 9.99 ) ] ], [ 'prices_include_tax' => true ] );
 
-		$this->assertSame( 'Subtotal', $this->row( $this->build( $order, 'incl' ), 'subtotal' )->label );
-		$this->assertSame( 'Sous-total TTC', $this->row( $this->build( $order, 'incl', [ 'total_subtotal_label' => 'Sous-total TTC' ] ), 'subtotal' )->label );
+		$statement = $this->build( $order, 'incl' );
+
+		$this->assertSame( 999, $statement->lines[0]->total );
+		$this->assertSame( 999, $statement->lines[0]->unit );
+		$this->assertSame( 999, $this->row( $statement, 'subtotal' )->amount );
+		$this->assertSame( [], $this->rows( $statement, 'rounding' ) );
+		$this->assertSame( 999, $this->row( $statement, 'total' )->amount );
+		$this->assertAddsUp( $statement );
+	}
+
+	public function test_old_order_without_rate_percent_keeps_one_row_per_rate(): void {
+		OrderFactory::tax_rates(
+			[
+				''             => 20.0,
+				'reduced-rate' => 5.5,
+			]
+		);
+		$order = OrderFactory::order(
+			[
+				[ OrderFactory::simple_product( 12.5 ), 2 ],
+				[ OrderFactory::simple_product( 7.3, 'reduced-rate' ), 3 ],
+			]
+		);
+
+		// Orders placed before WooCommerce 3.7 have no rate_percent meta (read back as 0.0),
+		// and French shops name every rate "TVA".
+		foreach ( $order->get_items( 'tax' ) as $tax ) {
+			wc_delete_order_item_meta( $tax->get_id(), 'rate_percent' );
+		}
+		$order = wc_get_order( $order->get_id() );
+
+		$statement = $this->build( $order, 'excl' );
+
+		$this->assertSame( 20.0, $statement->lines[0]->tax_rate );
+		$this->assertSame( 5.5, $statement->lines[1]->tax_rate );
+
+		$amounts = [];
+		foreach ( $this->rows( $statement, 'tax' ) as $tax ) {
+			$amounts[ $tax->label ] = $tax->amount;
+		}
+		$this->assertSame(
+			[
+				"VAT 20\u{00A0}%"  => 500,
+				"VAT 5,5\u{00A0}%" => 120,
+			],
+			$amounts
+		);
+		$this->assertAddsUp( $statement );
+	}
+
+	public function test_variation_without_parent_name_does_not_repeat_attribute(): void {
+		$variation = OrderFactory::variable_product( 'Conditionnement', '500 g', 12.0 );
+		$order     = OrderFactory::order( [ [ $variation ] ] );
+		$item_name = $order->get_items()[ array_key_first( $order->get_items() ) ]->get_name();
+
+		$statement = $this->build( $order, 'incl', [ 'item_parent_name_enabled' => false ] );
+		$line      = $statement->lines[0];
+
+		$this->assertSame( $item_name, $line->name );
+		$shown = $line->name . ' ' . implode( ' ', array_column( $line->attributes, 'value' ) );
+		$this->assertSame( 1, substr_count( $shown, '500 g' ) );
+		$this->assertAddsUp( $statement );
+	}
+
+	public function test_full_discount_coupon(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order(
+			[ [ OrderFactory::simple_product( 10.0 ) ] ],
+			[
+				'prices_include_tax' => true,
+				'coupon'             => [
+					'code'   => 'offert',
+					'type'   => 'percent',
+					'amount' => 100,
+				],
+			]
+		);
+
+		foreach ( [ 'incl', 'excl' ] as $mode ) {
+			$statement = $this->build( $order, $mode );
+			$subtotal  = $this->row( $statement, 'subtotal' )->amount;
+
+			$this->assertGreaterThan( 0, $subtotal );
+			$this->assertSame( -$subtotal, $this->row( $statement, 'discount' )->amount );
+			$this->assertSame( 0, $this->row( $statement, 'total' )->amount );
+			$this->assertSame( [], $this->rows( $statement, 'rounding' ) );
+			$this->assertAddsUp( $statement );
+		}
 	}
 
 	/**
