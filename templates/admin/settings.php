@@ -68,7 +68,7 @@ $environment = [
 							<p class="lumia-option__desc"><?php echo esc_html__( 'Choose between stable versions and development pre-releases.', 'lumia-factures' ); ?></p>
 						</div>
 						<div class="lumia-option__control">
-							<select id="lumia_factures_update_channel" name="lumia_factures_global[update_channel]" class="lumia-select lumia-select--sm">
+							<select id="lumia_factures_update_channel" name="lumia_factures_global[update_channel]" class="lumia-select lumia-select--sm" <?php disabled( ! current_user_can( 'update_plugins' ) ); ?>>
 								<option value="stable" <?php selected( $update_channel, 'stable' ); ?>><?php echo esc_html__( 'Stable (main)', 'lumia-factures' ); ?></option>
 								<option value="dev" <?php selected( $update_channel, 'dev' ); ?>><?php echo esc_html__( 'Dev (pre-release)', 'lumia-factures' ); ?></option>
 							</select>

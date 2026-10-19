@@ -229,6 +229,7 @@ class UpdaterTest extends TestCase {
 	}
 
 	public function test_channel_change_purges_update_caches(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		$settings = Plugin::instance()->settings();
 		$settings->set( 'global.update_channel', 'dev' );
 		set_transient( 'lumia_factures_github_update_dev', array( 'version' => '9.9.9-dev.1' ), 600 );

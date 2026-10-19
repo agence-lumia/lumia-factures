@@ -56,6 +56,7 @@ $has_form        = file_exists( $module_template ) || ! empty( $module_settings 
 									<label for="lumia_factures_<?php echo esc_attr( $key ); ?>" class="lumia-form__label"><?php echo esc_html( ucfirst( str_replace( '_', ' ', (string) $key ) ) ); ?></label>
 								</div>
 								<label class="lumia-toggle">
+									<input type="hidden" name="lumia_factures_module_settings[<?php echo esc_attr( $key ); ?>]" value="0">
 									<input type="checkbox"
 										id="lumia_factures_<?php echo esc_attr( $key ); ?>"
 										name="lumia_factures_module_settings[<?php echo esc_attr( $key ); ?>]"

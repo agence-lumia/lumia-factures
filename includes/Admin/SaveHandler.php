@@ -120,7 +120,7 @@ class SaveHandler {
 	private function save_global(): void {
 		$global = isset( $_POST['lumia_factures_global'] ) && is_array( $_POST['lumia_factures_global'] ) ? wp_unslash( $_POST['lumia_factures_global'] ) : []; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce verified in handle(); each key is sanitized below.
 
-		if ( array_key_exists( 'update_channel', $global ) ) {
+		if ( array_key_exists( 'update_channel', $global ) && is_scalar( $global['update_channel'] ) && current_user_can( 'update_plugins' ) ) {
 			$channel  = sanitize_key( (string) $global['update_channel'] );
 			$channel  = in_array( $channel, self::CHANNELS, true ) ? $channel : 'stable';
 			$previous = (string) $this->settings->get( 'global.update_channel', 'stable' );

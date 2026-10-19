@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Core\Settings;
+use Lumia\Factures\Tests\Support\SampleModule;
 use Lumia\Factures\Tests\Support\TestCase;
 use WPDieException;
 
@@ -132,7 +133,7 @@ class AdminTest extends TestCase {
 	}
 
 	public function test_save_settings_updates_option_and_redirects_with_notice(): void {
-		wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
+		$this->login_admin();
 		$location = $this->post_save(
 			array(
 				'lumia_factures_nonce'  => wp_create_nonce( 'lumia_factures_save_settings' ),
@@ -193,7 +194,81 @@ class AdminTest extends TestCase {
 				'lumia_factures_module_settings' => array( 'sample' => '1' ),
 			)
 		);
-		$this->assertSame( array( 'sample' => '1' ), get_option( 'lumia_factures_module_invoices' ) );
+		// The invoices module declares no defaults: an unknown key is dropped.
+		$this->assertSame( array(), get_option( 'lumia_factures_module_invoices' ) );
+	}
+
+	public function test_base_save_settings_keeps_known_keys_and_coerces_types(): void {
+		$module = new SampleModule( 'sample' );
+		$module->save_settings(
+			array(
+				'enabled' => '0',
+				'limit'   => '12abc',
+				'label'   => '<b>Hi</b> ',
+				'nested'  => array(
+					'flag'  => '1',
+					'other' => 'x',
+				),
+				'evil'    => '<script>',
+			)
+		);
+		$this->assertSame(
+			array(
+				'enabled' => false,
+				'limit'   => 12,
+				'label'   => 'Hi',
+				'nested'  => array( 'flag' => true ),
+			),
+			get_option( 'lumia_factures_module_sample' )
+		);
+		$this->assertFalse( $module->get_settings()['enabled'], 'A default-true boolean can be saved as false.' );
+	}
+
+	public function test_generic_module_form_emits_hidden_zero_before_checkbox(): void {
+		$this->login_admin();
+		$modules = Plugin::instance()->modules();
+		$modules->register(
+			'sample',
+			array(
+				'name'  => 'Sample',
+				'class' => SampleModule::class,
+			)
+		);
+		$modules->activate( 'sample' );
+		$modules->init_active_modules();
+		$html = $this->render_tab( 'module_sample' );
+		$this->assertMatchesRegularExpression( '/type="hidden" name="lumia_factures_module_settings\[enabled\]" value="0">\s*<input type="checkbox"/', $html );
+	}
+
+	public function test_shop_manager_cannot_change_update_channel(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
+		$this->post_save(
+			array(
+				'lumia_factures_nonce'  => wp_create_nonce( 'lumia_factures_save_settings' ),
+				'lumia_factures_tab'    => 'settings',
+				'lumia_factures_global' => array( 'update_channel' => 'dev' ),
+			)
+		);
+		$this->assertSame( 'stable', Plugin::instance()->settings()->get( 'global.update_channel', 'stable' ) );
+	}
+
+	public function test_array_update_channel_does_not_warn(): void {
+		$this->login_admin();
+		$this->post_save(
+			array(
+				'lumia_factures_nonce'  => wp_create_nonce( 'lumia_factures_save_settings' ),
+				'lumia_factures_tab'    => 'settings',
+				'lumia_factures_global' => array( 'update_channel' => array( 'dev' ) ),
+			)
+		);
+		$this->assertSame( 'stable', Plugin::instance()->settings()->get( 'global.update_channel', 'stable' ) );
+	}
+
+	public function test_channel_select_disabled_without_update_plugins(): void {
+		wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
+		$this->assertMatchesRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_tab( 'settings' ) );
+		$this->login_admin();
+		$this->assertDoesNotMatchRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_tab( 'settings' ) );
 	}
 
 	public function test_assets_enqueued_only_on_plugin_page(): void {

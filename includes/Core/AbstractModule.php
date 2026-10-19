@@ -54,10 +54,55 @@ abstract class AbstractModule implements ModuleInterface {
 	/**
 	 * Saves the module settings.
 	 *
-	 * @param array<string, mixed> $settings Settings to store.
+	 * The base implementation keeps only the keys declared by get_defaults()
+	 * and coerces each value to the type of its default. A module with richer
+	 * settings overrides this method.
+	 *
+	 * @param array<string, mixed> $settings Settings to store (raw form payload).
 	 */
 	public function save_settings( array $settings ): bool {
-		return $this->save_module_settings( $settings );
+		return $this->save_module_settings( self::sanitize_against_defaults( static::get_defaults(), $settings ) );
+	}
+
+	/**
+	 * Keeps the keys known by $defaults and coerces values to the default's type.
+	 *
+	 * Associative arrays are descended into; lists keep their scalar entries,
+	 * sanitized as text.
+	 *
+	 * @param array<mixed> $defaults Reference values.
+	 * @param array<mixed> $input    Raw values.
+	 * @return array<mixed>
+	 */
+	protected static function sanitize_against_defaults( array $defaults, array $input ): array {
+		$clean = [];
+
+		foreach ( $defaults as $key => $default ) {
+			if ( ! array_key_exists( $key, $input ) ) {
+				continue;
+			}
+
+			$value = $input[ $key ];
+
+			if ( is_array( $default ) ) {
+				if ( ! is_array( $value ) ) {
+					continue;
+				}
+				$clean[ $key ] = self::is_list( $default )
+					? array_values( array_map( 'sanitize_text_field', array_map( 'strval', array_filter( $value, 'is_scalar' ) ) ) )
+					: self::sanitize_against_defaults( $default, $value );
+			} elseif ( is_bool( $default ) ) {
+				$clean[ $key ] = ! empty( $value );
+			} elseif ( is_int( $default ) ) {
+				$clean[ $key ] = is_scalar( $value ) ? (int) $value : $default;
+			} elseif ( is_float( $default ) ) {
+				$clean[ $key ] = is_scalar( $value ) ? (float) $value : $default;
+			} else {
+				$clean[ $key ] = is_scalar( $value ) ? sanitize_text_field( (string) $value ) : $default;
+			}
+		}
+
+		return $clean;
 	}
 
 	/**
