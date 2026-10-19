@@ -58,7 +58,8 @@ class Attachments {
 			if ( ! Archive::verify( $doc ) ) {
 				Issuer::restore( $doc, $subject );
 				$doc = Register::find( Issuer::TYPE, $subject->get_id() );
-				if ( null === $doc ) {
+				// A file that still fails verification is never attached.
+				if ( null === $doc || ! Archive::verify( $doc ) ) {
 					return $attachments;
 				}
 			}

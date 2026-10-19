@@ -15,6 +15,8 @@ use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Module;
+use RuntimeException;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
@@ -135,11 +137,136 @@ class OrderToolsTest extends TestCase {
 	}
 
 	public function test_download_url_carries_action_and_nonce(): void {
-		$url = Download::url( 42 );
+		$url = wp_specialchars_decode( Download::url( 42 ) ); // wp_nonce_url() escapes the ampersands.
+		parse_str( (string) wp_parse_url( $url, PHP_URL_QUERY ), $query );
 
-		$this->assertStringContainsString( 'action=lumia_factures_invoices_download', $url );
-		$this->assertStringContainsString( 'order_id=42', $url );
-		$this->assertStringContainsString( '_wpnonce=', $url );
+		$this->assertSame( 'lumia_factures_invoices_download', $query['action'] );
+		$this->assertSame( '42', $query['order_id'] );
+		$this->assertSame( 1, wp_verify_nonce( (string) $query['_wpnonce'], 'lumia_factures_invoices_download_42' ) );
+		$this->assertFalse( wp_verify_nonce( (string) $query['_wpnonce'], 'lumia_factures_invoices_download_43' ) );
+	}
+
+	public function test_handlers_refuse_user_without_capability(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$id    = $order->get_id();
+		$this->without_issue_hook();
+		$order->set_status( 'processing' );
+		$order->save();
+
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		$_GET['order_id'] = (string) $id;
+
+		foreach ( [
+			'issue'    => [ OrderTools::class, 'handle_issue' ],
+			'restore'  => [ OrderTools::class, 'handle_restore' ],
+			'download' => [ Download::class, 'handle' ],
+		] as $name => $callback ) {
+			$_GET['_wpnonce'] = wp_create_nonce( 'lumia_factures_invoices_' . $name . '_' . $id );
+			try {
+				$callback();
+				$this->fail( 'Expected wp_die for ' . $name );
+			} catch ( WPDieException $e ) {
+				$this->assertSame( 403, $e->getCode(), $name );
+			}
+		}
+
+		$this->assertNull( Register::find( 'invoice', $id ) );
+		unset( $_GET['order_id'], $_GET['_wpnonce'] );
+	}
+
+	public function test_handlers_refuse_missing_or_bad_nonce(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$id    = $order->get_id();
+		$this->without_issue_hook();
+		$order->set_status( 'processing' );
+		$order->save();
+
+		$_GET['order_id'] = (string) $id;
+
+		foreach ( [ null, 'badnonce', wp_create_nonce( 'lumia_factures_invoices_issue_' . ( $id + 1 ) ) ] as $nonce ) {
+			unset( $_GET['_wpnonce'] );
+			if ( null !== $nonce ) {
+				$_GET['_wpnonce'] = $nonce;
+			}
+			foreach ( [ [ OrderTools::class, 'handle_issue' ], [ OrderTools::class, 'handle_restore' ], [ Download::class, 'handle' ] ] as $callback ) {
+				try {
+					$callback();
+					$this->fail( 'Expected wp_die for ' . $callback[1] );
+				} catch ( WPDieException $e ) {
+					$this->assertSame( 403, $e->getCode(), $callback[1] );
+				}
+			}
+		}
+
+		$this->assertNull( Register::find( 'invoice', $id ) );
+		unset( $_GET['order_id'], $_GET['_wpnonce'] );
+	}
+
+	public function test_damaged_archive_that_cannot_be_restored_is_never_served(): void {
+		$order = $this->issued_order();
+		$doc   = Register::find( 'invoice', $order->get_id() );
+		file_put_contents( (string) Archive::path( $doc ), 'damaged' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test corrupts the archive.
+
+		$fail = static function (): array {
+			throw new RuntimeException( 'Render broken.' );
+		};
+		add_filter( 'lumia_factures_dompdf_options', $fail );
+		$log = (string) tempnam( sys_get_temp_dir(), 'lf-log' );
+		$old = (string) ini_get( 'error_log' );
+		ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
+
+		try {
+			Download::file_for( $order->get_id() );
+			$this->fail( 'Expected wp_die.' );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( 404, $e->getCode() );
+		} finally {
+			ini_set( 'error_log', $old ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
+			wp_delete_file( $log );
+			remove_filter( 'lumia_factures_dompdf_options', $fail );
+		}
+	}
+
+	public function test_list_column_hooks_are_registered_with_the_callback(): void {
+		OrderTools::register();
+
+		foreach ( [ 'manage_woocommerce_page_wc-orders_custom_column', 'manage_shop_order_posts_custom_column' ] as $hook ) {
+			$this->assertSame( 10, has_action( $hook, [ OrderTools::class, 'render_column' ] ), $hook );
+		}
+
+		$order = $this->issued_order();
+		ob_start();
+		do_action( 'manage_woocommerce_page_wc-orders_custom_column', 'lumia_factures_invoice', $order ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound,WordPress.NamingConventions.ValidHookName.UseUnderscores -- WooCommerce hook.
+		$hpos = (string) ob_get_clean();
+		ob_start();
+		do_action( 'manage_shop_order_posts_custom_column', 'lumia_factures_invoice', $order->get_id() ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce hook.
+		$legacy = (string) ob_get_clean();
+
+		$this->assertStringContainsString( (string) Register::find( 'invoice', $order->get_id() )->number, $hpos );
+		$this->assertSame( $hpos, $legacy );
+	}
+
+	public function test_module_init_registers_admin_hooks_only_in_admin(): void {
+		remove_all_actions( 'add_meta_boxes' );
+		remove_all_actions( 'admin_post_lumia_factures_invoices_download' );
+		( new Module( 'invoices' ) )->init();
+		$this->assertFalse( has_action( 'add_meta_boxes', [ OrderTools::class, 'add_meta_box' ] ) );
+		$this->assertFalse( has_action( 'admin_post_lumia_factures_invoices_download', [ Download::class, 'handle' ] ) );
+
+		set_current_screen( 'dashboard' );
+		$this->assertTrue( is_admin() );
+		( new Module( 'invoices' ) )->init();
+		$this->assertSame( 10, has_action( 'add_meta_boxes', [ OrderTools::class, 'add_meta_box' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_download', [ Download::class, 'handle' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_issue', [ OrderTools::class, 'handle_issue' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_restore', [ OrderTools::class, 'handle_restore' ] ) );
+	}
+
+	/**
+	 * Stops the status change from issuing the invoice.
+	 */
+	private function without_issue_hook(): void {
+		remove_action( 'woocommerce_order_status_changed', [ \Lumia\Factures\Modules\Invoices\Documents\Issuer::class, 'on_status_changed' ], 10 );
 	}
 
 	public function test_column_added_on_hpos_and_legacy_screens(): void {

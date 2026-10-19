@@ -125,6 +125,23 @@ class EmailAttachmentsTest extends TestCase {
 		$this->assertTrue( Archive::verify( $restored ) );
 	}
 
+	public function test_damaged_archive_that_cannot_be_restored_is_not_attached(): void {
+		$order = $this->order();
+		$order->update_status( 'processing' );
+		$doc = Register::find( 'invoice', $order->get_id() );
+		$this->track( $doc );
+		file_put_contents( (string) Archive::path( $doc ), 'damaged' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test corrupts the archive.
+
+		$fail = static function (): array {
+			throw new RuntimeException( 'Render broken.' );
+		};
+		add_filter( 'lumia_factures_dompdf_options', $fail );
+		$result = $this->email( 'customer_completed_order', wc_get_order( $order->get_id() ), [ '/tmp/other.pdf' ] );
+		remove_filter( 'lumia_factures_dompdf_options', $fail );
+
+		$this->assertSame( [ '/tmp/other.pdf' ], $result );
+	}
+
 	public function test_exception_does_not_block_email(): void {
 		$fail = static function (): bool {
 			throw new RuntimeException( 'Broken filter.' );

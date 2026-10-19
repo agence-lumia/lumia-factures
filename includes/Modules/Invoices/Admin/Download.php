@@ -72,7 +72,8 @@ final class Download {
 				Issuer::restore( $doc, $order );
 			}
 			$doc = Register::find( Issuer::TYPE, $order_id );
-			if ( null === $doc ) {
+			// A file that still fails verification is never served.
+			if ( null === $doc || ! Archive::verify( $doc ) ) {
 				self::not_found();
 			}
 		}
