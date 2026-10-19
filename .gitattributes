@@ -1,13 +1,16 @@
-# Fichiers exclus du paquet ZIP du plugin (git archive / archive de tag GitHub).
-/.github            export-ignore
-/.gitignore         export-ignore
-/.gitattributes     export-ignore
-/composer.json      export-ignore
-/composer.lock      export-ignore
-/phpcs.xml.dist     export-ignore
-
-# Fins de ligne normalisées ; binaires jamais modifiés.
-* text=auto
+# Keep LF in the repository and in the working tree on every OS (fixtures are compared byte for byte).
+* text=auto eol=lf
 *.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
 *.png binary
 *.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.avif binary
+*.ico binary
+*.mo binary
+*.zip binary
+*.pdf binary

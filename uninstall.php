@@ -1,116 +1,120 @@
 <?php
 /**
- * Désinstallation.
+ * Data cleanup on uninstall.
  *
- * Exécuté uniquement lors d'une suppression explicite depuis l'écran des
- * extensions, jamais à la désactivation.
+ * Invoices must be kept for 10 years: by default, uninstalling the plugin
+ * deletes NOTHING. Data is only removed when the site owner explicitly
+ * defines `LUMIA_FACTURES_REMOVE_ALL_DATA` to true (wp-config.php).
  *
- * @package Lumia\FacturePDF
+ * Each module declares the keys to delete through ::get_uninstall_keys().
+ * The module list lives in Activator::MODULE_CLASSES.
+ *
+ * @package Lumia\Factures
  */
 
-declare( strict_types=1 );
+defined( 'ABSPATH' ) || exit;
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-/**
- * Les données de facturation ne sont jamais supprimées automatiquement.
- *
- * Les numéros de facture et leurs dates d'émission sont conservés en metas de
- * commande. Une facture émise engage l'entreprise : supprimer sa trace parce
- * qu'un plugin a été désinstallé serait un comportement inacceptable, et
- * potentiellement un problème en cas de contrôle.
- *
- * Pour un nettoyage complet, définir la constante suivante dans wp-config.php
- * avant de supprimer le plugin :
- *
- *     define( 'FPL_REMOVE_ALL_DATA', true );
- */
-if ( ! defined( 'FPL_REMOVE_ALL_DATA' ) || ! FPL_REMOVE_ALL_DATA ) {
-	// On retire uniquement les tâches planifiées et le cache de fichiers, qui
-	// n'ont aucune valeur légale.
-	$timestamp = wp_next_scheduled( 'fpl_cleanup_files' );
-
-	while ( false !== $timestamp ) {
-		wp_unschedule_event( $timestamp, 'fpl_cleanup_files' );
-
-		$timestamp = wp_next_scheduled( 'fpl_cleanup_files' );
-	}
-
+if ( ! defined( 'LUMIA_FACTURES_REMOVE_ALL_DATA' ) || true !== LUMIA_FACTURES_REMOVE_ALL_DATA ) {
 	return;
 }
 
-global $wpdb;
+// Load the autoloader to reach the module classes.
+require_once plugin_dir_path( __FILE__ ) . 'includes/Core/Autoloader.php';
+\Lumia\Factures\Core\Autoloader::register();
 
-// Options.
-$options = array(
-	'fpl_settings',
-	'fpl_version',
-	'fpl_db_version',
-	'fpl_schema_version',
-);
+$module_classes = \Lumia\Factures\Core\Activator::MODULE_CLASSES;
 
-foreach ( $options as $option ) {
-	delete_option( $option );
-}
+// Delete the global option.
+delete_option( \Lumia\Factures\Core\Settings::OPTION_KEY );
+delete_site_option( \Lumia\Factures\Core\Settings::OPTION_KEY );
 
-// Table des séquences.
-// phpcs:ignore WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}fpl_sequences" );
-
-// Metas de commande.
-$meta_keys = array(
-	'_fpl_invoice_number',
-	'_fpl_invoice_sequence',
-	'_fpl_invoice_date',
-	'_fpl_invoice_file',
-	'_fpl_invoice_generated_at',
-);
-
-foreach ( $meta_keys as $meta_key ) {
-	// Stockage historique (articles WordPress).
-	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	$wpdb->delete( $wpdb->postmeta, array( 'meta_key' => $meta_key ) );
-
-	// Stockage HPOS.
-	$hpos_table = $wpdb->prefix . 'wc_orders_meta';
-
-	// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $hpos_table ) ) === $hpos_table ) {
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $hpos_table, array( 'meta_key' => $meta_key ) );
+// Delete the options and meta that belong to each module.
+foreach ( $module_classes as $id => $class ) {
+	if ( ! class_exists( $class ) ) {
+		continue;
 	}
-}
 
-// Fichiers PDF en cache.
-$uploads = wp_upload_dir( null, false );
-$path    = trailingslashit( $uploads['basedir'] ) . 'facture-pdf-lumia';
+	// The module settings option, always owned by the module.
+	delete_option( 'lumia_factures_module_' . $id );
+	delete_site_option( 'lumia_factures_module_' . $id );
 
-if ( is_dir( $path ) ) {
-	$iterator = new RecursiveIteratorIterator(
-		new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ),
-		RecursiveIteratorIterator::CHILD_FIRST
-	);
+	$keys = $class::get_uninstall_keys();
 
-	foreach ( $iterator as $item ) {
-		if ( $item->isDir() ) {
-			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
-			rmdir( $item->getPathname() );
-		} else {
-			wp_delete_file( $item->getPathname() );
+	foreach ( $keys['options'] ?? [] as $option_key ) {
+		delete_option( $option_key );
+		delete_site_option( $option_key );
+	}
+
+	foreach ( $keys['meta'] ?? [] as $meta_key ) {
+		delete_post_meta_by_key( $meta_key );
+	}
+
+	// Tables owned by a module, declared without a prefix. The name only comes
+	// from the module code, never from user input: it is still restricted to
+	// identifier characters before being interpolated.
+	foreach ( $keys['tables'] ?? [] as $table ) {
+		if ( ! preg_match( '/^[a-z0-9_]+$/', $table ) ) {
+			continue;
+		}
+		$table = $GLOBALS['wpdb']->prefix . $table;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name validated above.
+		$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS `{$table}`" );
+	}
+
+	// Every event of the hook, whatever its arguments (see Deactivator).
+	foreach ( $keys['cron'] ?? [] as $hook ) {
+		wp_unschedule_hook( $hook );
+	}
+
+	// User metadata: delete_post_meta_by_key() does not touch it, it lives in
+	// another table.
+	foreach ( $keys['user_meta'] ?? [] as $meta_key ) {
+		delete_metadata( 'user', 0, $meta_key, '', true );
+	}
+
+	// Delete the custom post types.
+	foreach ( $keys['post_type'] ?? [] as $post_type ) {
+		$posts = get_posts(
+			[
+				'post_type'      => $post_type,
+				'post_status'    => 'any',
+				'numberposts'    => -1,
+				'posts_per_page' => -1,
+			]
+		);
+
+		foreach ( $posts as $post ) {
+			wp_delete_post( $post->ID, true ); // True = hard delete.
 		}
 	}
 
-	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
-	rmdir( $path );
-}
+	// Delete the custom taxonomies (every term).
+	// The plugin is not booted here, so the taxonomy is not registered: register
+	// it on the fly so that get_terms()/wp_delete_term() work.
+	foreach ( $keys['taxonomy'] ?? [] as $tax_name ) {
+		if ( '' === $tax_name ) {
+			continue;
+		}
+		if ( ! taxonomy_exists( $tax_name ) ) {
+			register_taxonomy( $tax_name, 'attachment', [ 'public' => false ] );
+		}
 
-// Tâches planifiées.
-$timestamp = wp_next_scheduled( 'fpl_cleanup_files' );
+		$terms = get_terms(
+			[
+				'taxonomy'   => $tax_name,
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			]
+		);
 
-while ( false !== $timestamp ) {
-	wp_unschedule_event( $timestamp, 'fpl_cleanup_files' );
-
-	$timestamp = wp_next_scheduled( 'fpl_cleanup_files' );
+		if ( ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term_id ) {
+				wp_delete_term( (int) $term_id, $tax_name );
+			}
+		}
+	}
 }

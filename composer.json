@@ -1,30 +1,59 @@
 {
-	"name": "lumia/facture-pdf-lumia",
-	"description": "Génération de factures PDF pour WooCommerce.",
-	"type": "wordpress-plugin",
-	"license": "GPL-2.0-or-later",
-	"require": {
-		"php": ">=8.1",
-		"dompdf/dompdf": "^3.0"
-	},
-	"require-dev": {
-		"squizlabs/php_codesniffer": "^3.9",
-		"wp-coding-standards/wpcs": "^3.1",
-		"phpcompatibility/phpcompatibility-wp": "^2.1"
-	},
-	"autoload": {
-		"psr-4": {
-			"Lumia\\FacturePDF\\": "src/"
-		}
-	},
-	"config": {
-		"allow-plugins": {
-			"dealerdirect/phpcodesniffer-composer-installer": true
-		},
-		"optimize-autoloader": true
-	},
-	"scripts": {
-		"lint": "phpcs --standard=phpcs.xml.dist",
-		"fix": "phpcbf --standard=phpcs.xml.dist"
-	}
+    "name": "agence-lumia/lumia-factures",
+    "description": "Invoice PDF generation for WooCommerce, built on the Lumia Tools conventions.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://github.com/agence-lumia/lumia-factures",
+    "require": {
+        "php": ">=8.1",
+        "dompdf/dompdf": "^3.1"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "php-stubs/woocommerce-stubs": "^10.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^9.6",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-coding-standards/wpcs": "^3.1",
+        "yoast/phpunit-polyfills": "^3.0"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Lumia\\Factures\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true
+        },
+        "platform": {
+            "php": "8.1.99"
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "lint": "phpcs",
+        "lint:fix": "phpcbf",
+        "analyse": "phpstan analyse --memory-limit=2G",
+        "check": [
+            "@lint",
+            "@analyse"
+        ],
+        "test": "phpunit",
+        "i18n:pot": "sh tools/i18n/wp.sh i18n make-pot . languages/lumia-factures.pot --slug=lumia-factures --domain=lumia-factures --exclude=vendor,tools,docs,dist,tests,node_modules",
+        "i18n:mo": "sh tools/i18n/wp.sh i18n make-mo languages/",
+        "i18n:check": "@php tools/i18n/build-po.php check languages/lumia-factures.pot languages/lumia-factures-fr_FR.po languages/lumia-factures-fr_FR.mo",
+        "i18n:test": "sh tools/i18n/test.sh"
+    },
+    "scripts-descriptions": {
+        "test": "Run the PHPUnit suite (inside wp-env: see package.json).",
+        "i18n:pot": "Regenerate languages/lumia-factures.pot from the source (WP-CLI make-pot).",
+        "i18n:mo": "Compile the .po files of languages/ into .mo (WP-CLI make-mo).",
+        "i18n:check": "Check the .po covers the .pot and the .mo matches the .po.",
+        "i18n:test": "Run the tests of tools/i18n/build-po.php."
+    }
 }
