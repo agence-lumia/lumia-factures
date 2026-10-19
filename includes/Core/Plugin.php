@@ -90,7 +90,10 @@ class Plugin {
 		$this->requirement_errors = Requirements::check();
 
 		if ( ! empty( $this->requirement_errors ) ) {
-			add_action( 'admin_notices', [ $this, 'render_requirements_notice' ] );
+			// all_admin_notices, not admin_notices: lumia-tools (often active on the
+			// same site) buffers admin_notices into its notification drawer, which
+			// would hide this blocking notice.
+			add_action( 'all_admin_notices', [ $this, 'render_requirements_notice' ] );
 			return;
 		}
 

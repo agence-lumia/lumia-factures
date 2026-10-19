@@ -54,14 +54,27 @@ class BootTest extends TestCase {
 		$this->assertArrayHasKey( 'woocommerce', Requirements::check() );
 	}
 
+	/**
+	 * Fresh singleton in a child process: the bootstrap one already started its
+	 * modules, and nothing set here (instance, errors) may reach the other tests.
+	 *
+	 * @runInSeparateProcess
+	 * @preserveGlobalState disabled
+	 */
 	public function test_failed_requirements_show_notice_instead_of_modules(): void {
+		$instance = new \ReflectionProperty( Plugin::class, 'instance' );
+		$instance->setValue( null, null );
+
 		add_filter( 'lumia_factures_requirements_wc_active', '__return_false' );
 		$plugin = Plugin::instance();
-		remove_all_actions( 'admin_notices' );
+		$this->assertSame( array(), $plugin->modules()->get_all(), 'Fresh instance expected.' );
 
 		$plugin->boot();
 		$this->assertArrayHasKey( 'woocommerce', $plugin->requirement_errors() );
-		$this->assertGreaterThan( 0, has_action( 'admin_notices', array( $plugin, 'render_requirements_notice' ) ) );
+		$this->assertSame( array(), $plugin->modules()->get_all() );
+		$this->assertSame( array(), $plugin->modules()->get_active_instances() );
+		$this->assertGreaterThan( 0, has_action( 'all_admin_notices', array( $plugin, 'render_requirements_notice' ) ) );
+		$this->assertFalse( has_action( 'admin_notices', array( $plugin, 'render_requirements_notice' ) ) );
 
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'administrator' ) ) );
 		ob_start();
