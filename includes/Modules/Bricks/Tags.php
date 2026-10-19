@@ -13,6 +13,7 @@ use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
 use Lumia\Factures\Modules\Invoices\Front\OrderContext;
+use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use WC_Order;
 
 /**
@@ -157,6 +158,11 @@ final class Tags {
 	 * nothing to a visitor who could not download the invoice. The status then reads `none`, so a
 	 * condition on it hides the element instead of leaving a dead link.
 	 *
+	 * The status is `available` only when the download link works: an issued invoice whose PDF was
+	 * never built (the endpoint builds it) or whose archive passes verification. Anything else is
+	 * `none`, the URL being empty in the same cases. Nothing here may write: Issuer::can_issue()
+	 * notes and saves the order, a front render must not.
+	 *
 	 * @param string $suffix `url`, `number` or `status`.
 	 * @param mixed  $post   Current object given by Bricks.
 	 */
@@ -167,22 +173,19 @@ final class Tags {
 			return 'status' === $suffix ? 'none' : '';
 		}
 
-		$doc    = Register::find( Issuer::TYPE, $order->get_id() );
-		$issued = null !== $doc && 'issued' === $doc->status;
+		$doc       = Register::find( Issuer::TYPE, $order->get_id() );
+		$issued    = null !== $doc && 'issued' === $doc->status;
+		$available = $issued && ( null === $doc->file || Archive::verify( $doc ) );
 
 		switch ( $suffix ) {
 			case 'url':
-				return $issued ? CustomerDownload::url( $order ) : '';
+				return $available ? CustomerDownload::url( $order ) : '';
 
 			case 'number':
 				return $issued ? (string) $doc->number : '';
 
 			default:
-				if ( $issued ) {
-					return 'available';
-				}
-
-				return Issuer::can_issue( $order ) ? 'pending' : 'none';
+				return $available ? 'available' : 'none';
 		}
 	}
 }

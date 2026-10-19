@@ -130,14 +130,34 @@ class TagsTest extends TestCase {
 		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
 		$status = static fn( WC_Order $order ) => apply_filters( 'bricks/dynamic_data/render_tag', '{lumia_factures_invoice_status}', $order, 'text' );
 
+		$url    = static fn( WC_Order $order ) => apply_filters( 'bricks/dynamic_data/render_tag', '{lumia_factures_invoice_url}', $order, 'text' );
+
 		// Not in a trigger status: nothing to issue.
 		$pending = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		$this->assertSame( 'none', $status( $pending ) );
 
-		// Can be issued but is not: pending. The tag itself does not issue anything.
-		$pending->set_status( 'processing' );
-		$this->assertSame( 'pending', $status( $pending ) );
+		// In a trigger status but not issued, here while the legacy import is pending: still none
+		// (a link would lead to "Invoice not found"). A front render never notes nor saves the order.
+		$saves = 0;
+		$count = static function () use ( &$saves ): void {
+			++$saves;
+		};
+		update_option( Migration::OPTION, [ 'status' => 'pending' ] );
+		add_action( 'woocommerce_update_order', $count );
+		try {
+			$pending->set_status( 'processing' );
+			$this->assertSame( 'none', $status( $pending ) );
+			$this->assertSame( '', $url( $pending ) );
+		} finally {
+			remove_action( 'woocommerce_update_order', $count );
+			delete_option( Migration::OPTION );
+		}
+		$this->assertSame( 0, $saves );
+		$this->assertSame( [], wc_get_order_notes( [ 'order_id' => $pending->get_id() ] ) );
 		$this->assertNull( Register::find( 'invoice', $pending->get_id() ) );
+
+		// Same once the import is done: `pending` is never produced.
+		$this->assertSame( 'none', $status( $pending ) );
 
 		// Issued: available, even if the order later leaves the trigger statuses.
 		$issued = $this->issued_order();
@@ -145,6 +165,17 @@ class TagsTest extends TestCase {
 		$issued->set_status( 'cancelled' );
 		$this->assertSame( 'available', $status( $issued ) );
 		$this->assertSame( (string) Register::find( 'invoice', $issued->get_id() )->number, apply_filters( 'bricks/dynamic_data/render_tag', '{lumia_factures_invoice_number}', $issued, 'text' ) );
+
+		// Recorded file missing or damaged: never rebuilt for a visitor, so no link.
+		wp_delete_file( (string) Archive::path( Register::find( 'invoice', $issued->get_id() ) ) );
+		$this->assertSame( 'none', $status( $issued ) );
+		$this->assertSame( '', $url( $issued ) );
+
+		// Imported without a PDF (never built): the download endpoint builds it, so it is available.
+		$imported = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$this->assertNotNull( Register::import( 'invoice', $imported->get_id(), 'FA-LEGACY-1', 'invoice_legacy', 1, time() ) );
+		$this->assertSame( 'available', $status( $imported ) );
+		$this->assertStringContainsString( 'lumia_factures_invoice=' . $imported->get_id(), $url( $imported ) );
 	}
 
 	public function test_importer_enables_bricks_module_when_legacy_tags_used(): void {
