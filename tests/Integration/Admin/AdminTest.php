@@ -194,8 +194,11 @@ class AdminTest extends TestCase {
 				'lumia_factures_module_settings' => array( 'sample' => '1' ),
 			)
 		);
-		// The invoices module declares no defaults: an unknown key is dropped.
-		$this->assertSame( array(), get_option( 'lumia_factures_module_invoices' ) );
+		// An unknown key is dropped: only the schema groups are stored.
+		$stored = get_option( 'lumia_factures_module_invoices' );
+		$this->assertIsArray( $stored );
+		$this->assertArrayNotHasKey( 'sample', $stored );
+		$this->assertSame( array( 'general', 'company', 'numbering', 'content', 'design' ), array_keys( $stored ) );
 	}
 
 	public function test_base_save_settings_keeps_known_keys_and_coerces_types(): void {

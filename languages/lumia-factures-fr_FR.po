@@ -398,3 +398,29 @@ msgstr "Configuration globale"
 #: templates/components/sidebar.php:55
 msgid "Navigation"
 msgstr "Navigation"
+
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:52
+msgid "The format cannot be empty."
+msgstr "Le format ne peut pas être vide."
+
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:56
+msgid "The format must contain the {number} tag, otherwise several invoices would share the same number."
+msgstr "Le format doit contenir le tag {number}, sinon plusieurs factures porteraient le même numéro."
+
+#. translators: %s: list of unknown tags
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:74
+#, php-format
+msgid "Unknown tag: %s. Check the spelling against the list of available tags."
+msgstr "Tag inconnu : %s. Vérifier l'orthographe dans la liste des tags disponibles."
+
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:82
+msgid "The format contains a character that is forbidden in a file name ( / \ : * ? \" < > | )."
+msgstr "Le format contient un caractère interdit dans un nom de fichier ( / \ : * ? \" < > | )."
+
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:90
+msgid "With a periodic reset, the format must contain {year}, otherwise two periods would print the same numbers."
+msgstr "Avec une remise à zéro périodique, le format doit contenir {year}, sinon deux périodes imprimeraient les mêmes numéros."
+
+#: includes/Modules/Invoices/Numbering/NumberFormat.php:94
+msgid "With a monthly reset, the format must contain {year} and {month}, otherwise two months would print the same numbers."
+msgstr "Avec une remise à zéro mensuelle, le format doit contenir {year} et {month}, sinon deux mois imprimeraient les mêmes numéros."
