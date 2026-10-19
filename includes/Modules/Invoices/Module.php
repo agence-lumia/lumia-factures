@@ -10,6 +10,8 @@ namespace Lumia\Factures\Modules\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\AbstractModule;
+use Lumia\Factures\Modules\Invoices\Admin\Download;
+use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
@@ -32,6 +34,12 @@ class Module extends AbstractModule {
 
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
+
+		// admin-post.php requests are is_admin() too.
+		if ( is_admin() ) {
+			OrderTools::register();
+			Download::register();
+		}
 	}
 
 	/**

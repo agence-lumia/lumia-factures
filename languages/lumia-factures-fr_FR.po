@@ -604,3 +604,39 @@ msgstr "Facture %s émise. Son PDF n'a pas pu être généré ; le PDF sera cré
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr "Le PDF de la facture %s était manquant ou endommagé : il a été reconstruit à partir des données actuelles de la commande."
+
+msgid "You are not allowed to download invoices."
+msgstr "Vous n'êtes pas autorisé à télécharger les factures."
+
+msgid "This invoice does not exist."
+msgstr "Cette facture n'existe pas."
+
+msgid "Download PDF"
+msgstr "Télécharger le PDF"
+
+msgid "Rebuild missing PDF"
+msgstr "Reconstruire le PDF manquant"
+
+msgid "No invoice has been issued for this order yet."
+msgstr "Aucune facture n'a encore été émise pour cette commande."
+
+msgid "Issue invoice now"
+msgstr "Émettre la facture maintenant"
+
+msgid "The current order status does not allow an invoice yet."
+msgstr "Le statut actuel de la commande ne permet pas encore d'émettre une facture."
+
+msgid "The invoice has been issued."
+msgstr "La facture a été émise."
+
+msgid "The invoice could not be issued."
+msgstr "La facture n'a pas pu être émise."
+
+msgid "The invoice PDF has been rebuilt."
+msgstr "Le PDF de la facture a été reconstruit."
+
+msgid "The invoice PDF could not be rebuilt."
+msgstr "Le PDF de la facture n'a pas pu être reconstruit."
+
+msgid "You are not allowed to do this."
+msgstr "Vous n'êtes pas autorisé à effectuer cette action."
