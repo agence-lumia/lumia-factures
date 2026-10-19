@@ -1185,3 +1185,69 @@ msgstr "Actualiser"
 msgctxt "watermark printed on the invoice preview"
 msgid "Preview"
 msgstr "Aperçu"
+
+msgid "Invoice URL"
+msgstr "URL de la facture"
+
+msgid "Invoice status"
+msgstr "Statut de la facture"
+
+msgid "Lümia Factures: no invoice is issued until the Facture PDF Lumia data is imported."
+msgstr "Lümia Factures : aucune facture n'est émise tant que les données de Facture PDF Lumia ne sont pas importées."
+
+msgid "Import status: %s."
+msgstr "Statut de l'import : %s."
+
+msgid "Last run: %1$d invoices imported, %2$d already imported, %3$d PDFs copied, %4$d PDFs missing, %5$d conflicts."
+msgstr "Dernier passage : %1$d factures importées, %2$d déjà importées, %3$d PDF copiés, %4$d PDF manquants, %5$d conflits."
+
+msgid "Last error: %s"
+msgstr "Dernière erreur : %s"
+
+msgid "Run the import now"
+msgstr "Lancer l'import maintenant"
+
+msgid "The Facture PDF Lumia data has been imported. Invoices are issued again."
+msgstr "Les données de Facture PDF Lumia ont été importées. Les factures sont de nouveau émises."
+
+msgid "The Facture PDF Lumia data has been imported, but some invoices were skipped: run \"wp lumia-factures migration-status\" or check the PHP error log."
+msgstr "Les données de Facture PDF Lumia ont été importées, mais certaines factures ont été ignorées : exécutez \"wp lumia-factures migration-status\" ou consultez le journal d'erreurs PHP."
+
+msgid "The Facture PDF Lumia import failed. See the PHP error log, then try again."
+msgstr "L'import de Facture PDF Lumia a échoué. Consultez le journal d'erreurs PHP, puis réessayez."
+
+msgid "The Facture PDF Lumia import is already running. Reload this page in a few minutes."
+msgstr "L'import de Facture PDF Lumia est déjà en cours. Rechargez cette page dans quelques minutes."
+
+msgid "There is no Facture PDF Lumia data to import."
+msgstr "Il n'y a aucune donnée Facture PDF Lumia à importer."
+
+msgid "waiting to run"
+msgstr "en attente de lancement"
+
+msgid "running"
+msgstr "en cours"
+
+msgid "failed"
+msgstr "échoué"
+
+msgid "not started"
+msgstr "non démarré"
+
+msgid "No invoice can be issued for this order until the Facture PDF Lumia data is imported."
+msgstr "Aucune facture ne peut être émise pour cette commande tant que les données de Facture PDF Lumia ne sont pas importées."
+
+msgid "Invoice not issued: this order has a Facture PDF Lumia invoice that could not be imported; see the migration report."
+msgstr "Facture non émise : cette commande a une facture Facture PDF Lumia qui n'a pas pu être importée ; consultez le rapport de migration."
+
+msgid "Invoice not issued: the Facture PDF Lumia data is being imported."
+msgstr "Facture non émise : les données de Facture PDF Lumia sont en cours d'import."
+
+msgid "Invoice not found."
+msgstr "Facture introuvable."
+
+msgid "Download my invoice"
+msgstr "Télécharger ma facture"
+
+msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
+msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia : le module Bricks est activé, il les affiche comme avant."
