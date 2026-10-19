@@ -71,7 +71,7 @@ class Admin {
 		$this->modules  = $plugin->modules();
 		$this->settings = $plugin->settings();
 
-		new SaveHandler( $this->modules, $this->settings, self::SLUG );
+		new SaveHandler( $this->modules, $this->settings, self::SLUG, $plugin->updater() );
 
 		// Priority 60: where the legacy "Facture PDF" entry sat in the WooCommerce menu.
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ], 60 );
@@ -273,6 +273,7 @@ class Admin {
 		$messages = [
 			'settings_saved'  => __( 'Settings saved successfully.', 'lumia-factures' ),
 			'modules_updated' => __( 'Modules updated.', 'lumia-factures' ),
+			'updates_checked' => __( 'Update check completed.', 'lumia-factures' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {

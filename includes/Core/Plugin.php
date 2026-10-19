@@ -33,6 +33,11 @@ class Plugin {
 	private Settings $settings;
 
 	/**
+	 * GitHub updater.
+	 */
+	private Updater $updater;
+
+	/**
 	 * Admin interface.
 	 */
 	private Admin $admin;
@@ -50,6 +55,10 @@ class Plugin {
 	private function __construct() {
 		$this->settings = new Settings();
 		$this->modules  = new Modules( $this->settings );
+		// Registered whatever the requirements: a site blocked by a missing
+		// dependency must still be able to receive a fixed version.
+		$this->updater = new Updater( $this->settings );
+		$this->updater->init();
 		// Built whatever the requirements: the page must explain why the modules
 		// did not start. Its constructor only registers admin hooks.
 		$this->admin = new Admin( $this );
@@ -79,6 +88,13 @@ class Plugin {
 	 */
 	public function settings(): Settings {
 		return $this->settings;
+	}
+
+	/**
+	 * GitHub updater.
+	 */
+	public function updater(): Updater {
+		return $this->updater;
 	}
 
 	/**

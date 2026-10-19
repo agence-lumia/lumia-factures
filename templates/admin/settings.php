@@ -11,6 +11,11 @@ defined( 'ABSPATH' ) || exit;
 
 $update_channel = (string) $this->settings->get( 'global.update_channel', 'stable' );
 
+// Automatic update: the source of truth is the WordPress option `auto_update_plugins`,
+// shared with the plugins list.
+$can_auto_update = wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' );
+$auto_update_on  = in_array( plugin_basename( LUMIA_FACTURES_PLUGIN_FILE ), (array) get_site_option( 'auto_update_plugins', [] ), true );
+
 $environment = [
 	[ __( 'WordPress', 'lumia-factures' ), (string) get_bloginfo( 'version' ), true ],
 	[ __( 'PHP', 'lumia-factures' ), PHP_VERSION, true ],
@@ -49,8 +54,11 @@ $environment = [
 							<span class="lumia-option__label"><?php echo esc_html__( 'Current version', 'lumia-factures' ); ?></span>
 							<p class="lumia-option__desc"><?php echo esc_html__( 'Plugin version installed on this site.', 'lumia-factures' ); ?></p>
 						</div>
-						<div class="lumia-option__control">
+						<div class="lumia-option__control lumia-inline">
 							<span class="lumia-badge lumia-badge--info">v<?php echo esc_html( LUMIA_FACTURES_VERSION ); ?></span>
+							<button type="submit" class="lumia-btn lumia-btn--secondary lumia-btn--sm" form="lumia-factures-check-updates-form">
+								<?php echo esc_html__( 'Check for updates', 'lumia-factures' ); ?>
+							</button>
 						</div>
 					</div>
 
@@ -66,8 +74,35 @@ $environment = [
 							</select>
 						</div>
 					</div>
+
+					<div class="lumia-option">
+						<div class="lumia-option__content">
+							<label for="lumia_factures_auto_update" class="lumia-option__label"><?php echo esc_html__( 'Automatic updates', 'lumia-factures' ); ?></label>
+							<p class="lumia-option__desc">
+								<?php
+								echo esc_html(
+									$can_auto_update
+										? __( 'Installs new versions of the chosen channel without intervention. Same setting as the "Automatic updates" column of the plugins list.', 'lumia-factures' )
+										: __( 'Automatic plugin updates are disabled on this site, or your account cannot manage them.', 'lumia-factures' )
+								);
+								?>
+							</p>
+						</div>
+						<div class="lumia-option__control">
+							<input type="hidden" name="lumia_factures_global[auto_update_initial]" value="<?php echo $auto_update_on ? '1' : '0'; ?>">
+							<label class="lumia-toggle">
+								<input type="checkbox" id="lumia_factures_auto_update" name="lumia_factures_global[auto_update]" value="1" <?php checked( $auto_update_on ); ?> <?php disabled( ! $can_auto_update ); ?>>
+								<span class="lumia-toggle__slider"></span>
+							</label>
+						</div>
+					</div>
 				</div>
 			</div>
+		</form>
+
+		<form id="lumia-factures-check-updates-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+			<?php wp_nonce_field( 'lumia_factures_check_updates', 'lumia_factures_check_nonce' ); ?>
+			<input type="hidden" name="action" value="lumia_factures_check_updates">
 		</form>
 
 		<div class="lumia-divider"></div>
