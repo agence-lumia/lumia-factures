@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
+use Lumia\Factures\Modules\Invoices\Settings\Schema;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Throwable;
 use WC_Order;
@@ -41,6 +42,12 @@ class Attachments {
 
 		try {
 			if ( $subject instanceof WC_Order_Refund || ! $subject instanceof WC_Order ) {
+				return $attachments;
+			}
+
+			// The refund email never carries the invoice, even when a 2.0 save stored it in the list:
+			// the settings screen no longer offers it there.
+			if ( in_array( (string) $email_id, Schema::REFUND_EMAILS, true ) ) {
 				return $attachments;
 			}
 

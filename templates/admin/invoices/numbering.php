@@ -4,14 +4,22 @@
  *
  * Included by includes/Modules/Invoices/settings-template.php ($fields is a Fields instance,
  * $sequences the counters). The "Raise" inputs belong to standalone forms printed after the
- * module form (HTML5 `form` attribute), because forms cannot nest.
+ * module form (HTML5 `form` attribute), because forms cannot nest. Invoices (`numbering`) and
+ * credit notes (`credit_notes`) each have their own series and live sample
+ * (`data-lumia-factures-sample="{type}"`, see invoices.js).
  *
  * @package Lumia\Factures
  */
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
+
+$numbering_periods = [
+	'yearly'  => __( 'Year', 'lumia-factures' ),
+	'monthly' => __( 'Month', 'lumia-factures' ),
+];
 
 $numbering_tags = [
 	'number'       => __( 'Counter. {number:5} pads it with zeros to 5 digits. Required.', 'lumia-factures' ),
@@ -33,7 +41,7 @@ $numbering_tags = [
 
 		<div class="lumia-form__group">
 			<span class="lumia-form__label"><?php echo esc_html__( 'Next invoice number', 'lumia-factures' ); ?></span>
-			<div class="lumia-factures-inv-sample" data-lumia-factures-sample aria-live="polite">&nbsp;</div>
+			<div class="lumia-factures-inv-sample" data-lumia-factures-sample="invoice" aria-live="polite">&nbsp;</div>
 			<p class="lumia-form__help"><?php echo esc_html__( 'Sample with today\'s date, order 14243 and customer 27.', 'lumia-factures' ); ?></p>
 		</div>
 
@@ -50,32 +58,43 @@ $numbering_tags = [
 
 		<?php $fields->number( 'numbering', 'start_number', __( 'First number', 'lumia-factures' ), __( 'Used when a counter starts. An existing counter is never changed by this setting.', 'lumia-factures' ) ); ?>
 		<?php $fields->toggle( 'numbering', 'reset_enabled', __( 'Restart the counter each period', 'lumia-factures' ), __( 'When on, the format must contain the year (and the month for a monthly reset).', 'lumia-factures' ) ); ?>
-		<?php
-		$fields->select(
-			'numbering',
-			'reset_period',
-			__( 'Restart every', 'lumia-factures' ),
-			[
-				'yearly'  => __( 'Year', 'lumia-factures' ),
-				'monthly' => __( 'Month', 'lumia-factures' ),
-			]
-		);
-		?>
+		<?php $fields->select( 'numbering', 'reset_period', __( 'Restart every', 'lumia-factures' ), $numbering_periods ); ?>
+	</div>
+</div>
+
+<div class="lumia-section">
+	<div class="lumia-section__header">
+		<h2 class="lumia-section__title"><?php echo esc_html__( 'Credit note number', 'lumia-factures' ); ?></h2>
+		<p class="lumia-section__desc"><?php echo esc_html__( 'Credit notes have their own continuous series. Their format must start with a prefix that differs from the invoice one, e.g. AV- and FA-, so that a credit note never shares an invoice number.', 'lumia-factures' ); ?></p>
+	</div>
+	<div class="lumia-section__content">
+		<?php $fields->text( 'credit_notes', 'format', __( 'Format', 'lumia-factures' ), __( 'Same tags as the invoice number; the order tags refer to the refunded order.', 'lumia-factures' ) ); ?>
+
+		<div class="lumia-form__group">
+			<span class="lumia-form__label"><?php echo esc_html__( 'Next credit note number', 'lumia-factures' ); ?></span>
+			<div class="lumia-factures-inv-sample" data-lumia-factures-sample="credit_note" aria-live="polite">&nbsp;</div>
+			<p class="lumia-form__help"><?php echo esc_html__( 'Sample with today\'s date, order 14243 and customer 27.', 'lumia-factures' ); ?></p>
+		</div>
+
+		<?php $fields->number( 'credit_notes', 'start_number', __( 'First number', 'lumia-factures' ), __( 'Used when a counter starts. An existing counter is never changed by this setting.', 'lumia-factures' ) ); ?>
+		<?php $fields->toggle( 'credit_notes', 'reset_enabled', __( 'Restart the counter each period', 'lumia-factures' ), __( 'When on, the format must contain the year (and the month for a monthly reset).', 'lumia-factures' ) ); ?>
+		<?php $fields->select( 'credit_notes', 'reset_period', __( 'Restart every', 'lumia-factures' ), $numbering_periods ); ?>
 	</div>
 </div>
 
 <div class="lumia-section">
 	<div class="lumia-section__header">
 		<h2 class="lumia-section__title"><?php echo esc_html__( 'Counters', 'lumia-factures' ); ?></h2>
-		<p class="lumia-section__desc"><?php echo esc_html__( 'A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices created elsewhere.', 'lumia-factures' ); ?></p>
+		<p class="lumia-section__desc"><?php echo esc_html__( 'A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices or credit notes created elsewhere.', 'lumia-factures' ); ?></p>
 	</div>
 	<div class="lumia-section__content">
 		<?php if ( [] === $sequences ) : ?>
-			<p class="lumia-form__help"><?php echo esc_html__( 'No counter yet. The first one is created with the first invoice.', 'lumia-factures' ); ?></p>
+			<p class="lumia-form__help"><?php echo esc_html__( 'No counter yet. The first one is created with the first invoice or credit note.', 'lumia-factures' ); ?></p>
 		<?php else : ?>
 			<table class="lumia-server-table lumia-factures-inv-counters" data-lumia-factures-counters>
 				<thead>
 					<tr>
+						<th scope="col"><?php echo esc_html__( 'Document', 'lumia-factures' ); ?></th>
 						<th scope="col"><?php echo esc_html__( 'Counter', 'lumia-factures' ); ?></th>
 						<th scope="col"><?php echo esc_html__( 'Last number used', 'lumia-factures' ); ?></th>
 						<th scope="col"><?php echo esc_html__( 'Updated', 'lumia-factures' ); ?></th>
@@ -89,6 +108,7 @@ $numbering_tags = [
 						$numbering_input = 'lumia-factures-raise-value-' . $numbering_index;
 						?>
 						<tr>
+							<td><?php echo esc_html( Counters::document_label( $numbering_sequence['key'] ) ); ?></td>
 							<td><code><?php echo esc_html( $numbering_sequence['key'] ); ?></code></td>
 							<td><?php echo esc_html( (string) $numbering_sequence['value'] ); ?></td>
 							<td><?php echo esc_html( $numbering_sequence['updated_at'] ); ?></td>

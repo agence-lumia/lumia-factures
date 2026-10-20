@@ -107,9 +107,9 @@ class Module extends AbstractModule {
 	/**
 	 * Data of the settings screen, merged into `lumiaFacturesAdmin`.
 	 *
-	 * The live number sample is computed in JS from these values (it mirrors `NumberFormat::preview()`):
+	 * The live number samples are computed in JS from these values (they mirror `NumberFormat::preview()`):
 	 * today's date in the site timezone, the sample order 14243 and customer 27, the counters by key
-	 * and the tags a format may use.
+	 * and the tags a format may use. `documents` gives, per numbered type, the group of its fields.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -119,10 +119,15 @@ class Module extends AbstractModule {
 			$counters[ $sequence['key'] ] = $sequence['value'];
 		}
 
+		$documents = [];
+		foreach ( Schema::NUMBERED as $type => $group ) {
+			$documents[ $type ] = [ 'group' => $group ];
+		}
+
 		return [
 			'invoices' => [
-				'type'     => 'invoice',
-				'sample'   => [
+				'documents' => $documents,
+				'sample'    => [
 					'year'        => (string) wp_date( 'Y' ),
 					'month'       => (string) wp_date( 'm' ),
 					'day'         => (string) wp_date( 'd' ),
@@ -130,10 +135,10 @@ class Module extends AbstractModule {
 					'orderId'     => '14243',
 					'customerId'  => '27',
 				],
-				'counters' => $counters,
-				'tags'     => NumberFormat::known_tags(),
+				'counters'  => $counters,
+				'tags'      => NumberFormat::known_tags(),
 				// ES modules the preview loads with import() (not enqueued); the version busts the cache.
-				'pdfjs'    => [
+				'pdfjs'     => [
 					'lib'    => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
 					'worker' => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.worker.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
 				],
@@ -218,7 +223,9 @@ class Module extends AbstractModule {
 		$current = self::settings();
 		$result  = Schema::sanitize( $settings, $current );
 
-		self::carry_counter( $current['numbering'], $result['settings']['numbering'] );
+		foreach ( Schema::NUMBERED as $type => $group ) {
+			self::carry_counter( $type, $current[ $group ], $result['settings'][ $group ] );
+		}
 
 		if ( [] !== $result['errors'] ) {
 			set_transient( 'lumia_factures_invoices_errors', $result['errors'], MINUTE_IN_SECONDS );
@@ -230,17 +237,19 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Keeps the invoice series going when the numbering policy changes.
+	 * Keeps a document series going when its numbering policy changes.
 	 *
-	 * The reset policy chooses the counter key (`invoice`, `invoice_2026`, `invoice_2026_10`). A new
-	 * policy moves to another key that starts at the start number, behind the numbers already issued:
-	 * they would collide, or the series would restart within the period. The counter the new policy
-	 * uses for the current period is raised to the current value of the old one (never lowered).
+	 * The reset policy chooses the counter key (`invoice`, `invoice_2026`, `invoice_2026_10`; the
+	 * same with `credit_note`). A new policy moves to another key that starts at the start number,
+	 * behind the numbers already issued: they would collide, or the series would restart within the
+	 * period. The counter the new policy uses for the current period is raised to the current value
+	 * of the old one (never lowered). Each type has its own counters, so only its own move.
 	 *
-	 * @param array<string, mixed> $before Numbering settings before the save.
-	 * @param array<string, mixed> $after  Numbering settings about to be saved.
+	 * @param string               $type   Document type, a key of Schema::NUMBERED.
+	 * @param array<string, mixed> $before Numbering policy of the type before the save.
+	 * @param array<string, mixed> $after  Numbering policy of the type about to be saved.
 	 */
-	private static function carry_counter( array $before, array $after ): void {
+	private static function carry_counter( string $type, array $before, array $after ): void {
 		$changed = false;
 		foreach ( [ 'format', 'reset_enabled', 'reset_period' ] as $field ) {
 			if ( ( $before[ $field ] ?? null ) !== ( $after[ $field ] ?? null ) ) {
@@ -253,8 +262,8 @@ class Module extends AbstractModule {
 		}
 
 		$now     = time();
-		$old_key = Sequences::key( Issuer::TYPE, $now, $before );
-		$new_key = Sequences::key( Issuer::TYPE, $now, $after );
+		$old_key = Sequences::key( $type, $now, $before );
+		$new_key = Sequences::key( $type, $now, $after );
 		$value   = Sequences::current( $old_key );
 
 		if ( $old_key === $new_key || $value <= 0 ) {

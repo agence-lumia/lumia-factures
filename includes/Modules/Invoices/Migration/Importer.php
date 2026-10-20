@@ -168,7 +168,7 @@ final class Importer {
 		}
 
 		$stored = get_option( self::SETTINGS_OPTION, false );
-		if ( false !== $stored && Schema::defaults() != $stored ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- Same values, key order and int/float equality do not matter.
+		if ( false !== $stored && ! self::left_at_defaults( $stored ) ) {
 			$report->settings = 'skipped_existing';
 			return;
 		}
@@ -182,6 +182,30 @@ final class Importer {
 		if ( ! $dry_run ) {
 			update_option( self::SETTINGS_OPTION, $sanitized['settings'] );
 		}
+	}
+
+	/**
+	 * Whether the stored settings are the defaults the activator stored, so never saved by the user.
+	 *
+	 * A group added by a later version (credit_notes in 2.1) is missing from the defaults stored by
+	 * an earlier one: it is read from the current defaults, as Module::settings() does, so an update
+	 * that lands before the import does not turn the old defaults into user settings.
+	 *
+	 * @param mixed $stored Stored option.
+	 */
+	private static function left_at_defaults( $stored ): bool {
+		if ( ! is_array( $stored ) ) {
+			return false;
+		}
+
+		$defaults = Schema::defaults();
+		foreach ( $defaults as $group => $values ) {
+			if ( ! array_key_exists( $group, $stored ) ) {
+				$stored[ $group ] = $values;
+			}
+		}
+
+		return $defaults == $stored; // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Same values, key order and int/float equality do not matter.
 	}
 
 	/**

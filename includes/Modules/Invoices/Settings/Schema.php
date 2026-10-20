@@ -14,14 +14,34 @@ use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 /**
  * Single source of truth of the invoice settings.
  *
- * Settings are grouped (general, company, numbering, content, design), and the
+ * Settings are grouped (general, company, numbering, credit_notes, content, design), and the
  * stored shape equals the form shape. Keys follow the legacy 1.x schema so that
  * stored settings can be mapped one to one. Label defaults are stored empty:
  * the translated default is resolved at render time.
  */
 final class Schema {
 
-	public const GROUPS = [ 'general', 'company', 'numbering', 'content', 'design' ];
+	public const GROUPS = [ 'general', 'company', 'numbering', 'credit_notes', 'content', 'design' ];
+
+	/**
+	 * Numbered document types, and the group holding their numbering policy (`format`,
+	 * `start_number`, `reset_enabled`, `reset_period`).
+	 */
+	public const NUMBERED = [
+		'invoice'     => 'numbering',
+		'credit_note' => 'credit_notes',
+	];
+
+	/**
+	 * Ids of the WooCommerce refund email. WooCommerce renames it `customer_partially_refunded_order`
+	 * while it sends a partial refund. It carries the credit note, never the invoice.
+	 */
+	public const REFUND_EMAILS = [ 'customer_refunded_order', 'customer_partially_refunded_order' ];
+
+	/**
+	 * Keys of a numbering policy: reverted together when the policy is refused.
+	 */
+	private const POLICY_KEYS = [ 'format', 'reset_enabled', 'reset_period' ];
 
 	/**
 	 * Field definitions, cached.
@@ -52,6 +72,8 @@ final class Schema {
 	 *
 	 * A key absent from $input keeps its $current value; a present key is
 	 * sanitized; unknown groups and keys are dropped. $current is assumed valid.
+	 * A refused numbering policy (format, reset_enabled, reset_period) keeps its
+	 * current value and adds an error; the other fields are saved.
 	 *
 	 * @param array<string, mixed> $input   Raw payload, already unslashed.
 	 * @param array<string, mixed> $current Current valid settings.
@@ -74,14 +96,30 @@ final class Schema {
 			}
 		}
 
-		$numbering = $settings['numbering'];
-		$validated = NumberFormat::validate( (string) $numbering['format'], (bool) $numbering['reset_enabled'], (string) $numbering['reset_period'] );
+		// Each numbering policy is checked on its own: a refused one goes back to its current value.
+		foreach ( self::NUMBERED as $type => $group ) {
+			$policy    = $settings[ $group ];
+			$validated = NumberFormat::validate( (string) $policy['format'], (bool) $policy['reset_enabled'], (string) $policy['reset_period'] );
 
-		if ( true !== $validated ) {
-			$errors[] = $validated;
+			if ( true !== $validated ) {
+				if ( 'credit_note' === $type ) {
+					/* translators: %s: why the credit note number format is refused. */
+					$validated = sprintf( __( 'Credit note number: %s', 'lumia-factures' ), $validated );
+				}
 
-			foreach ( [ 'format', 'reset_enabled', 'reset_period' ] as $key ) {
-				$settings['numbering'][ $key ] = $current['numbering'][ $key ] ?? self::defaults()['numbering'][ $key ];
+				$errors[] = $validated;
+				$settings = self::revert_policy( $settings, $group, $current );
+			}
+		}
+
+		// Then the two series must never print the same number: the credit note policy goes back
+		// first, and the invoice policy too when the conflict came from the invoice format alone.
+		if ( ! self::prefixes_differ( $settings ) ) {
+			$errors[] = __( 'The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-.', 'lumia-factures' );
+			$settings = self::revert_policy( $settings, self::NUMBERED['credit_note'], $current );
+
+			if ( ! self::prefixes_differ( $settings ) ) {
+				$settings = self::revert_policy( $settings, self::NUMBERED['invoice'], $current );
 			}
 		}
 
@@ -89,6 +127,36 @@ final class Schema {
 			'settings' => $settings,
 			'errors'   => $errors,
 		];
+	}
+
+	/**
+	 * Whether the invoice and credit note formats of a settings array have distinct prefixes.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings.
+	 */
+	private static function prefixes_differ( array $settings ): bool {
+		return NumberFormat::prefixes_differ(
+			(string) $settings[ self::NUMBERED['invoice'] ]['format'],
+			(string) $settings[ self::NUMBERED['credit_note'] ]['format']
+		);
+	}
+
+	/**
+	 * Puts a numbering policy back to its current value (the default when it has none).
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param string                              $group    Group of the policy.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function revert_policy( array $settings, string $group, array $current ): array {
+		$stored = isset( $current[ $group ] ) && is_array( $current[ $group ] ) ? $current[ $group ] : [];
+
+		foreach ( self::POLICY_KEYS as $key ) {
+			$settings[ $group ][ $key ] = $stored[ $key ] ?? self::fields()[ $group ][ $key ]['default'];
+		}
+
+		return $settings;
 	}
 
 	/**
@@ -125,8 +193,10 @@ final class Schema {
 				return is_scalar( $value ) ? sanitize_textarea_field( str_replace( [ "\r\n", "\r" ], "\n", (string) $value ) ) : $previous;
 
 			case 'statuses':
+				return self::sanitize_list( $value, self::status_options() );
+
 			case 'emails':
-				return self::sanitize_list( $value, 'statuses' === $field['type'] ? self::status_options() : self::email_options() );
+				return self::sanitize_list( $value, self::email_options( (string) ( $field['scope'] ?? 'all' ) ) );
 
 			case 'text':
 			default:
@@ -176,9 +246,11 @@ final class Schema {
 	/**
 	 * WooCommerce email ids.
 	 *
+	 * @param string $scope `all`, `invoice` (every email but the refund one) or `refund` (the refund
+	 *                      email only, see REFUND_EMAILS).
 	 * @return string[]
 	 */
-	public static function email_options(): array {
+	public static function email_options( string $scope = 'all' ): array {
 		if ( ! function_exists( 'WC' ) || ! WC()->mailer() ) {
 			return [];
 		}
@@ -189,6 +261,14 @@ final class Schema {
 			if ( is_object( $email ) && ! empty( $email->id ) ) {
 				$ids[] = (string) $email->id;
 			}
+		}
+
+		if ( 'invoice' === $scope ) {
+			return array_values( array_diff( $ids, self::REFUND_EMAILS ) );
+		}
+
+		if ( 'refund' === $scope ) {
+			return array_values( array_intersect( $ids, self::REFUND_EMAILS ) );
 		}
 
 		return $ids;
@@ -202,11 +282,12 @@ final class Schema {
 	public static function fields(): array {
 		if ( null === self::$fields ) {
 			self::$fields = [
-				'general'   => self::general(),
-				'company'   => self::company(),
-				'numbering' => self::numbering(),
-				'content'   => self::content(),
-				'design'    => self::design(),
+				'general'      => self::general(),
+				'company'      => self::company(),
+				'numbering'    => self::numbering(),
+				'credit_notes' => self::credit_notes(),
+				'content'      => self::content(),
+				'design'       => self::design(),
 			];
 		}
 
@@ -239,7 +320,7 @@ final class Schema {
 	private static function general(): array {
 		return [
 			'trigger_statuses'  => self::field( 'statuses', [ 'processing', 'completed' ] ),
-			'email_attachments' => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice' ] ),
+			'email_attachments' => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice' ], [ 'scope' => 'invoice' ] ),
 		];
 	}
 
@@ -326,8 +407,18 @@ final class Schema {
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function numbering(): array {
+		return self::numbering_policy( 'FA-{year}-{number:5}' );
+	}
+
+	/**
+	 * Fields of a numbering policy.
+	 *
+	 * @param string $format Default format.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function numbering_policy( string $format ): array {
 		return [
-			'format'        => self::field( 'text', 'FA-{year}-{number:5}' ),
+			'format'        => self::field( 'text', $format ),
 			'start_number'  => self::field(
 				'int',
 				1,
@@ -339,6 +430,24 @@ final class Schema {
 			'reset_enabled' => self::field( 'bool', true ),
 			'reset_period'  => self::field( 'select', 'yearly', [ 'options' => [ 'yearly', 'monthly' ] ] ),
 		];
+	}
+
+	/**
+	 * Group: credit_notes. Its own number series (the prefix must differ from the invoice one, see
+	 * sanitize()), title, refund reason and emails. There is no on/off switch: every refund of an
+	 * invoiced order gets a credit note.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function credit_notes(): array {
+		return array_merge(
+			self::numbering_policy( 'AV-{year}-{number:5}' ),
+			[
+				'title'             => self::field( 'text', '' ),
+				'reason_enabled'    => self::field( 'bool', true ),
+				'email_attachments' => self::field( 'emails', [ 'customer_refunded_order' ], [ 'scope' => 'refund' ] ),
+			]
+		);
 	}
 
 	/**

@@ -476,6 +476,21 @@ class ImporterTest extends TestCase {
 		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
 	}
 
+	public function test_settings_left_at_defaults_of_an_older_version_are_replaced(): void {
+		// Activated in 2.0 (no credit_notes group yet) while the legacy plugin was still active, then
+		// updated before the import ran: the settings were still never saved by the user.
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$defaults_2_0 = Schema::defaults();
+		unset( $defaults_2_0['credit_notes'] );
+		update_option( 'lumia_factures_module_invoices', $defaults_2_0 );
+
+		$report = Importer::run( false )->to_array();
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+		$this->assertSame( Schema::defaults()['credit_notes'], get_option( 'lumia_factures_module_invoices' )['credit_notes'] );
+	}
+
 	public function test_no_legacy_settings(): void {
 		$this->assertFalse( LegacySource::has_data() );
 		$report = Importer::run( false )->to_array();

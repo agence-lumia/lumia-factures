@@ -1,6 +1,6 @@
 /**
  * Lümia Factures - Invoices settings screen.
- * Logo picker (wp.media), live number sample, color fields and themes, live PDF preview (pdf.js),
+ * Logo picker (wp.media), live number samples, color fields and themes, live PDF preview (pdf.js),
  * tab from the URL hash.
  * Data comes from PHP: lumiaFacturesAdmin.invoices (see Modules\Invoices\Module::get_admin_js_data()).
  */
@@ -23,14 +23,13 @@
     return text;
   }
 
-  /* ---------------- Number sample (mirrors NumberFormat::preview) ---------------- */
+  /* ---------------- Number samples (mirror NumberFormat::preview) ---------------- */
 
-  /** Counter key of the current period (mirrors Sequences::key). */
-  function counterKey(resetEnabled, period) {
-    var base = data.type || "invoice";
+  /** Counter key of a document type for the current period (mirrors Sequences::key). */
+  function counterKey(type, resetEnabled, period) {
     var sample = data.sample || {};
-    if (!resetEnabled) return base;
-    return period === "monthly" ? base + "_" + sample.year + "_" + sample.month : base + "_" + sample.year;
+    if (!resetEnabled) return type;
+    return period === "monthly" ? type + "_" + sample.year + "_" + sample.month : type + "_" + sample.year;
   }
 
   function renderFormat(format, counter) {
@@ -68,18 +67,29 @@
     return { text: text, invalid: invalid };
   }
 
-  function initSample() {
-    var output = document.querySelector("[data-lumia-factures-sample]");
-    var format = field("numbering.format");
-    if (!output || !format) return;
+  /**
+   * One live sample per `[data-lumia-factures-sample="{type}"]`, fed by the fields of the type's
+   * group (lumiaFacturesAdmin.invoices.documents: invoice -> numbering, credit_note -> credit_notes).
+   */
+  function initSamples() {
+    var documents = data.documents || {};
+    document.querySelectorAll("[data-lumia-factures-sample]").forEach(function (output) {
+      var type = output.getAttribute("data-lumia-factures-sample");
+      if (type && documents[type]) initSample(output, type, documents[type].group);
+    });
+  }
 
-    var start = field("numbering.start_number");
-    var reset = document.querySelector('input[type="checkbox"][name="lumia_factures_module_settings[numbering][reset_enabled]"]');
-    var period = field("numbering.reset_period");
+  function initSample(output, type, group) {
+    var format = field(group + ".format");
+    if (!format) return;
+
+    var start = field(group + ".start_number");
+    var reset = document.querySelector('input[type="checkbox"][name="lumia_factures_module_settings[' + group + '][reset_enabled]"]');
+    var period = field(group + ".reset_period");
 
     function update() {
       var counters = data.counters || {};
-      var key = counterKey(reset ? reset.checked : true, period ? period.value : "yearly");
+      var key = counterKey(type, reset ? reset.checked : true, period ? period.value : "yearly");
       var last = parseInt(counters[key], 10) || 0;
       var first = Math.max(1, parseInt(start && start.value, 10) || 1);
       var next = last > 0 ? last + 1 : first;
@@ -594,7 +604,7 @@
   }
 
   document.addEventListener("DOMContentLoaded", function () {
-    initSample();
+    initSamples();
     initLogo();
     initColors();
     initThemes();

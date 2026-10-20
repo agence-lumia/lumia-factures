@@ -101,6 +101,60 @@ final class NumberFormat {
 	}
 
 	/**
+	 * Literal text of a format before its first tag (`FA-` for `FA-{year}-{number:5}`).
+	 *
+	 * @param string $format Format.
+	 */
+	public static function prefix( string $format ): string {
+		$format = trim( $format );
+
+		if ( preg_match( self::TAG_PATTERN, $format, $matches, PREG_OFFSET_CAPTURE ) ) {
+			return substr( $format, 0, (int) $matches[0][1] );
+		}
+
+		return $format;
+	}
+
+	/**
+	 * Whether the numbers of another document type can never equal the invoice numbers, judged on
+	 * the literal prefixes of the two formats.
+	 *
+	 * The other prefix must not be empty. Behind a literal invoice prefix, neither prefix may start
+	 * the other (`FA-` and `FA-AV-` could meet). An invoice format that starts with a tag prints
+	 * digits first (`{year}{month}{number:6}`), so the other prefix must start with a character that
+	 * is not a digit (`2026-` would meet `{year}-{number:5}`). The comparison ignores letter case and
+	 * accents, like the collation of the register's unique keys.
+	 *
+	 * @param string $invoice_format Invoice number format.
+	 * @param string $other_format   Number format of the other document type.
+	 */
+	public static function prefixes_differ( string $invoice_format, string $other_format ): bool {
+		$invoice = self::fold( self::prefix( $invoice_format ) );
+		$other   = self::fold( self::prefix( $other_format ) );
+
+		if ( '' === $other ) {
+			return false;
+		}
+
+		if ( '' === $invoice ) {
+			return 1 !== preg_match( '/^\d/', $other );
+		}
+
+		return ! str_starts_with( $invoice, $other ) && ! str_starts_with( $other, $invoice );
+	}
+
+	/**
+	 * Case and accent folding of a prefix.
+	 *
+	 * @param string $text Text.
+	 */
+	private static function fold( string $text ): string {
+		$text = remove_accents( $text );
+
+		return function_exists( 'mb_strtolower' ) ? mb_strtolower( $text, 'UTF-8' ) : strtolower( $text );
+	}
+
+	/**
 	 * Builds an invoice number.
 	 *
 	 * @param string   $format    Format, e.g. `FA-{year}-{number:5}`.

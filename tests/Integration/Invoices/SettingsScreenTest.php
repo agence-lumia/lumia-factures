@@ -16,6 +16,9 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Admin\Themes;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
+use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Emails\Attachments;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
@@ -200,10 +203,94 @@ class SettingsScreenTest extends TestCase {
 	public function test_list_settings_post_an_empty_entry_first(): void {
 		$html = $this->render();
 
-		foreach ( [ 'trigger_statuses', 'email_attachments' ] as $key ) {
-			$hidden = '<input type="hidden" name="lumia_factures_module_settings[general][' . $key . '][]" value="">';
+		foreach ( [ 'general][trigger_statuses', 'general][email_attachments', 'credit_notes][email_attachments' ] as $key ) {
+			$hidden = '<input type="hidden" name="lumia_factures_module_settings[' . $key . '][]" value="">';
 			$this->assertStringContainsString( $hidden, $html, $key );
 		}
+	}
+
+	public function test_refund_emails_hidden_from_invoice_email_list(): void {
+		$html = $this->render();
+
+		// The refund email is offered for the credit note, never for the invoice.
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[general][email_attachments][]" value="customer_refunded_order"', $html );
+		$this->assertStringContainsString( 'name="lumia_factures_module_settings[general][email_attachments][]" value="customer_invoice"', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[email_attachments\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[credit_notes][email_attachments][]" value="customer_invoice"', $html );
+
+		$this->assertNotContains( 'customer_refunded_order', Schema::email_options( 'invoice' ) );
+		$this->assertContains( 'customer_invoice', Schema::email_options( 'invoice' ) );
+		$this->assertSame( [ 'customer_refunded_order' ], Schema::email_options( 'refund' ) );
+		$this->assertContains( 'customer_refunded_order', Schema::email_options() );
+
+		// The sanitizer keeps each list to its own emails.
+		$result = Schema::sanitize(
+			[
+				'general'      => [ 'email_attachments' => [ 'customer_invoice', 'customer_refunded_order' ] ],
+				'credit_notes' => [ 'email_attachments' => [ 'customer_invoice', 'customer_refunded_order' ] ],
+			],
+			Schema::defaults()
+		);
+		$this->assertSame( [ 'customer_invoice' ], $result['settings']['general']['email_attachments'] );
+		$this->assertSame( [ 'customer_refunded_order' ], $result['settings']['credit_notes']['email_attachments'] );
+
+		// A refund email stored in the invoice list by an earlier version never gets the invoice.
+		$settings                                 = Schema::defaults();
+		$settings['general']['email_attachments'] = [ 'customer_refunded_order', 'customer_partially_refunded_order' ];
+		update_option( 'lumia_factures_module_invoices', $settings );
+		add_filter( 'lumia_factures_can_issue', '__return_true' );
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$this->assertTrue( Issuer::can_issue( $order ), 'The order could be invoiced.' );
+
+		foreach ( [ 'customer_refunded_order', 'customer_partially_refunded_order' ] as $email_id ) {
+			$this->assertSame( [ '/tmp/other.pdf' ], Attachments::attach( [ '/tmp/other.pdf' ], $email_id, $order ), $email_id );
+		}
+		$this->assertNull( Register::find( Issuer::TYPE, $order->get_id() ), 'Nothing was issued.' );
+	}
+
+	public function test_numbering_tab_renders_two_samples_and_document_column(): void {
+		$year = (string) wp_date( 'Y' );
+		Sequences::next( 'invoice_' . $year, 1 );
+		Sequences::next( 'credit_note_' . $year, 1 );
+
+		$html = $this->render();
+
+		// One live sample per numbered document type, each fed by its own group.
+		$this->assertSame( 2, substr_count( $html, 'data-lumia-factures-sample=' ) );
+		$this->assertStringContainsString( 'data-lumia-factures-sample="invoice"', $html );
+		$this->assertStringContainsString( 'data-lumia-factures-sample="credit_note"', $html );
+		foreach ( [ 'format', 'start_number', 'reset_enabled', 'reset_period' ] as $key ) {
+			$this->assertStringContainsString( 'name="lumia_factures_module_settings[credit_notes][' . $key . ']"', $html, $key );
+		}
+
+		// The counters table names the document type of each counter.
+		$this->assertMatchesRegularExpression( '#<th scope="col">Document</th>\s*<th scope="col">Counter</th>#', $html );
+		$this->assertMatchesRegularExpression( '#<td>Invoice</td>\s*<td><code>invoice_' . $year . '</code></td>#', $html );
+		$this->assertMatchesRegularExpression( '#<td>Credit note</td>\s*<td><code>credit_note_' . $year . '</code></td>#', $html );
+
+		$this->assertSame( 'invoice', Counters::document_type( 'invoice' ) );
+		$this->assertSame( 'invoice', Counters::document_type( 'invoice_2026_10' ) );
+		$this->assertSame( 'credit_note', Counters::document_type( 'credit_note_2026' ) );
+		$this->assertSame( '', Counters::document_type( 'invoices_2026' ) );
+
+		// The JS reads each type's fields from its group.
+		$data = Plugin::instance()->modules()->get_active_instances()['invoices']->get_admin_js_data();
+		$this->assertSame(
+			[
+				'invoice'     => [ 'group' => 'numbering' ],
+				'credit_note' => [ 'group' => 'credit_notes' ],
+			],
+			$data['invoices']['documents']
+		);
+		$this->assertSame( 1, $data['invoices']['counters'][ 'credit_note_' . $year ] );
+	}
+
+	public function test_content_tab_renders_the_credit_note_fields(): void {
+		$html = $this->render();
+
+		$this->assertMatchesRegularExpression( '/<input type="text"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[title\]"[^>]*placeholder="Credit note"/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[reason_enabled\]"[^>]*checked/', $html );
 	}
 
 	public function test_unchecking_every_item_of_a_list_saves_an_empty_list(): void {
