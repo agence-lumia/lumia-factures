@@ -103,6 +103,47 @@ final class Register {
 	}
 
 	/**
+	 * Whether a number recorded for a document type starts with one of the given texts.
+	 *
+	 * LIKE follows the collation of the number column, the one of the unique key (type, number):
+	 * letter case and accents are ignored, as NumberFormat::prefixes_differ() does. One query for
+	 * all the texts. A query that fails (no table yet, during a dry-run import before the first
+	 * activation) is logged and finds nothing.
+	 *
+	 * @param string $type      Document type.
+	 * @param string ...$starts Texts the number may start with; empty texts are ignored.
+	 */
+	public static function number_starts_with( string $type, string ...$starts ): bool {
+		global $wpdb;
+
+		$likes = [];
+		foreach ( $starts as $start ) {
+			if ( '' !== $start ) {
+				$likes[] = $wpdb->esc_like( $start ) . '%';
+			}
+		}
+
+		if ( [] === $likes ) {
+			return false;
+		}
+
+		$table = Installer::documents_table();
+		$where = implode( ' OR ', array_fill( 0, count( $likes ), 'number LIKE %s' ) );
+
+		$suppressed = $wpdb->suppress_errors( true );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.ReplacementsWrongNumber -- table name from Installer; $where holds one %s per LIKE, the sniff cannot count them.
+		$found = $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE type = %s AND ( {$where} ) LIMIT 1", $type, ...$likes ) );
+		$error = (string) $wpdb->last_error;
+		$wpdb->suppress_errors( $suppressed );
+
+		if ( '' !== $error ) {
+			error_log( '[lumia-factures] Could not look for ' . $type . ' numbers starting with ' . implode( ', ', $starts ) . ': ' . $error ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- Operational log, the project convention.
+		}
+
+		return null !== $found;
+	}
+
+	/**
 	 * Reserves the right to issue a document for an order.
 	 *
 	 * @param string $type      Document type.

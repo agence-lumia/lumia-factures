@@ -144,6 +144,19 @@ final class NumberFormat {
 	}
 
 	/**
+	 * What every number of a format starts with: its literal prefix, or one of the ten digits when
+	 * the format starts with a tag (the core tags print digits, see prefixes_differ()).
+	 *
+	 * @param string $format Format.
+	 * @return string[]
+	 */
+	public static function number_starts( string $format ): array {
+		$prefix = self::prefix( $format );
+
+		return '' !== $prefix ? [ $prefix ] : [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ];
+	}
+
+	/**
 	 * Case and accent folding of a prefix.
 	 *
 	 * @param string $text Text.

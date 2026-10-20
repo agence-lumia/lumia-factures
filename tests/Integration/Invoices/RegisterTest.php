@@ -266,4 +266,29 @@ class RegisterTest extends TestCase {
 		$other = (int) Register::reserve( 'credit_note', 644, 641 );
 		$this->assertTrue( Register::assign( $other, 'DOC-1', 'credit_note', 2, time() ) );
 	}
+
+	public function test_number_starts_with(): void {
+		$invoice = (int) Register::reserve( 'invoice', 651 );
+		Register::assign( $invoice, 'FA-2026-00001', 'invoice_2026', 1, time() );
+		$legacy = (int) Register::reserve( 'invoice', 652 );
+		Register::assign( $legacy, '202610000123', 'invoice_2026', 123, time() );
+		Register::reserve( 'credit_note', 653, 651 );
+
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'FA-' ) );
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'FA-2026-00001' ) );
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'fa-' ), 'The collation ignores letter case.' );
+		$this->assertTrue( Register::number_starts_with( 'invoice', '2' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'AV-' ) );
+		$this->assertFalse( Register::number_starts_with( 'credit_note', 'FA-' ), 'Only the given type; a reserved row has no number.' );
+		$this->assertFalse( Register::number_starts_with( 'invoice', '' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice' ) );
+
+		// Several texts: any of them.
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'AV-', '1', '2' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'AV-', 'CN-', '' ) );
+
+		// LIKE wildcards in the text are literal.
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'F_-' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', '%' ) );
+	}
 }

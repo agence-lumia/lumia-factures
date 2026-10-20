@@ -491,6 +491,52 @@ class ImporterTest extends TestCase {
 		$this->assertSame( Schema::defaults()['credit_notes'], get_option( 'lumia_factures_module_invoices' )['credit_notes'] );
 	}
 
+	public function test_legacy_invoice_format_clashing_with_credit_note_prefix_is_kept(): void {
+		// A legacy invoice prefix that starts the default credit note prefix (A and AV-): the invoice
+		// numbering goes on as it was, the credit notes take another prefix.
+		$legacy              = LegacySettingsTest::neonat();
+		$legacy['numbering'] = [
+			'format'        => 'A{year}{month}{number:5}',
+			'start_number'  => 1,
+			'reset_enabled' => true,
+			'reset_period'  => 'monthly',
+		];
+		update_option( 'fpl_settings', $legacy );
+
+		$dry = Importer::run( true )->to_array();
+		$this->assertFalse( get_option( 'lumia_factures_module_invoices' ), 'A dry run writes nothing.' );
+
+		$report = Importer::run( false )->to_array();
+		$this->assertSame( $dry['notes'], $report['notes'], 'The dry run tells the same story.' );
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$settings = Module::settings();
+		$this->assertSame( 'A{year}{month}{number:5}', $settings['numbering']['format'] );
+		$this->assertTrue( $settings['numbering']['reset_enabled'] );
+		$this->assertSame( 'monthly', $settings['numbering']['reset_period'] );
+		$this->assertSame( 'CN-{year}-{number:5}', $settings['credit_notes']['format'] );
+
+		// No refusal in the report, one note naming the credit note format the import chose.
+		$this->assertEmpty( preg_grep( '/must start with a prefix|cannot take a prefix/', $report['notes'] ) );
+		$this->assertCount( 1, preg_grep( '/A\{year\}\{month\}\{number:5\}.*AV-\{year\}-\{number:5\}.*CN-\{year\}-\{number:5\}/', $report['notes'] ) );
+
+		// The stored settings pass their own rules: the next save keeps both formats.
+		delete_transient( 'lumia_factures_invoices_errors' );
+		( new Module( 'invoices' ) )->save_settings( [ 'company' => [ 'phone' => '0102' ] ] );
+		$this->assertFalse( get_transient( 'lumia_factures_invoices_errors' ) );
+		$this->assertSame( 'A{year}{month}{number:5}', Module::settings()['numbering']['format'] );
+		$this->assertSame( 'CN-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
+
+		// A legacy invoice format free of the default credit note prefix keeps the default.
+		delete_option( 'lumia_factures_module_invoices' );
+		$legacy['numbering']['format'] = 'C{year}{month}{number:5}';
+		update_option( 'fpl_settings', $legacy );
+		$report = Importer::run( false )->to_array();
+		$this->assertSame( 'C{year}{month}{number:5}', Module::settings()['numbering']['format'] );
+		$this->assertSame( 'AV-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
+		$this->assertEmpty( preg_grep( '/CN-\{year\}/', $report['notes'] ) );
+	}
+
 	public function test_no_legacy_settings(): void {
 		$this->assertFalse( LegacySource::has_data() );
 		$report = Importer::run( false )->to_array();

@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
@@ -315,7 +316,7 @@ class SettingsSchemaTest extends TestCase {
 		$this->assertSame( 'FA-{year}-{number:5}', $result['settings']['numbering']['format'] );
 		$this->assertSame( 'AV-{year}-{number:5}', $result['settings']['credit_notes']['format'] );
 
-		// Swapping the two prefixes in one save is fine.
+		// Swapping the two prefixes in one save is refused (see test_prefix_cannot_take_numbers_of_the_other_type).
 		$result = Schema::sanitize(
 			[
 				'numbering'    => [ 'format' => 'AV-{year}-{number:5}' ],
@@ -323,7 +324,9 @@ class SettingsSchemaTest extends TestCase {
 			],
 			Schema::defaults()
 		);
-		$this->assertSame( [], $result['errors'] );
+		$this->assertCount( 1, $result['errors'] );
+		$this->assertSame( Schema::defaults()['numbering'], $result['settings']['numbering'] );
+		$this->assertSame( Schema::defaults()['credit_notes'], $result['settings']['credit_notes'] );
 
 		// Through the module: the refused credit note format is not stored, the other fields are.
 		delete_transient( 'lumia_factures_invoices_errors' );
@@ -336,6 +339,82 @@ class SettingsSchemaTest extends TestCase {
 		$this->assertSame( 'AV-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
 		$this->assertSame( '0102', Module::settings()['company']['phone'] );
 		$this->assertSame( [ $message ], get_transient( 'lumia_factures_invoices_errors' ) );
+	}
+
+	public function test_prefix_cannot_take_numbers_of_the_other_type(): void {
+		$message = 'A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number.';
+		$year    = (string) wp_date( 'Y' );
+
+		// Invoices FA- and credit notes AV- issued, then a swap in one save: carry_counter() would keep
+		// both series going, so the next credit note would print an issued invoice number. Both stay.
+		Register::import( 'invoice', 661, 'FA-' . $year . '-00011', 'invoice_' . $year, 11, time() );
+		Register::import( 'credit_note', 662, 'AV-' . $year . '-00001', 'credit_note_' . $year, 1, time() );
+		Sequences::raise( 'invoice_' . $year, 500 );
+		Sequences::raise( 'credit_note_' . $year, 10 );
+		update_option( 'lumia_factures_module_invoices', Schema::defaults() );
+
+		delete_transient( 'lumia_factures_invoices_errors' );
+		( new Module( 'invoices' ) )->save_settings(
+			[
+				'company'      => [ 'phone' => '0102' ],
+				'numbering'    => [ 'format' => 'AV-{year}-{number:5}' ],
+				'credit_notes' => [ 'format' => 'FA-{year}-{number:5}' ],
+			]
+		);
+		$this->assertSame( [ $message ], get_transient( 'lumia_factures_invoices_errors' ) );
+		$this->assertSame( 'FA-{year}-{number:5}', Module::settings()['numbering']['format'] );
+		$this->assertSame( 'AV-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
+		$this->assertSame( '0102', Module::settings()['company']['phone'], 'The other fields are saved.' );
+		$this->assertSame( 500, Sequences::current( 'invoice_' . $year ) );
+		$this->assertSame( 10, Sequences::current( 'credit_note_' . $year ) );
+
+		// Only one side moving onto the current prefix of the other is refused the same way.
+		$result = Schema::sanitize(
+			[
+				'numbering'    => [ 'format' => 'AV-{year}-{number:5}' ],
+				'credit_notes' => [ 'format' => 'CR-{year}-{number:5}' ],
+			],
+			Schema::defaults()
+		);
+		$this->assertSame( [ $message ], $result['errors'] );
+		$this->assertSame( 'FA-{year}-{number:5}', $result['settings']['numbering']['format'] );
+		$this->assertSame( 'CR-{year}-{number:5}', $result['settings']['credit_notes']['format'], 'The credit note side was free.' );
+
+		// In two saves the current formats no longer see the old prefix: the register does. FA- moved
+		// to FAC- for the invoices, and the credit notes cannot take FA- (any letter case).
+		$current                        = Schema::defaults();
+		$current['numbering']['format'] = 'FAC-{year}-{number:5}';
+		$this->assertSame( [], Schema::sanitize( [], $current )['errors'] );
+		foreach ( [ 'FA-{year}-{number:5}', 'fa-{year}-{number:6}' ] as $format ) {
+			$result = Schema::sanitize( [ 'credit_notes' => [ 'format' => $format ] ], $current );
+			$this->assertSame( [ $message ], $result['errors'], $format );
+			$this->assertSame( 'AV-{year}-{number:5}', $result['settings']['credit_notes']['format'], $format );
+		}
+
+		// The same for the invoices: the credit notes moved from AV- to CR-, AV- stays theirs.
+		$current                           = Schema::defaults();
+		$current['credit_notes']['format'] = 'CR-{year}-{number:5}';
+		$result                            = Schema::sanitize( [ 'numbering' => [ 'format' => 'AV-{year}-{number:5}' ] ], $current );
+		$this->assertSame( [ $message ], $result['errors'] );
+		$this->assertSame( 'FA-{year}-{number:5}', $result['settings']['numbering']['format'] );
+
+		// An invoice format starting with a tag prints digits: refused while a credit note number
+		// starts with a digit (printed by an earlier 2026-{number:5} format).
+		Register::import( 'credit_note', 663, $year . '-00001', 'credit_note', 1, time() );
+		$result = Schema::sanitize( [ 'numbering' => [ 'format' => '{year}{month}{number:6}' ] ], Schema::defaults() );
+		$this->assertSame( [ $message ], $result['errors'] );
+		$this->assertSame( 'FA-{year}-{number:5}', $result['settings']['numbering']['format'] );
+
+		// A new prefix nothing has printed is accepted, and an unchanged prefix is never looked up.
+		$result = Schema::sanitize(
+			[
+				'numbering'    => [ 'format' => 'INV-{year}-{number:5}' ],
+				'credit_notes' => [ 'format' => 'AV-{year}{number:6}' ],
+			],
+			Schema::defaults()
+		);
+		$this->assertSame( [], $result['errors'] );
+		$this->assertSame( 'INV-{year}-{number:5}', $result['settings']['numbering']['format'] );
 	}
 
 	public function test_credit_note_prefix_needs_non_digit_when_invoice_format_starts_with_tag(): void {

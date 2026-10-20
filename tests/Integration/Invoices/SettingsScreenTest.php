@@ -19,6 +19,7 @@ use Lumia\Factures\Modules\Invoices\Admin\Themes;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Emails\EmailIds;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
@@ -247,6 +248,34 @@ class SettingsScreenTest extends TestCase {
 			$this->assertSame( [ '/tmp/other.pdf' ], Attachments::attach( [ '/tmp/other.pdf' ], $email_id, $order ), $email_id );
 		}
 		$this->assertNull( Register::find( Issuer::TYPE, $order->get_id() ), 'Nothing was issued.' );
+	}
+
+	public function test_refund_email_keeps_its_id_after_a_partial_refund_email(): void {
+		// WooCommerce renames the refund email object while it sends a partial refund, and the object
+		// keeps that id for the rest of the request (or of this PHPUnit process).
+		$email = WC()->mailer()->get_emails()['WC_Email_Customer_Refunded_Order'] ?? null;
+		$this->assertIsObject( $email );
+		$this->assertSame( 'customer_refunded_order', EmailIds::normalize( 'customer_partially_refunded_order' ) );
+		$this->assertSame( 'customer_refunded_order', EmailIds::normalize( 'customer_refunded_order' ) );
+		$this->assertSame( 'customer_invoice', EmailIds::normalize( 'customer_invoice' ) );
+
+		$original  = $email->id;
+		$email->id = 'customer_partially_refunded_order';
+		try {
+			$this->assertSame( [ 'customer_refunded_order' ], Schema::email_options( 'refund' ) );
+			$this->assertNotContains( 'customer_partially_refunded_order', Schema::email_options() );
+			$this->assertNotContains( 'customer_refunded_order', Schema::email_options( 'invoice' ) );
+
+			// The stored id survives a save, and the form still offers it, checked.
+			$result = Schema::sanitize( [ 'credit_notes' => [ 'email_attachments' => [ 'customer_refunded_order' ] ] ], Schema::defaults() );
+			$this->assertSame( [ 'customer_refunded_order' ], $result['settings']['credit_notes']['email_attachments'] );
+
+			$html = $this->render();
+			$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[email_attachments\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+			$this->assertStringNotContainsString( 'value="customer_partially_refunded_order"', $html );
+		} finally {
+			$email->id = $original;
+		}
 	}
 
 	public function test_numbering_tab_renders_two_samples_and_document_column(): void {

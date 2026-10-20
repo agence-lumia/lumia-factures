@@ -10,6 +10,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Emails\EmailIds;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 $general_statuses = [];
@@ -17,14 +18,16 @@ foreach ( wc_get_order_statuses() as $general_slug => $general_label ) {
 	$general_statuses[ (string) preg_replace( '/^wc-/', '', (string) $general_slug ) ] = (string) $general_label;
 }
 
-// Email id => title, in the WooCommerce order.
+// Email id => title, in the WooCommerce order. Canonical ids, like Schema::email_options(): the refund
+// email object keeps the partial refund id once WooCommerce sent one in this request.
 $general_titles = [];
 if ( function_exists( 'WC' ) && WC()->mailer() ) {
 	foreach ( WC()->mailer()->get_emails() as $general_email ) {
 		if ( is_object( $general_email ) && ! empty( $general_email->id ) ) {
+			$general_id    = EmailIds::normalize( (string) $general_email->id );
 			$general_title = (string) $general_email->get_title();
 
-			$general_titles[ (string) $general_email->id ] = '' !== $general_title ? $general_title : (string) $general_email->id;
+			$general_titles[ $general_id ] = '' !== $general_title ? $general_title : $general_id;
 		}
 	}
 }

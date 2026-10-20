@@ -99,4 +99,9 @@ class NumberFormatTest extends TestCase {
 		$this->assertFalse( NumberFormat::prefixes_differ( '{year}-{number:5}', '2026-{number:5}' ) );
 		$this->assertFalse( NumberFormat::prefixes_differ( '{year}{number}', '' ) );
 	}
+
+	public function test_number_starts(): void {
+		$this->assertSame( [ 'FA-' ], NumberFormat::number_starts( 'FA-{year}-{number:5}' ) );
+		$this->assertSame( [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], NumberFormat::number_starts( '{year}{month}{number:6}' ) );
+	}
 }

@@ -9,6 +9,8 @@ namespace Lumia\Factures\Modules\Invoices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Emails\EmailIds;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 
 /**
@@ -34,9 +36,9 @@ final class Schema {
 
 	/**
 	 * Ids of the WooCommerce refund email. WooCommerce renames it `customer_partially_refunded_order`
-	 * while it sends a partial refund. It carries the credit note, never the invoice.
+	 * while it sends a partial refund (see EmailIds). It carries the credit note, never the invoice.
 	 */
-	public const REFUND_EMAILS = [ 'customer_refunded_order', 'customer_partially_refunded_order' ];
+	public const REFUND_EMAILS = [ EmailIds::REFUND, EmailIds::PARTIAL_REFUND ];
 
 	/**
 	 * Keys of a numbering policy: reverted together when the policy is refused.
@@ -71,9 +73,11 @@ final class Schema {
 	 * Sanitizes a (possibly partial) settings payload.
 	 *
 	 * A key absent from $input keeps its $current value; a present key is
-	 * sanitized; unknown groups and keys are dropped. $current is assumed valid.
-	 * A refused numbering policy (format, reset_enabled, reset_period) keeps its
-	 * current value and adds an error; the other fields are saved.
+	 * sanitized; unknown groups and keys are dropped. $current is assumed valid,
+	 * and its number formats are the ones the documents were issued with (see
+	 * separate_series()). A refused numbering policy (format, reset_enabled,
+	 * reset_period) keeps its current value and adds an error; the other fields
+	 * are saved.
 	 *
 	 * @param array<string, mixed> $input   Raw payload, already unslashed.
 	 * @param array<string, mixed> $current Current valid settings.
@@ -112,10 +116,48 @@ final class Schema {
 			}
 		}
 
-		// Then the two series must never print the same number: the credit note policy goes back
-		// first, and the invoice policy too when the conflict came from the invoice format alone.
+		// Then the two series must never print the same number.
+		$settings = self::separate_series( $settings, $current, $errors );
+
+		return [
+			'settings' => $settings,
+			'errors'   => $errors,
+		];
+	}
+
+	/**
+	 * Keeps the invoice and credit note series from ever printing the same number.
+	 *
+	 * First each type whose prefix changes must leave alone the numbers of the other type
+	 * (prefix_is_free()): a refused one reverts on its own. Then the two formats being saved must
+	 * have distinct prefixes (NumberFormat::prefixes_differ()): the credit note policy goes back
+	 * first, and the invoice policy too when the conflict came from the invoice format alone.
+	 * One error at most, about the formats posted.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 * @param string[]                            $errors   Errors, appended to.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function separate_series( array $settings, array $current, array &$errors ): array {
+		$invoice_free = self::prefix_is_free( 'invoice', $settings, $current );
+		$credit_free  = self::prefix_is_free( 'credit_note', $settings, $current );
+
 		if ( ! self::prefixes_differ( $settings ) ) {
 			$errors[] = __( 'The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-.', 'lumia-factures' );
+		} elseif ( ! $invoice_free || ! $credit_free ) {
+			$errors[] = __( 'A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number.', 'lumia-factures' );
+		}
+
+		if ( ! $invoice_free ) {
+			$settings = self::revert_policy( $settings, self::NUMBERED['invoice'], $current );
+		}
+
+		if ( ! $credit_free ) {
+			$settings = self::revert_policy( $settings, self::NUMBERED['credit_note'], $current );
+		}
+
+		if ( ! self::prefixes_differ( $settings ) ) {
 			$settings = self::revert_policy( $settings, self::NUMBERED['credit_note'], $current );
 
 			if ( ! self::prefixes_differ( $settings ) ) {
@@ -123,10 +165,51 @@ final class Schema {
 			}
 		}
 
-		return [
-			'settings' => $settings,
-			'errors'   => $errors,
-		];
+		return $settings;
+	}
+
+	/**
+	 * Whether the prefix of a type's new format leaves alone the numbers of the other type.
+	 *
+	 * Comparing the two formats being saved is not enough: Module::carry_counter() keeps each
+	 * series going, so after a swap of the prefixes (FA- and AV-) the next credit note would print
+	 * the number of an issued invoice, and Pipeline::number() would refuse value after value. A
+	 * prefix that changes must therefore also differ from the other type's current format, and no
+	 * number the register holds for the other type (printed by an earlier format) may start the way
+	 * the new numbers do. LIKE follows the collation of the register, as prefixes_differ() folds.
+	 * An unchanged prefix is not checked: the current settings are assumed valid.
+	 *
+	 * @param string                              $type     Numbered type, a key of NUMBERED.
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 */
+	private static function prefix_is_free( string $type, array $settings, array $current ): bool {
+		$other  = 'invoice' === $type ? 'credit_note' : 'invoice';
+		$format = (string) $settings[ self::NUMBERED[ $type ] ]['format'];
+
+		if ( NumberFormat::prefix( $format ) === NumberFormat::prefix( self::current_format( $current, $type ) ) ) {
+			return true;
+		}
+
+		$other_format = self::current_format( $current, $other );
+		$apart        = 'invoice' === $type
+			? NumberFormat::prefixes_differ( $format, $other_format )
+			: NumberFormat::prefixes_differ( $other_format, $format );
+
+		return $apart && ! Register::number_starts_with( $other, ...NumberFormat::number_starts( $format ) );
+	}
+
+	/**
+	 * Number format of a type in the current settings (the default when they have none).
+	 *
+	 * @param array<string, mixed> $current Current valid settings.
+	 * @param string               $type    Numbered type, a key of NUMBERED.
+	 */
+	private static function current_format( array $current, string $type ): string {
+		$group  = self::NUMBERED[ $type ];
+		$stored = isset( $current[ $group ] ) && is_array( $current[ $group ] ) ? $current[ $group ] : [];
+
+		return (string) ( $stored['format'] ?? self::fields()[ $group ]['format']['default'] );
 	}
 
 	/**
@@ -244,7 +327,11 @@ final class Schema {
 	}
 
 	/**
-	 * WooCommerce email ids.
+	 * WooCommerce email ids, canonical (EmailIds::normalize()).
+	 *
+	 * The ids are read from the email objects, and WooCommerce renames the refund email object
+	 * `customer_partially_refunded_order` for the rest of the request once it sent a partial refund:
+	 * read as is, the stored `customer_refunded_order` would be dropped by the next save.
 	 *
 	 * @param string $scope `all`, `invoice` (every email but the refund one) or `refund` (the refund
 	 *                      email only, see REFUND_EMAILS).
@@ -259,9 +346,11 @@ final class Schema {
 
 		foreach ( WC()->mailer()->get_emails() as $email ) {
 			if ( is_object( $email ) && ! empty( $email->id ) ) {
-				$ids[] = (string) $email->id;
+				$ids[] = EmailIds::normalize( (string) $email->id );
 			}
 		}
+
+		$ids = array_values( array_unique( $ids ) );
 
 		if ( 'invoice' === $scope ) {
 			return array_values( array_diff( $ids, self::REFUND_EMAILS ) );

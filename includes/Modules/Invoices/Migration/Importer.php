@@ -44,6 +44,13 @@ final class Importer {
 	public const NOTED_META = '_lumia_factures_import_noted';
 
 	/**
+	 * Credit note formats the settings import tries, in order, when the legacy invoice format takes
+	 * the prefix of the default one (`A{year}{number:5}` and `AV-`). No literal invoice prefix can
+	 * start like both `AV` and `CN`, so one of them always keeps the legacy invoice numbering.
+	 */
+	private const CREDIT_NOTE_FALLBACKS = [ 'AVOIR-{year}-{number:5}', 'CN-{year}-{number:5}' ];
+
+	/**
 	 * True during a dry run on a site whose tables do not exist yet (the plugin never started,
 	 * the legacy plugin still being active): the register reads as empty, the counters as 0.
 	 *
@@ -174,14 +181,67 @@ final class Importer {
 		}
 
 		$mapped    = LegacySettings::map( $legacy );
-		$sanitized = Schema::sanitize( $mapped['settings'], Schema::defaults() );
+		$sanitized = self::sanitize_settings( $mapped['settings'] );
 
 		$report->settings = 'imported';
-		$report->notes    = array_merge( $report->notes, $mapped['notes'], $sanitized['errors'] );
+		$report->notes    = array_merge( $report->notes, $mapped['notes'], $sanitized['errors'], $sanitized['notes'] );
 
 		if ( ! $dry_run ) {
 			update_option( self::SETTINGS_OPTION, $sanitized['settings'] );
 		}
+	}
+
+	/**
+	 * Sanitizes the mapped legacy settings, keeping the legacy invoice numbering policy.
+	 *
+	 * 1.x had no credit notes, so the credit note policy comes from the defaults. When the legacy
+	 * invoice format takes the default credit note prefix, Schema::sanitize() would revert the
+	 * invoice policy (a store numbered `A{year}{number:5}` would restart under `FA-`), so the first
+	 * format of CREDIT_NOTE_FALLBACKS that leaves the invoice policy alone is used, with a note. A
+	 * legacy invoice format refused on its own reverts whatever the credit note format: the default
+	 * is kept.
+	 *
+	 * @param array<string, array<string, mixed>> $mapped Mapped legacy settings.
+	 * @return array{settings: array<string, array<string, mixed>>, errors: string[], notes: string[]}
+	 */
+	private static function sanitize_settings( array $mapped ): array {
+		$default = (string) Schema::defaults()['credit_notes']['format'];
+		$chosen  = $default;
+		$best    = Schema::sanitize( $mapped, Schema::defaults() );
+
+		foreach ( self::CREDIT_NOTE_FALLBACKS as $format ) {
+			if ( [] === $best['errors'] ) {
+				break;
+			}
+
+			// The credit note format goes in as the current one, not as posted: it is never compared
+			// to the invoice format of the defaults, which no document was issued with.
+			$base                           = Schema::defaults();
+			$base['credit_notes']['format'] = $format;
+
+			$result = Schema::sanitize( $mapped, $base );
+			if ( count( $result['errors'] ) < count( $best['errors'] ) ) {
+				$best   = $result;
+				$chosen = $format;
+			}
+		}
+
+		$notes = [];
+		if ( $default !== $chosen ) {
+			$notes[] = sprintf(
+				/* translators: 1: imported invoice number format, 2: default credit note number format, 3: credit note number format used instead */
+				__( 'The invoice number format %1$s starts like the default credit note number format %2$s: credit notes will be numbered %3$s. Another format can be chosen in the Numbering tab.', 'lumia-factures' ),
+				(string) $best['settings']['numbering']['format'],
+				$default,
+				$chosen
+			);
+		}
+
+		return [
+			'settings' => $best['settings'],
+			'errors'   => $best['errors'],
+			'notes'    => $notes,
+		];
 	}
 
 	/**
