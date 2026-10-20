@@ -29,6 +29,7 @@ use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
+use Lumia\Factures\Modules\Invoices\Settings\Upgrader;
 
 /**
  * Core module: numbering, documents, rendering, storage and emails (lot 2).
@@ -42,7 +43,9 @@ class Module extends AbstractModule {
 	public function init(): void {
 		// Called directly: init() already runs inside the `init` hook at priority 10,
 		// a callback added to it now would never fire. Updating a plugin does not run
-		// the activation hook, so the tables are checked on every boot.
+		// the activation hook, so the tables are checked on every boot. The settings first: the
+		// installer records its schema version, one of the signs of an existing installation.
+		Upgrader::maybe_upgrade();
 		Installer::maybe_upgrade();
 
 		// The legacy import runs by itself, never during a front-end request (a visitor would wait
@@ -186,6 +189,8 @@ class Module extends AbstractModule {
 	 * active) the import is planned by the first request that meets them.
 	 */
 	public function on_activate(): void {
+		// Before the installer, which records the schema version a fresh site would then seem to have.
+		Upgrader::maybe_upgrade();
 		Installer::install();
 		CreditNoteIssuer::ensure_since();
 		Migration::forget_no_data();
@@ -212,8 +217,7 @@ class Module extends AbstractModule {
 				Migration::LOCK,
 				CreditNoteIssuer::SINCE_OPTION,
 				CreditNoteIssuer::SWEEP_CURSOR_OPTION,
-				// Version of the stored settings, recorded by the settings upgrade (lot 4a, task 12).
-				'lumia_factures_invoices_settings_version',
+				Upgrader::OPTION,
 			],
 			'meta'      => [
 				'_lumia_factures_invoice_number',

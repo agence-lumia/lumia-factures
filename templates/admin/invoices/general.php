@@ -3,7 +3,8 @@
  * Invoices settings, General tab.
  *
  * Included by includes/Modules/Invoices/settings-template.php ($fields is a Fields instance).
- * The refund email is offered for the credit note only (Schema::email_options() scopes).
+ * The refund email is offered for the credit note only (Schema::email_options() scopes); the
+ * document links go to the customer emails only, refund email included.
  *
  * @package Lumia\Factures
  */
@@ -32,8 +33,9 @@ if ( function_exists( 'WC' ) && WC()->mailer() ) {
 	}
 }
 
-$general_emails = array_intersect_key( $general_titles, array_flip( Schema::email_options( 'invoice' ) ) );
-$general_refund = array_intersect_key( $general_titles, array_flip( Schema::email_options( 'refund' ) ) );
+$general_emails   = array_intersect_key( $general_titles, array_flip( Schema::email_options( 'invoice' ) ) );
+$general_refund   = array_intersect_key( $general_titles, array_flip( Schema::email_options( 'refund' ) ) );
+$general_customer = array_intersect_key( $general_titles, array_flip( Schema::email_options( 'customer' ) ) );
 ?>
 <div class="lumia-section">
 	<div class="lumia-section__header">
@@ -62,5 +64,22 @@ $general_refund = array_intersect_key( $general_titles, array_flip( Schema::emai
 	</div>
 	<div class="lumia-section__content">
 		<?php $fields->checklist( 'credit_notes', 'email_attachments', __( 'Attach the credit note to', 'lumia-factures' ), $general_refund ); ?>
+	</div>
+</div>
+
+<div class="lumia-section">
+	<div class="lumia-section__header">
+		<h2 class="lumia-section__title"><?php echo esc_html__( 'Customer access', 'lumia-factures' ); ?></h2>
+		<p class="lumia-section__desc"><?php echo esc_html__( 'Where customers find the links to their invoice and credit notes. A link appears once the document is issued.', 'lumia-factures' ); ?></p>
+	</div>
+	<div class="lumia-section__content">
+		<?php
+		$fields->toggle( 'customer', 'account_orders', __( 'Invoice button in the My Account orders list', 'lumia-factures' ) );
+		$fields->toggle( 'customer', 'order_details', __( 'Documents on the order page', 'lumia-factures' ), __( 'The order view of My Account and the thank-you page.', 'lumia-factures' ) );
+		$fields->checklist( 'customer', 'email_links', __( 'Add the document links to', 'lumia-factures' ), $general_customer );
+		?>
+		<?php if ( defined( 'BRICKS_VERSION' ) ) : ?>
+			<p class="lumia-form__help"><?php echo esc_html__( 'Bricks is active: if your templates already show the documents with the Lümia Factures dynamic tags, turn off the matching options to avoid showing them twice.', 'lumia-factures' ); ?></p>
+		<?php endif; ?>
 	</div>
 </div>

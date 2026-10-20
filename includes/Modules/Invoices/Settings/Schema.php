@@ -16,14 +16,14 @@ use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 /**
  * Single source of truth of the invoice settings.
  *
- * Settings are grouped (general, company, numbering, credit_notes, content, design), and the
+ * Settings are grouped (general, company, numbering, credit_notes, customer, content, design), and the
  * stored shape equals the form shape. Keys follow the legacy 1.x schema so that
  * stored settings can be mapped one to one. Label defaults are stored empty:
  * the translated default is resolved at render time.
  */
 final class Schema {
 
-	public const GROUPS = [ 'general', 'company', 'numbering', 'credit_notes', 'content', 'design' ];
+	public const GROUPS = [ 'general', 'company', 'numbering', 'credit_notes', 'customer', 'content', 'design' ];
 
 	/**
 	 * Numbered document types, and the group holding their numbering policy (`format`,
@@ -333,8 +333,9 @@ final class Schema {
 	 * `customer_partially_refunded_order` for the rest of the request once it sent a partial refund:
 	 * read as is, the stored `customer_refunded_order` would be dropped by the next save.
 	 *
-	 * @param string $scope `all`, `invoice` (every email but the refund one) or `refund` (the refund
-	 *                      email only, see REFUND_EMAILS).
+	 * @param string $scope `all`, `invoice` (every email but the refund one), `refund` (the refund
+	 *                      email only, see REFUND_EMAILS) or `customer` (the emails sent to the
+	 *                      customer, refund email included).
 	 * @return string[]
 	 */
 	public static function email_options( string $scope = 'all' ): array {
@@ -345,9 +346,15 @@ final class Schema {
 		$ids = [];
 
 		foreach ( WC()->mailer()->get_emails() as $email ) {
-			if ( is_object( $email ) && ! empty( $email->id ) ) {
-				$ids[] = EmailIds::normalize( (string) $email->id );
+			if ( ! is_object( $email ) || empty( $email->id ) ) {
+				continue;
 			}
+
+			if ( 'customer' === $scope && ! ( method_exists( $email, 'is_customer_email' ) && $email->is_customer_email() ) ) {
+				continue;
+			}
+
+			$ids[] = EmailIds::normalize( (string) $email->id );
 		}
 
 		$ids = array_values( array_unique( $ids ) );
@@ -375,6 +382,7 @@ final class Schema {
 				'company'      => self::company(),
 				'numbering'    => self::numbering(),
 				'credit_notes' => self::credit_notes(),
+				'customer'     => self::customer(),
 				'content'      => self::content(),
 				'design'       => self::design(),
 			];
@@ -537,6 +545,51 @@ final class Schema {
 				'email_attachments' => self::field( 'emails', [ 'customer_refunded_order' ], [ 'scope' => 'refund' ] ),
 			]
 		);
+	}
+
+	/**
+	 * Group: customer. Where the customer finds the links to the order's documents: the My Account
+	 * orders list, the order details (My Account order view and thank-you page) and the emails.
+	 * Upgrader turns the first two off on an existing installation.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function customer(): array {
+		return [
+			'account_orders' => self::field( 'bool', true ),
+			'order_details'  => self::field( 'bool', true ),
+			'email_links'    => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice', EmailIds::REFUND ], [ 'scope' => 'customer' ] ),
+		];
+	}
+
+	/**
+	 * Whether stored settings still equal the defaults, so were never saved by the user (the
+	 * activator stores the defaults).
+	 *
+	 * A group added by a later version is missing from the defaults stored by an earlier one: it is
+	 * read from the current defaults, as Module::settings() does, so an update does not turn the old
+	 * defaults into user settings. Groups in $except are left out of the comparison.
+	 *
+	 * @param mixed    $stored Stored option.
+	 * @param string[] $except Groups not compared.
+	 */
+	public static function left_at_defaults( $stored, array $except = [] ): bool {
+		if ( ! is_array( $stored ) ) {
+			return false;
+		}
+
+		$defaults = self::defaults();
+		foreach ( $defaults as $group => $values ) {
+			if ( ! array_key_exists( $group, $stored ) ) {
+				$stored[ $group ] = $values;
+			}
+		}
+
+		foreach ( $except as $group ) {
+			unset( $defaults[ $group ], $stored[ $group ] );
+		}
+
+		return $defaults == $stored; // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Same values, key order and int/float equality do not matter.
 	}
 
 	/**

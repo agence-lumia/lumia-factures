@@ -216,6 +216,42 @@ class SettingsSchemaTest extends TestCase {
 		$this->assertSame( [], Schema::sanitize( Schema::defaults(), Schema::defaults() )['errors'] );
 	}
 
+	public function test_customer_defaults_all_on(): void {
+		$this->assertContains( 'customer', Schema::GROUPS );
+		$this->assertSame(
+			[
+				'account_orders' => true,
+				'order_details'  => true,
+				'email_links'    => [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice', 'customer_refunded_order' ],
+			],
+			Schema::defaults()['customer']
+		);
+		$this->assertSame( 'emails', Schema::fields()['customer']['email_links']['type'] );
+
+		// Every default email is a customer email the form offers.
+		$this->assertSame( [], array_diff( Schema::defaults()['customer']['email_links'], Schema::email_options( 'customer' ) ) );
+		$this->assertSame( Schema::defaults()['customer'], Schema::sanitize( Schema::defaults(), Schema::defaults() )['settings']['customer'] );
+	}
+
+	public function test_email_links_rejects_unknown_email_id(): void {
+		$result = Schema::sanitize(
+			[
+				'customer' => [
+					'email_links'    => [ 'customer_invoice', 'bogus', '', 'customer_partially_refunded_order', 'new_order', 'customer_refunded_order', 'customer_invoice' ],
+					'account_orders' => '0',
+				],
+			],
+			Schema::defaults()
+		);
+
+		// Unknown ids, the renamed refund id and the emails sent to the shop are dropped.
+		$this->assertSame( [ 'customer_invoice', 'customer_refunded_order' ], $result['settings']['customer']['email_links'] );
+		$this->assertNotContains( 'new_order', Schema::email_options( 'customer' ) );
+		$this->assertContains( 'customer_refunded_order', Schema::email_options( 'customer' ) );
+		$this->assertFalse( $result['settings']['customer']['account_orders'] );
+		$this->assertTrue( $result['settings']['customer']['order_details'] );
+	}
+
 	public function test_credit_note_format_validated_independently(): void {
 		// A broken credit note format reverts the credit note policy only.
 		$result = Schema::sanitize(

@@ -162,7 +162,8 @@ final class Importer {
 	 * Imports the legacy settings unless the user already saved settings.
 	 *
 	 * The activator stores the defaults before the migration runs, so an option still equal to
-	 * the defaults was never saved by the user and is replaced.
+	 * the defaults was never saved by the user and is replaced (Schema::left_at_defaults()). The
+	 * `customer` group is left out of that comparison and kept (keep_customer_group()).
 	 *
 	 * @param bool   $dry_run Dry run.
 	 * @param Report $report  Report.
@@ -175,20 +176,46 @@ final class Importer {
 		}
 
 		$stored = get_option( self::SETTINGS_OPTION, false );
-		if ( false !== $stored && ! self::left_at_defaults( $stored ) ) {
+		if ( false !== $stored && ! Schema::left_at_defaults( $stored, [ 'customer' ] ) ) {
 			$report->settings = 'skipped_existing';
 			return;
 		}
 
 		$mapped    = LegacySettings::map( $legacy );
 		$sanitized = self::sanitize_settings( $mapped['settings'] );
+		$settings  = self::keep_customer_group( $sanitized['settings'], $stored );
 
 		$report->settings = 'imported';
 		$report->notes    = array_merge( $report->notes, $mapped['notes'], $sanitized['errors'], $sanitized['notes'] );
 
 		if ( ! $dry_run ) {
-			update_option( self::SETTINGS_OPTION, $sanitized['settings'] );
+			update_option( self::SETTINGS_OPTION, $settings );
 		}
+	}
+
+	/**
+	 * Puts the stored `customer` group back over the imported settings.
+	 *
+	 * 1.x had no such group, and Settings\Upgrader writes it before the import runs (page links off
+	 * on a site with legacy data): it is not a user choice that blocks the import (left_at_defaults()
+	 * leaves it out), and the import never resets it either.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Imported settings.
+	 * @param mixed                               $stored   Stored option (false when missing).
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function keep_customer_group( array $settings, $stored ): array {
+		if ( ! is_array( $stored ) || ! isset( $stored['customer'] ) || ! is_array( $stored['customer'] ) ) {
+			return $settings;
+		}
+
+		foreach ( $stored['customer'] as $key => $value ) {
+			if ( array_key_exists( $key, $settings['customer'] ) ) {
+				$settings['customer'][ $key ] = $value;
+			}
+		}
+
+		return $settings;
 	}
 
 	/**
@@ -242,30 +269,6 @@ final class Importer {
 			'errors'   => $best['errors'],
 			'notes'    => $notes,
 		];
-	}
-
-	/**
-	 * Whether the stored settings are the defaults the activator stored, so never saved by the user.
-	 *
-	 * A group added by a later version (credit_notes in 2.1) is missing from the defaults stored by
-	 * an earlier one: it is read from the current defaults, as Module::settings() does, so an update
-	 * that lands before the import does not turn the old defaults into user settings.
-	 *
-	 * @param mixed $stored Stored option.
-	 */
-	private static function left_at_defaults( $stored ): bool {
-		if ( ! is_array( $stored ) ) {
-			return false;
-		}
-
-		$defaults = Schema::defaults();
-		foreach ( $defaults as $group => $values ) {
-			if ( ! array_key_exists( $group, $stored ) ) {
-				$stored[ $group ] = $values;
-			}
-		}
-
-		return $defaults == $stored; // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Same values, key order and int/float equality do not matter.
 	}
 
 	/**

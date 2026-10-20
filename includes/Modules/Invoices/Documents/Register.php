@@ -70,6 +70,18 @@ final class Register {
 	}
 
 	/**
+	 * Whether the register holds any row, of any type and state.
+	 */
+	public static function has_rows(): bool {
+		global $wpdb;
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		return null !== $wpdb->get_var( "SELECT id FROM {$table} LIMIT 1" );
+	}
+
+	/**
 	 * Whether a number is already recorded for a document type.
 	 *
 	 * @param string $type   Document type.

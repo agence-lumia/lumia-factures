@@ -155,9 +155,15 @@ class SettingsScreenTest extends TestCase {
 					'font_size'     => '10.5',
 				],
 				'general'   => [ 'trigger_statuses' => [ 'completed' ] ],
+				'customer'  => [
+					'account_orders' => '0',
+					// In the order of the WooCommerce emails, the order the form posts.
+					'email_links'    => [ 'customer_refunded_order', 'customer_invoice' ],
+				],
 			]
 		);
 		$before = Module::settings();
+		$this->assertFalse( $before['customer']['account_orders'] );
 
 		$dom = new \DOMDocument();
 		libxml_use_internal_errors( true );
@@ -204,7 +210,7 @@ class SettingsScreenTest extends TestCase {
 	public function test_list_settings_post_an_empty_entry_first(): void {
 		$html = $this->render();
 
-		foreach ( [ 'general][trigger_statuses', 'general][email_attachments', 'credit_notes][email_attachments' ] as $key ) {
+		foreach ( [ 'general][trigger_statuses', 'general][email_attachments', 'credit_notes][email_attachments', 'customer][email_links' ] as $key ) {
 			$hidden = '<input type="hidden" name="lumia_factures_module_settings[' . $key . '][]" value="">';
 			$this->assertStringContainsString( $hidden, $html, $key );
 		}
@@ -313,6 +319,60 @@ class SettingsScreenTest extends TestCase {
 			$data['invoices']['documents']
 		);
 		$this->assertSame( 1, $data['invoices']['counters'][ 'credit_note_' . $year ] );
+	}
+
+	public function test_general_tab_renders_the_customer_access_section(): void {
+		$settings                              = Schema::defaults();
+		$settings['customer']['order_details'] = false;
+		$settings['customer']['email_links']   = [ 'customer_invoice', 'customer_refunded_order' ];
+		update_option( 'lumia_factures_module_invoices', $settings );
+
+		$html = $this->render();
+
+		$this->assertStringContainsString( 'Customer access', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[account_orders\]"[^>]*checked/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[order_details\]" value="1"\s*>/', $html );
+		$this->assertStringContainsString( '<input type="hidden" name="lumia_factures_module_settings[customer][email_links][]" value="">', $html );
+
+		// The customer emails only, refund email included, each checked as stored.
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[email_links\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[email_links\]\[\]" value="customer_processing_order"\s*>/', $html );
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[customer][email_links][]" value="new_order"', $html );
+
+		$bricks_help = 'Bricks is active:';
+		if ( defined( 'BRICKS_VERSION' ) ) {
+			$this->assertStringContainsString( $bricks_help, $html );
+		} else {
+			$this->assertStringNotContainsString( $bricks_help, $html );
+		}
+	}
+
+	public function test_customer_access_section_round_trips(): void {
+		$instance = Plugin::instance()->modules()->get_active_instances()['invoices'];
+		$instance->save_settings(
+			[
+				'customer' => [
+					'account_orders' => '0',
+					'order_details'  => '1',
+					'email_links'    => [ '', 'customer_completed_order', 'customer_refunded_order' ],
+				],
+			]
+		);
+
+		$this->assertSame(
+			[
+				'account_orders' => false,
+				'order_details'  => true,
+				'email_links'    => [ 'customer_completed_order', 'customer_refunded_order' ],
+			],
+			Module::settings()['customer']
+		);
+		$this->assertFalse( get_transient( 'lumia_factures_invoices_errors' ) );
+
+		// Every box off: an empty list, not the defaults.
+		$instance->save_settings( [ 'customer' => [ 'email_links' => [ '' ] ] ] );
+		$this->assertSame( [], Module::settings()['customer']['email_links'] );
+		$this->assertFalse( Module::settings()['customer']['account_orders'] );
 	}
 
 	public function test_content_tab_renders_the_credit_note_fields(): void {

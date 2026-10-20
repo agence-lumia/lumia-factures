@@ -491,6 +491,63 @@ class ImporterTest extends TestCase {
 		$this->assertSame( Schema::defaults()['credit_notes'], get_option( 'lumia_factures_module_invoices' )['credit_notes'] );
 	}
 
+	public function test_settings_imported_despite_upgrader_customer_group(): void {
+		// 2.1 activated on a 1.x site: the activator stored the defaults, then Settings\Upgrader turned
+		// the page links off before the import ran. That is not a user choice.
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$stored                               = Schema::defaults();
+		$stored['customer']['account_orders'] = false;
+		$stored['customer']['order_details']  = false;
+		update_option( 'lumia_factures_module_invoices', $stored );
+
+		$report = Importer::run( false )->to_array();
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+
+		// Same with the partial group the upgrader writes over 2.0 settings.
+		update_option( 'lumia_factures_module_invoices', [ 'customer' => [ 'account_orders' => false ] ] );
+		$this->assertSame( 'imported', Importer::run( false )->to_array()['settings'] );
+
+		// Any other saved setting still blocks the import.
+		$stored['company']['phone'] = '0102';
+		update_option( 'lumia_factures_module_invoices', $stored );
+		$this->assertSame( 'skipped_existing', Importer::run( false )->to_array()['settings'] );
+		$this->assertSame( $stored, get_option( 'lumia_factures_module_invoices' ) );
+	}
+
+	public function test_import_keeps_stored_customer_group(): void {
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$stored                            = Schema::defaults();
+		$stored['customer']                = [
+			'account_orders' => false,
+			'order_details'  => false,
+		];
+		$stored['customer']['email_links'] = [ 'customer_invoice' ];
+		update_option( 'lumia_factures_module_invoices', $stored );
+
+		// A dry run writes nothing.
+		$this->assertSame( 'imported', Importer::run( true )->to_array()['settings'] );
+		$this->assertSame( $stored, get_option( 'lumia_factures_module_invoices' ) );
+
+		Importer::run( false );
+
+		$this->assertSame(
+			[
+				'account_orders' => false,
+				'order_details'  => false,
+				'email_links'    => [ 'customer_invoice' ],
+			],
+			get_option( 'lumia_factures_module_invoices' )['customer']
+		);
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+
+		// Without a stored group, the imported settings carry the defaults.
+		delete_option( 'lumia_factures_module_invoices' );
+		Importer::run( false );
+		$this->assertSame( Schema::defaults()['customer'], get_option( 'lumia_factures_module_invoices' )['customer'] );
+	}
+
 	public function test_legacy_invoice_format_clashing_with_credit_note_prefix_is_kept(): void {
 		// A legacy invoice prefix that starts the default credit note prefix (A and AV-): the invoice
 		// numbering goes on as it was, the credit notes take another prefix.
