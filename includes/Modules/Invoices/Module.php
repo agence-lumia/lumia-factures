@@ -58,6 +58,8 @@ class Module extends AbstractModule {
 		add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
 		add_action( 'lumia_factures_invoice_issued', [ CreditNoteIssuer::class, 'on_invoice_issued' ], 20, 2 );
 		add_filter( 'woocommerce_pre_delete_order_refund', [ CreditNoteIssuer::class, 'block_deletion' ], 10, 3 );
+		add_action( 'woocommerce_before_delete_order', [ CreditNoteIssuer::class, 'on_order_deleting' ], 10, 2 );
+		add_action( 'woocommerce_delete_order', [ CreditNoteIssuer::class, 'on_order_deleted' ], 10, 1 );
 		add_action( 'woocommerce_delete_order_refund', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 1 );
 		add_action( 'woocommerce_refund_deleted', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 2 );
 		add_action( CreditNoteIssuer::SWEEP_HOOK, [ CreditNoteIssuer::class, 'sweep' ] );

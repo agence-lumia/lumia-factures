@@ -157,6 +157,67 @@ final class StorageModeTest extends TestCase {
 	}
 
 	/**
+	 * Deleting an order for good takes its credited refunds with it in both storages: HPOS deletes
+	 * them one by one through `woocommerce_pre_delete_order_refund`, the legacy storage with
+	 * wp_delete_post(). The credit notes and their archives stay; nothing is refused or noted.
+	 */
+	public function test_order_deleted_for_good_takes_its_credited_refunds_in_hpos_and_legacy(): void {
+		global $wpdb;
+
+		delete_option( 'lumia_factures_module_invoices' );
+		delete_option( Migration::OPTION );
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'administrator' ] ) );
+
+		$order  = $this->invoiced_order();
+		$first  = OrderFactory::refund( $order, [], 3.0, 'Deleted with its order' );
+		$second = OrderFactory::refund( wc_get_order( $order->get_id() ), [], 2.0 );
+		$docs   = Register::for_parent( 'credit_note', $order->get_id() );
+		$this->assertCount( 2, $docs );
+		array_map( [ $this, 'track' ], $docs );
+
+		// A credited refund of another order, which must stay protected.
+		$other        = $this->invoiced_order();
+		$other_refund = OrderFactory::refund( $other, [], 1.0 );
+		$this->track( Register::find( 'credit_note', $other_refund->get_id() ) );
+
+		$this->assertTrue( wc_get_order( $order->get_id() )->delete( true ) );
+
+		$this->assertFalse( wc_get_order( $order->get_id() ) );
+		foreach ( [ $first, $second ] as $refund ) {
+			$this->assertFalse( wc_get_order( $refund->get_id() ) );
+			if ( OrderUtil::custom_orders_table_usage_is_enabled() ) {
+				$this->assertSame( '0', $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}wc_orders WHERE id = %d", $refund->get_id() ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- test query on a core table.
+			} else {
+				$this->assertNull( get_post( $refund->get_id() ) );
+			}
+		}
+
+		// The credit notes stay issued, files untouched.
+		foreach ( $docs as $doc ) {
+			$kept = Register::find( 'credit_note', $doc->order_id );
+			$this->assertNotNull( $kept );
+			$this->assertSame( $doc->id, $kept->id );
+			$this->assertSame( $doc->number, $kept->number );
+			$this->assertSame( $doc->file, $kept->file );
+			$this->assertTrue( Archive::verify( $kept ) );
+		}
+
+		// Nothing refused: no notice for the manager, no refusal logged; the deletion is logged once.
+		ob_start();
+		CreditNoteIssuer::render_deletion_notice();
+		$this->assertSame( '', ob_get_clean() );
+
+		$log = (string) file_get_contents( $this->log_file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local log file.
+		$this->assertStringNotContainsString( 'deletion was refused', $log );
+		$this->assertStringNotContainsString( 'was deleted; credit note', $log );
+		$this->assertSame( 1, substr_count( $log, sprintf( 'Order %1$d is deleted for good with its refunds; credit notes %2$s, %3$s stay issued.', $order->get_id(), $docs[0]->number, $docs[1]->number ) ) );
+
+		// Another order's credited refund is still refused afterwards.
+		$this->assertFalse( wc_get_order( $other_refund->get_id() )->delete( true ) );
+		$this->assertInstanceOf( WC_Order_Refund::class, wc_get_order( $other_refund->get_id() ) );
+	}
+
+	/**
 	 * An order moved to a trigger status, with its issued invoice.
 	 */
 	private function invoiced_order(): WC_Order {

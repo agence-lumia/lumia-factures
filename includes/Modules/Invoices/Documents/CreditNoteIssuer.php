@@ -100,6 +100,13 @@ final class CreditNoteIssuer {
 	private static array $deletions_noted = [];
 
 	/**
+	 * Ids of the orders being deleted for good in this request (see on_order_deleting()).
+	 *
+	 * @var array<int, true>
+	 */
+	private static array $orders_deleting = [];
+
+	/**
 	 * Hook `woocommerce_order_refunded`: issues the refund's credit note.
 	 *
 	 * Never throws: a failure is logged and must not break the refund.
@@ -534,11 +541,54 @@ final class CreditNoteIssuer {
 	}
 
 	/**
+	 * Hook `woocommerce_before_delete_order`: the order is about to be deleted for good, its refunds
+	 * with it. Both storages fire it before deleting anything; HPOS then deletes each refund through
+	 * `woocommerce_pre_delete_order_refund`, which block_deletion() lets through for this order until
+	 * `woocommerce_delete_order` (on_order_deleted()). Logs the credit notes that stay issued.
+	 *
+	 * @param mixed $order_id Order id.
+	 * @param mixed $order    Order being deleted.
+	 */
+	public static function on_order_deleting( $order_id, $order = null ): void {
+		$order_id = (int) $order_id;
+		if ( $order_id <= 0 || $order instanceof WC_Order_Refund ) {
+			return;
+		}
+
+		self::$orders_deleting[ $order_id ] = true;
+
+		try {
+			$numbers = [];
+			foreach ( Register::for_parent( self::TYPE, $order_id ) as $doc ) {
+				if ( 'issued' === $doc->status && null !== $doc->number ) {
+					$numbers[] = $doc->number;
+				}
+			}
+
+			if ( [] !== $numbers ) {
+				Pipeline::log( 'Order ' . $order_id . ' is deleted for good with its refunds; credit notes ' . implode( ', ', $numbers ) . ' stay issued.' );
+			}
+		} catch ( Throwable $e ) {
+			Pipeline::log( 'The deletion of order ' . $order_id . ' could not be logged: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+		}
+	}
+
+	/**
+	 * Hook `woocommerce_delete_order`: the order is gone, its refunds are protected again.
+	 *
+	 * @param mixed $order_id Order id.
+	 */
+	public static function on_order_deleted( $order_id ): void {
+		unset( self::$orders_deleting[ (int) $order_id ] );
+	}
+
+	/**
 	 * Filter `woocommerce_pre_delete_order_refund`: refuses to delete a refund that carries a credit note.
 	 *
 	 * The credit note stays issued whatever happens to the refund; deleting the refund would leave
 	 * the order out of step with its documents. Filter `lumia_factures_allow_credited_refund_deletion`
 	 * lets the deletion through (the row and the file are kept, a note is written on the order).
+	 * The refunds of an order being deleted for good always go (see on_order_deleting()).
 	 *
 	 * @param mixed $check        Null to let WooCommerce decide, anything else short-circuits.
 	 * @param mixed $refund       Refund being deleted.
@@ -547,6 +597,13 @@ final class CreditNoteIssuer {
 	 */
 	public static function block_deletion( $check, $refund = null, $force_delete = false ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundAfterLastUsed -- Filter signature.
 		if ( null !== $check || ! $refund instanceof WC_Order_Refund ) {
+			return $check;
+		}
+
+		// HPOS deletes the refunds of an order deleted for good one by one, through this filter, before
+		// the order rows: refusing would leave them in the orders table without their order (the
+		// legacy storage deletes them with wp_delete_post(), without asking).
+		if ( isset( self::$orders_deleting[ $refund->get_parent_id() ] ) ) {
 			return $check;
 		}
 
@@ -593,6 +650,13 @@ final class CreditNoteIssuer {
 
 			$doc = Register::find( self::TYPE, $refund_id );
 			if ( null === $doc || 'issued' !== $doc->status || $doc->parent_id <= 0 ) {
+				return;
+			}
+
+			// The order goes too: nothing to note on it (on_order_deleting() logged its credit notes),
+			// as with the legacy storage, which fires no refund hook then.
+			if ( isset( self::$orders_deleting[ $doc->parent_id ] ) ) {
+				self::$deletions_noted[ $refund_id ] = true;
 				return;
 			}
 
