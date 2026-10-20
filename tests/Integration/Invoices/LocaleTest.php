@@ -11,7 +11,9 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
@@ -168,6 +170,28 @@ class LocaleTest extends TestCase {
 
 		$this->assertIsString( $html );
 		$this->assertFrench( $html );
+		$this->assertUserLocaleIsBack();
+	}
+
+	public function test_cancellation_reason_is_in_the_site_language(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->update_status( 'processing' );
+		$this->track( Register::find( 'invoice', $order->get_id() ) );
+		wc_get_order( $order->get_id() )->update_status( 'cancelled' );
+		$this->html = [];
+
+		$this->assertSame( 'invoice_cancelled', OrderTools::cancel_for( $order->get_id() ) );
+
+		$refunds = wc_get_order( $order->get_id() )->get_refunds();
+		$this->assertCount( 1, $refunds );
+		$doc = CreditNoteIssuer::find_for( $refunds[0] );
+		$this->track( $doc );
+
+		// Stored on the refund in the site language, so the archived credit note prints it in French.
+		$this->assertSame( "Facture annul\u{e9}e", $refunds[0]->get_reason() );
+		$this->assertCount( 1, $this->html );
+		$this->assertStringContainsString( "Facture annul\u{e9}e", $this->html[0] );
+		$this->assertStringNotContainsString( 'Invoice cancelled', $this->html[0] );
 		$this->assertUserLocaleIsBack();
 	}
 

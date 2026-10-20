@@ -16,6 +16,7 @@ use Lumia\Factures\Modules\Invoices\Documents\InvoiceCancellation;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use WC_Order;
 use WC_Order_Refund;
@@ -324,7 +325,10 @@ final class OrderTools {
 			return 'invoice_cancel_refused';
 		}
 
-		$refund = InvoiceCancellation::cancel( $order, __( 'Invoice cancelled', 'lumia-factures' ) );
+		// The reason is stored on the refund and printed on the archived credit note: it is built in
+		// the site locale, as the PDF is, never in the language of the admin who clicks.
+		$reason = Renderer::in_site_locale( static fn(): string => __( 'Invoice cancelled', 'lumia-factures' ) );
+		$refund = InvoiceCancellation::cancel( $order, $reason );
 		if ( null === $refund ) {
 			return 'invoice_cancel_refused';
 		}
