@@ -44,13 +44,6 @@ final class Importer {
 	public const NOTED_META = '_lumia_factures_import_noted';
 
 	/**
-	 * Credit note formats the settings import tries, in order, when the legacy invoice format takes
-	 * the prefix of the default one (`A{year}{number:5}` and `AV-`). No literal invoice prefix can
-	 * start like both `AV` and `CN`, so one of them always keeps the legacy invoice numbering.
-	 */
-	private const CREDIT_NOTE_FALLBACKS = [ 'AVOIR-{year}-{number:5}', 'CN-{year}-{number:5}' ];
-
-	/**
 	 * True during a dry run on a site whose tables do not exist yet (the plugin never started,
 	 * the legacy plugin still being active): the register reads as empty, the counters as 0.
 	 *
@@ -224,7 +217,7 @@ final class Importer {
 	 * 1.x had no credit notes, so the credit note policy comes from the defaults. When the legacy
 	 * invoice format takes the default credit note prefix, Schema::sanitize() would revert the
 	 * invoice policy (a store numbered `A{year}{number:5}` would restart under `FA-`), so the first
-	 * format of CREDIT_NOTE_FALLBACKS that leaves the invoice policy alone is used, with a note. A
+	 * format of Schema::CREDIT_NOTE_FALLBACKS that leaves the invoice policy alone is used, with a note. A
 	 * legacy invoice format refused on its own reverts whatever the credit note format: the default
 	 * is kept.
 	 *
@@ -236,7 +229,7 @@ final class Importer {
 		$chosen  = $default;
 		$best    = Schema::sanitize( $mapped, Schema::defaults() );
 
-		foreach ( self::CREDIT_NOTE_FALLBACKS as $format ) {
+		foreach ( Schema::CREDIT_NOTE_FALLBACKS as $format ) {
 			if ( [] === $best['errors'] ) {
 				break;
 			}

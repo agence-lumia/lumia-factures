@@ -41,6 +41,14 @@ final class Schema {
 	public const REFUND_EMAILS = [ EmailIds::REFUND, EmailIds::PARTIAL_REFUND ];
 
 	/**
+	 * Credit note formats tried, in order, when an invoice format chosen before credit notes existed
+	 * (a 1.x import, a 2.0.x site) takes the prefix of the default one (`A{year}{number:5}` and
+	 * `AV-`). No literal invoice prefix can start like both `AV` and `CN`, so one of them always
+	 * keeps that invoice numbering. Used by Importer::sanitize_settings() and Upgrader.
+	 */
+	public const CREDIT_NOTE_FALLBACKS = [ 'AVOIR-{year}-{number:5}', 'CN-{year}-{number:5}' ];
+
+	/**
 	 * Keys of a numbering policy: reverted together when the policy is refused.
 	 */
 	private const POLICY_KEYS = [ 'format', 'reset_enabled', 'reset_period' ];

@@ -170,6 +170,56 @@ class SettingsUpgraderTest extends TestCase {
 		$this->assertSame( $stored, $after );
 	}
 
+	public function test_upgrade_from_2_0_separates_a_clashing_credit_note_prefix(): void {
+		update_option( Installer::OPTION, 1 );
+		$stored                        = $this->settings_2_0();
+		$stored['numbering']['format'] = 'A{year}{month}{number:5}';
+		update_option( self::SETTINGS, $stored );
+
+		// The premise: with the default credit note format, the settings screen refuses every save.
+		$clashing = Module::settings();
+		$this->assertSame( 'AV-{year}-{number:5}', $clashing['credit_notes']['format'] );
+		$this->assertNotSame( [], Schema::sanitize( $clashing, $clashing )['errors'] );
+
+		Upgrader::maybe_upgrade();
+
+		$after = get_option( self::SETTINGS );
+		$this->assertSame( [ 'format' => 'CN-{year}-{number:5}' ], $after['credit_notes'] );
+		$this->assertSame( $stored['numbering'], $after['numbering'] );
+
+		$settings = Module::settings();
+		$this->assertSame( 'A{year}{month}{number:5}', $settings['numbering']['format'] );
+		$this->assertSame( 'CN-{year}-{number:5}', $settings['credit_notes']['format'] );
+		$this->assertSame( [], Schema::sanitize( $settings, $settings )['errors'] );
+	}
+
+	public function test_upgrade_takes_the_first_fallback_that_differs(): void {
+		update_option( Installer::OPTION, 1 );
+		$stored                        = $this->settings_2_0();
+		$stored['numbering']['format'] = 'AV-F{year}-{number:5}';
+		update_option( self::SETTINGS, $stored );
+
+		Upgrader::maybe_upgrade();
+
+		// `AV-F` starts like `AV-` but not like `AVOIR-`: the first fallback is taken.
+		$settings = Module::settings();
+		$this->assertSame( 'AV-F{year}-{number:5}', $settings['numbering']['format'] );
+		$this->assertSame( 'AVOIR-{year}-{number:5}', $settings['credit_notes']['format'] );
+		$this->assertSame( [], Schema::sanitize( $settings, $settings )['errors'] );
+	}
+
+	public function test_upgrade_leaves_the_credit_note_format_alone_without_a_clash(): void {
+		update_option( Installer::OPTION, 1 );
+		$stored                        = $this->settings_2_0();
+		$stored['numbering']['format'] = '{year}{month}{number:6}';
+		update_option( self::SETTINGS, $stored );
+
+		Upgrader::maybe_upgrade();
+
+		$this->assertArrayNotHasKey( 'credit_notes', get_option( self::SETTINGS ) );
+		$this->assertSame( Schema::defaults()['credit_notes']['format'], Module::settings()['credit_notes']['format'] );
+	}
+
 	public function test_upgrade_runs_once(): void {
 		update_option( Installer::OPTION, 1 );
 		update_option( self::SETTINGS, $this->settings_2_0() );
