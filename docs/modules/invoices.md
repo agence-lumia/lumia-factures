@@ -170,6 +170,7 @@ Pitfalls:
 - **Same rule as the admin download (R41).** Only a register `file` that is NULL is built on first need (`Issuer::restore()`); a recorded file that is missing or damaged is a 404 for a visitor and is rebuilt explicitly by a manager from the order.
 - **Rate limit.** 10 builds per 60 seconds per user (or IP), transient `lumia_factures_rate_<md5>`, counted only when a never-built PDF must be generated: serving an archived file is never limited. The window starts at the first build.
 - **Shortcode** `[lumia_factures_invoice order_id="" label="" class="" inline="0"]` and the alias `[facture_pdf_lumia]` (same attributes; the alias keeps the class `fpl-download-button` by default). It renders a link only when an issued invoice exists and `can_access()` is true, never a dead button. Without `order_id` the order comes from the WooCommerce page (`OrderContext`).
+- **Documents shortcode** `[lumia_factures_documents order_id=""]`: the documents block of the order pages (`CustomerLinks::documents_html()`, template `order-documents.php`), invoice then credit notes, each kept only when `can_access()` lets the visitor in for its type, with the key of the page. An explicit `order_id` only names the order to check, it never bypasses the access check; a refund id lists nothing. Placement `shortcode` of `lumia_factures_show_customer_links` (no setting). The Bricks tag `{lumia_factures_documents}` renders the same HTML (`Shortcode::documents()`).
 
 Pitfalls:
 

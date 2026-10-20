@@ -104,7 +104,6 @@ final class CustomerLinks {
 			return;
 		}
 
-		$level = ob_get_level();
 		try {
 			// Only the order of the "View order" or "Order received" endpoint: never the order tracking page.
 			if ( OrderContext::current_order_id() !== $order_id ) {
@@ -116,10 +115,38 @@ final class CustomerLinks {
 			}
 
 			$documents = DocumentList::for_order( $order, false );
-			if ( [] === $documents ) {
-				return;
-			}
+		} catch ( Throwable $e ) {
+			self::log( 'Documents block of order ' . $order_id . ' failed: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+			return;
+		}
 
+		$html = self::documents_html( $order, $documents );
+		if ( null === $html ) {
+			return;
+		}
+
+		self::$rendered[ $order_id ] = true;
+
+		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by the template.
+	}
+
+	/**
+	 * HTML of the documents block (template `order-documents.php`, overridable from the theme).
+	 *
+	 * Shared by the order pages, the `[lumia_factures_documents]` shortcode and the Bricks tag. The
+	 * caller has checked the visitor's access; this only renders.
+	 *
+	 * @param WC_Order                                                                         $order     Order.
+	 * @param list<array{type: string, label: string, number: string, date: string, url: string}> $documents Documents (DocumentList::for_order()).
+	 * @return string|null Null when there is nothing to show or the template failed.
+	 */
+	public static function documents_html( WC_Order $order, array $documents ): ?string {
+		if ( [] === $documents ) {
+			return null;
+		}
+
+		$level = ob_get_level();
+		try {
 			// Buffered: a template that fails half way prints nothing.
 			ob_start();
 			wc_get_template(
@@ -131,19 +158,17 @@ final class CustomerLinks {
 				'lumia-factures/',
 				LUMIA_FACTURES_TEMPLATES_DIR . 'front/'
 			);
-			$html = (string) ob_get_clean();
+
+			return (string) ob_get_clean();
 		} catch ( Throwable $e ) {
 			// Drops the partial output of the template, never a buffer opened by WooCommerce.
 			while ( ob_get_level() > $level ) {
 				ob_end_clean();
 			}
-			self::log( 'Documents block of order ' . $order_id . ' failed: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
-			return;
+			self::log( 'Documents block of order ' . $order->get_id() . ' failed: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+
+			return null;
 		}
-
-		self::$rendered[ $order_id ] = true;
-
-		echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped by the template.
 	}
 
 	/**
