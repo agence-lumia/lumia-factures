@@ -138,7 +138,9 @@ Every public hook is prefixed `lumia_factures_`. Filters return their value; the
 | `lumia_factures_legacy_import_batch_size` | filter | `Migration/Importer.php` | Legacy orders imported per batch (default 200, minimum 1). |
 | `lumia_factures_legacy_import_batch_done` | action | `Migration/Importer.php` | Fires after each batch of legacy orders (`$report`, `$after` last order id, `$dry_run`): progress reporting. |
 | `lumia_factures_customer_download_url` | filter | `Front/CustomerDownload.php` | Customer download URL of an invoice (`$url`, `$order`). |
-| `lumia_factures_can_access_invoice` | filter | `Front/CustomerDownload.php` | Whether the visitor may download the order's invoice (`$can`, `$order`, `$key`); applies to the endpoint, the shortcode and the Bricks tags. |
+| `lumia_factures_can_access_invoice` | filter | `Front/CustomerDownload.php` | Whether the visitor may download the order's invoice (`$can`, `$order`, `$key`), invoices only; applies to the endpoint, the shortcode and the Bricks tags. |
+| `lumia_factures_can_access_document` | filter | `Front/CustomerDownload.php` | Whether the visitor may download a document of the order (`$can`, `$order`, `$key`, `$type`), invoices and credit notes; runs after `lumia_factures_can_access_invoice`. |
+| `lumia_factures_customer_credit_note_url` | filter | `Front/CustomerDownload.php` | Customer download URL of a credit note (`$url`, `$doc`, `$order` the refunded order). |
 
 ## Translations
 

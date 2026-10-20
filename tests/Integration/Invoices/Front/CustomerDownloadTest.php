@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices\Front;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
@@ -19,6 +20,7 @@ use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
 use WC_Order;
+use WC_Order_Refund;
 use WPDieException;
 
 /**
@@ -133,7 +135,7 @@ class CustomerDownloadTest extends TestCase {
 				]
 			)
 		);
-		$this->assertSame( 'Invoice not found.', $messages['no key'] );
+		$this->assertSame( 'Document not found.', $messages['no key'] );
 	}
 
 	public function test_legacy_url_is_served(): void {
@@ -300,6 +302,390 @@ class CustomerDownloadTest extends TestCase {
 		$this->assertNull( OrderContext::current_order_key() );
 	}
 
+	public function test_credit_note_url_uses_refund_id_and_parent_key(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+
+		$url = CustomerDownload::credit_note_url( $doc, $order );
+		$this->assertStringContainsString( 'lumia_factures_credit_note=' . $refund->get_id(), $url );
+		$this->assertStringContainsString( 'key=' . $order->get_order_key(), $url );
+		$this->assertStringNotContainsString( 'lumia_factures_invoice', $url );
+		$this->assertStringNotContainsString( 'inline=', $url );
+		$this->assertStringContainsString( 'inline=0', CustomerDownload::credit_note_url( $doc, $order, false ) );
+
+		$seen   = [];
+		$filter = static function ( $url, $document, $refunded ) use ( &$seen ) {
+			$seen = [ $document->id, $refunded->get_id() ];
+			return $url . '&filtered=1';
+		};
+		add_filter( 'lumia_factures_customer_credit_note_url', $filter, 10, 3 );
+		$filtered = CustomerDownload::credit_note_url( $doc, $order );
+		remove_filter( 'lumia_factures_customer_credit_note_url', $filter, 10 );
+
+		$this->assertStringEndsWith( '&filtered=1', $filtered );
+		$this->assertSame( [ $doc->id, $order->get_id() ], $seen );
+	}
+
+	public function test_url_with_key_always_carries_key_for_manager(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+
+		$this->assertStringNotContainsString( 'key=', CustomerDownload::url( $order ) );
+		$this->assertStringNotContainsString( 'key=', CustomerDownload::credit_note_url( $doc, $order ) );
+		$this->assertStringContainsString( 'key=' . $order->get_order_key(), CustomerDownload::url( $order, true, true ) );
+		$this->assertStringContainsString( 'key=' . $order->get_order_key(), CustomerDownload::credit_note_url( $doc, $order, true, true ) );
+	}
+
+	public function test_url_default_omits_key_for_owner(): void {
+		$owner  = self::factory()->user->create( [ 'role' => 'customer' ] );
+		$order  = $this->issued_order( $owner );
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		wp_set_current_user( $owner );
+
+		$this->assertStringNotContainsString( 'key=', CustomerDownload::url( $order ) );
+		$this->assertStringNotContainsString( 'key=', CustomerDownload::credit_note_url( $doc, $order ) );
+		$this->assertStringContainsString( 'key=' . $order->get_order_key(), CustomerDownload::url( $order, false, true ) );
+		$this->assertStringContainsString( 'key=' . $order->get_order_key(), CustomerDownload::credit_note_url( $doc, $order, true, true ) );
+
+		// The owner gets in without the key.
+		$this->assertSame( Archive::path( $doc ), CustomerDownload::locate( [ 'lumia_factures_credit_note' => (string) $refund->get_id() ] )['path'] );
+	}
+
+	public function test_credit_note_download_with_parent_key_serves_archived_file(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+
+		$file = CustomerDownload::locate(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+
+		$this->assertSame( Archive::path( $doc ), $file['path'] );
+		$this->assertSame( $doc->number . '.pdf', $file['name'] );
+		$this->assertTrue( $file['inline'] );
+		$this->assertFalse(
+			CustomerDownload::locate(
+				[
+					'lumia_factures_credit_note' => (string) $refund->get_id(),
+					'key'                        => $order->get_order_key(),
+					'inline'                     => '0',
+				]
+			)['inline']
+		);
+	}
+
+	public function test_credit_note_download_wrong_key_404(): void {
+		$order  = $this->issued_order();
+		$other  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$id     = (string) $refund->get_id();
+
+		$this->refusal( [ 'lumia_factures_credit_note' => $id ] );
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => $id,
+				'key'                        => 'wc_order_wrong',
+			]
+		);
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => $id,
+				'key'                        => $other->get_order_key(),
+			]
+		);
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => '99999999',
+				'key'                        => $order->get_order_key(),
+			]
+		);
+	}
+
+	public function test_credit_note_other_customer_logged_in_404(): void {
+		$owner  = self::factory()->user->create( [ 'role' => 'customer' ] );
+		$order  = $this->issued_order( $owner );
+		$refund = $this->refund( $order, 3.0 );
+		$args   = [ 'lumia_factures_credit_note' => (string) $refund->get_id() ];
+
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		$this->refusal( $args );
+		$this->assertStringContainsString( 'key=', CustomerDownload::credit_note_url( Register::find( 'credit_note', $refund->get_id() ), $order ) );
+
+		wp_set_current_user( $owner );
+		$this->assertFileExists( CustomerDownload::locate( $args )['path'] );
+	}
+
+	public function test_credit_note_var_with_order_id_404(): void {
+		$order = $this->issued_order();
+		$this->refund( $order, 3.0 );
+
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $order->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+		$this->refusal( [ 'lumia_factures_credit_note' => (string) $order->get_id() ] );
+	}
+
+	public function test_invoice_var_with_refund_id_404(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+
+		$this->refusal(
+			[
+				'lumia_factures_invoice' => (string) $refund->get_id(),
+				'key'                    => $order->get_order_key(),
+			]
+		);
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+		$this->refusal( [ 'lumia_factures_invoice' => (string) $refund->get_id() ] );
+	}
+
+	public function test_both_vars_present_resolves_invoice_only(): void {
+		$order   = $this->issued_order();
+		$refund  = $this->refund( $order, 3.0 );
+		$invoice = Register::find( 'invoice', $order->get_id() );
+
+		$file = CustomerDownload::locate(
+			[
+				'lumia_factures_invoice'     => (string) $order->get_id(),
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+		$this->assertSame( Archive::path( $invoice ), $file['path'] );
+
+		// A wrong invoice var never falls back on the credit note.
+		$this->refusal(
+			[
+				'lumia_factures_invoice'     => (string) $refund->get_id(),
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+	}
+
+	public function test_legacy_fpl_download_document_credit_note_404(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+
+		foreach ( [ $order->get_id(), $refund->get_id() ] as $id ) {
+			$this->refusal(
+				[
+					'fpl_download' => '1',
+					'order'        => (string) $id,
+					'document'     => 'credit_note',
+					'key'          => $order->get_order_key(),
+				]
+			);
+		}
+		$this->refusal(
+			[
+				'fpl_download' => '1',
+				'order'        => (string) $refund->get_id(),
+				'key'          => $order->get_order_key(),
+			]
+		);
+	}
+
+	public function test_credit_note_still_served_after_refund_deleted(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+
+		add_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+		$this->assertTrue( wc_get_order( $refund->get_id() )->delete( true ) );
+		remove_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+		$this->assertFalse( wc_get_order( $refund->get_id() ) );
+
+		$file = CustomerDownload::locate(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+		$this->assertSame( Archive::path( $doc ), $file['path'] );
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => 'wc_order_wrong',
+			]
+		);
+	}
+
+	public function test_credit_note_recorded_file_damaged_is_never_rebuilt_404(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$path   = (string) Archive::path( $doc );
+		file_put_contents( $path, '%PDF damaged' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+		$this->assertSame( $doc->file, Register::find( 'credit_note', $refund->get_id() )->file );
+		$this->assertSame( '%PDF damaged', file_get_contents( $path ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		wp_delete_file( $path );
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $order->get_order_key(),
+			]
+		);
+		$this->assertSame( $doc->file, Register::find( 'credit_note', $refund->get_id() )->file );
+	}
+
+	public function test_credit_note_null_file_built_under_rate_limit(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = $this->forget_file( Register::find( 'credit_note', $refund->get_id() ) );
+		$args   = [
+			'lumia_factures_credit_note' => (string) $refund->get_id(),
+			'key'                        => $order->get_order_key(),
+		];
+
+		// The quota is shared with the invoice builds: full, nothing is built.
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.8';
+		$name                   = 'lumia_factures_rate_' . md5( '203.0.113.8' );
+		set_transient(
+			$name,
+			[
+				'count' => CustomerDownload::RATE_LIMIT,
+				'until' => time() + 60,
+			],
+			60
+		);
+		$this->refusal( $args );
+		$this->assertNull( Register::find( 'credit_note', $refund->get_id() )->file );
+
+		delete_transient( $name );
+		$file  = CustomerDownload::locate( $args );
+		$built = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $built );
+
+		$this->assertSame( Archive::path( $built ), $file['path'] );
+		$this->assertTrue( Archive::verify( $built ) );
+		$this->assertSame( $doc->number, $built->number );
+		$this->assertSame( $doc->issued_at, $built->issued_at );
+		$this->assertSame( 1, get_transient( $name )['count'] );
+		delete_transient( $name );
+	}
+
+	public function test_not_found_message_identical_for_both_endpoints(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+
+		$messages = [
+			$this->refusal( [ 'lumia_factures_invoice' => (string) $order->get_id() ] ),
+			$this->refusal( [ 'lumia_factures_credit_note' => (string) $refund->get_id() ] ),
+			$this->refusal( [ 'lumia_factures_credit_note' => '99999999' ] ),
+			$this->refusal(
+				[
+					'fpl_download' => '1',
+					'order'        => (string) $order->get_id(),
+				]
+			),
+		];
+
+		$this->assertSame( [ 'Document not found.' ], array_values( array_unique( $messages ) ) );
+	}
+
+	public function test_can_access_document_filter_receives_type(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$key    = $order->get_order_key();
+
+		$types  = [];
+		$record = static function ( $can, $document_order, $document_key, $type ) use ( &$types ) {
+			$types[] = [ $type, $document_order->get_id(), $document_key ];
+			return $can;
+		};
+		add_filter( 'lumia_factures_can_access_document', $record, 10, 4 );
+		CustomerDownload::locate(
+			[
+				'lumia_factures_invoice' => (string) $order->get_id(),
+				'key'                    => $key,
+			]
+		);
+		CustomerDownload::locate(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $key,
+			]
+		);
+		remove_filter( 'lumia_factures_can_access_document', $record, 10 );
+
+		$this->assertSame(
+			[
+				[ 'invoice', $order->get_id(), $key ],
+				[ 'credit_note', $order->get_id(), $key ],
+			],
+			$types
+		);
+
+		// The filter can refuse either type.
+		add_filter( 'lumia_factures_can_access_document', '__return_false' );
+		$this->refusal(
+			[
+				'lumia_factures_invoice' => (string) $order->get_id(),
+				'key'                    => $key,
+			]
+		);
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => $key,
+			]
+		);
+		remove_filter( 'lumia_factures_can_access_document', '__return_false' );
+	}
+
+	public function test_can_access_invoice_filter_still_applies_to_invoices_only(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$key    = $order->get_order_key();
+
+		$calls  = 0;
+		$refuse = static function () use ( &$calls ) {
+			++$calls;
+			return false;
+		};
+		add_filter( 'lumia_factures_can_access_invoice', $refuse );
+		try {
+			$this->refusal(
+				[
+					'lumia_factures_invoice' => (string) $order->get_id(),
+					'key'                    => $key,
+				]
+			);
+			$this->assertSame( 1, $calls );
+
+			$file = CustomerDownload::locate(
+				[
+					'lumia_factures_credit_note' => (string) $refund->get_id(),
+					'key'                        => $key,
+				]
+			);
+			$this->assertFileExists( $file['path'] );
+			$this->assertSame( 1, $calls, 'The invoice filter is not asked about a credit note.' );
+		} finally {
+			remove_filter( 'lumia_factures_can_access_invoice', $refuse );
+		}
+	}
+
 	/**
 	 * Runs a request that must be refused with the 404.
 	 *
@@ -332,6 +718,50 @@ class CustomerDownloadTest extends TestCase {
 		$this->track( Register::find( 'invoice', $order->get_id() ) );
 
 		return wc_get_order( $order->get_id() );
+	}
+
+	/**
+	 * A refund of an amount with its credit note, remembered for tear_down.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param float    $amount Amount.
+	 */
+	private function refund( WC_Order $order, float $amount ): WC_Order_Refund {
+		$refund = OrderFactory::refund( wc_get_order( $order->get_id() ), [], $amount );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$this->assertNotNull( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->track( $doc );
+
+		return $refund;
+	}
+
+	/**
+	 * Turns an issued document into one whose PDF was never built (NULL file), as a render failure leaves it.
+	 *
+	 * @param IssuedDocument $doc Document.
+	 * @return IssuedDocument The row as stored now.
+	 */
+	private function forget_file( IssuedDocument $doc ): IssuedDocument {
+		global $wpdb;
+
+		$path = Archive::path( $doc );
+		if ( null !== $path ) {
+			wp_delete_file( $path );
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- simulates a PDF that was never archived.
+		$wpdb->update(
+			Installer::documents_table(),
+			[
+				'file'     => null,
+				'checksum' => null,
+			],
+			[ 'id' => $doc->id ]
+		);
+		$fresh = Register::find( $doc->type, $doc->order_id );
+		$this->assertNull( $fresh->file );
+
+		return $fresh;
 	}
 
 	/**

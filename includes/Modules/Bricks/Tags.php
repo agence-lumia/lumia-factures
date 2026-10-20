@@ -11,9 +11,9 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Front\Availability;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
 use Lumia\Factures\Modules\Invoices\Front\OrderContext;
-use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use WC_Order;
 
 /**
@@ -161,9 +161,9 @@ final class Tags {
 	 * condition on it hides the element instead of leaving a dead link.
 	 *
 	 * The status is `available` only when the download link works: an issued invoice whose PDF was
-	 * never built (the endpoint builds it) or whose archive passes verification. Anything else is
-	 * `none`, the URL being empty in the same cases. Nothing here may write: Issuer::can_issue()
-	 * notes and saves the order, a front render must not.
+	 * never built and can be built by the endpoint, or whose archive passes verification
+	 * (Availability::is_available()). Anything else is `none`, the URL being empty in the same cases.
+	 * Nothing here may write: Issuer::can_issue() notes and saves the order, a front render must not.
 	 *
 	 * @param string $suffix `url`, `number` or `status`.
 	 * @param mixed  $post   Current object given by Bricks.
@@ -177,7 +177,7 @@ final class Tags {
 
 		$doc       = Register::find( Issuer::TYPE, $order->get_id() );
 		$issued    = null !== $doc && 'issued' === $doc->status;
-		$available = $issued && ( null === $doc->file || Archive::verify( $doc ) );
+		$available = $issued && Availability::is_available( $doc );
 
 		switch ( $suffix ) {
 			case 'url':
