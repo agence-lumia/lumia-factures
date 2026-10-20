@@ -216,7 +216,7 @@
 }
 
 /*
- * Bounded height: the sidebar stays fixed and only the main area scrolls.
+ * Bounded height: the header and tabs stay fixed and only the main area scrolls.
  * #wpbody-content is a column that holds the admin notices printed above the
  * wrap, so the wrap takes what they leave instead of overflowing the screen.
  */

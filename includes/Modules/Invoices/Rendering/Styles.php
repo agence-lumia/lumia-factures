@@ -100,7 +100,7 @@ final class Styles {
 			'footer-bottom'       => round( 6 - $bottom, 1 ) . 'mm',
 		];
 
-		foreach ( [ 'primary', 'secondary', 'text', 'muted', 'thead_bg', 'thead_text', 'row_alt', 'block_bg', 'border', 'page' ] as $color ) {
+		foreach ( [ 'primary', 'text', 'muted', 'thead_bg', 'thead_text', 'row_alt', 'block_bg', 'border', 'page' ] as $color ) {
 			// Re-validated here: the value ends up inside a stylesheet.
 			$value = sanitize_hex_color( (string) $design[ 'color_' . $color ] );
 			if ( empty( $value ) ) {

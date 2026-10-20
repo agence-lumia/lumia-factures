@@ -15,6 +15,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
+use Lumia\Factures\Modules\Invoices\Admin\Themes;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
@@ -246,7 +247,8 @@ class SettingsScreenTest extends TestCase {
 			]
 		);
 
-		$this->assertStringContainsString( 'tab=module_invoices', $location );
+		$this->assertStringContainsString( 'page=lumia-factures', $location );
+		$this->assertStringNotContainsString( 'tab=', $location );
 		$this->assertStringContainsString( 'lumia_factures_notice=settings_saved', $location );
 
 		$settings = Module::settings();
@@ -341,7 +343,8 @@ class SettingsScreenTest extends TestCase {
 			]
 		);
 
-		$this->assertStringContainsString( 'tab=module_invoices', $location );
+		$this->assertStringContainsString( 'page=lumia-factures', $location );
+		$this->assertStringNotContainsString( 'tab=', $location );
 		$this->assertStringContainsString( 'lumia_factures_notice=counter_raised', $location );
 		$this->assertStringContainsString( 'lumia_factures_notice_type=success', $location );
 		$this->assertStringEndsWith( '#numbering', $location );
@@ -396,6 +399,82 @@ class SettingsScreenTest extends TestCase {
 		$this->assertSame( 1, $data['invoices']['counters'][ 'invoice_' . wp_date( 'Y' ) ] );
 		$this->assertContains( 'year', $data['invoices']['tags'] );
 		$this->assertArrayHasKey( 'i18n', $data );
+	}
+
+	public function test_js_data_points_to_the_bundled_pdfjs(): void {
+		$data = Plugin::instance()->modules()->get_active_instances()['invoices']->get_admin_js_data();
+
+		foreach ( [
+			'lib'    => 'pdf.min.js',
+			'worker' => 'pdf.worker.min.js',
+		] as $key => $file ) {
+			$url = $data['invoices']['pdfjs'][ $key ];
+			$this->assertStringStartsWith( LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/' . $file . '?ver=', $url );
+			$this->assertFileExists( LUMIA_FACTURES_PLUGIN_DIR . 'assets/vendor/pdfjs/' . $file );
+		}
+	}
+
+	public function test_preview_pane_sits_in_the_form_next_to_the_pdf_tabs(): void {
+		$html = $this->render();
+
+		$this->assertSame( 1, substr_count( $html, 'data-lumia-factures-preview ' ) );
+		$this->assertStringContainsString( 'data-lumia-factures-preview-tabs="company content design"', $html );
+		$this->assertLessThan( strpos( $html, '</form>' ), strpos( $html, 'data-lumia-factures-preview ' ) );
+		// Its order field is never a setting: no name, so it is neither saved nor counted as a change.
+		$this->assertMatchesRegularExpression( '/<input type="number"[^>]*data-lumia-factures-preview-order[^>]*>/', $html );
+		preg_match( '/<input type="number"[^>]*data-lumia-factures-preview-order[^>]*>/', $html, $order_input );
+		$this->assertStringNotContainsString( 'name=', $order_input[0] );
+	}
+
+	public function test_design_tab_offers_the_themes_and_drops_the_unused_secondary_color(): void {
+		$this->assertArrayNotHasKey( 'color_secondary', Schema::defaults()['design'], 'Never printed by the PDF template.' );
+
+		$html = $this->render();
+
+		foreach ( Themes::all() as $theme ) {
+			$this->assertStringContainsString( esc_attr( (string) wp_json_encode( $theme['colors'] ) ), $html );
+		}
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[design][color_secondary]"', $html );
+		$this->assertStringContainsString( 'name="lumia_factures_module_settings[design][color_primary]"', $html );
+
+		// The hex boxes mirror the swatches and are never posted.
+		preg_match_all( '/<input[^>]*data-lumia-factures-hex-for[^>]*>/', $html, $hex_inputs );
+		$this->assertCount( 9, $hex_inputs[0] );
+		foreach ( $hex_inputs[0] as $hex_input ) {
+			$this->assertStringNotContainsString( 'name=', $hex_input );
+		}
+	}
+
+	public function test_themes_are_complete_and_keep_the_header_text_readable(): void {
+		$themes = Themes::all();
+		$this->assertSame( array_intersect_key( Schema::defaults()['design'], array_flip( Themes::KEYS ) ), $themes['classic']['colors'], 'The first theme is the default look.' );
+
+		$luminance = static function ( string $hex ): float {
+			$channels = array_map(
+				static function ( string $pair ): float {
+					$c = hexdec( $pair ) / 255;
+					return $c <= 0.03928 ? $c / 12.92 : ( ( $c + 0.055 ) / 1.055 ) ** 2.4;
+				},
+				str_split( substr( $hex, 1 ), 2 )
+			);
+			return 0.2126 * $channels[0] + 0.7152 * $channels[1] + 0.0722 * $channels[2];
+		};
+		$contrast  = static function ( string $a, string $b ) use ( $luminance ): float {
+			$l = [ $luminance( $a ), $luminance( $b ) ];
+			return ( max( $l ) + 0.05 ) / ( min( $l ) + 0.05 );
+		};
+
+		foreach ( $themes as $id => $theme ) {
+			$this->assertSame( Themes::KEYS, array_keys( $theme['colors'] ), $id );
+			foreach ( $theme['colors'] as $key => $color ) {
+				$this->assertSame( $color, sanitize_hex_color( $color ), "$id $key" );
+			}
+			$colors = $theme['colors'];
+			// WCAG AA for normal text: the header text sits on the title band and on the table header.
+			$this->assertGreaterThanOrEqual( 4.5, $contrast( $colors['color_thead_text'], $colors['color_primary'] ), "$id band" );
+			$this->assertGreaterThanOrEqual( 4.5, $contrast( $colors['color_thead_text'], $colors['color_thead_bg'] ), "$id table header" );
+			$this->assertGreaterThanOrEqual( 4.5, $contrast( $colors['color_text'], $colors['color_page'] ), "$id text" );
+		}
 	}
 
 	public function test_module_declares_its_script_and_media_dependency(): void {

@@ -117,12 +117,16 @@ final class PdfEngine {
 			'{PAGE_COUNT}'
 		);
 
-		// page_text() has no alignment: centre on a sample, the markers being replaced by shorter numbers.
+		// page_text() has no alignment: right-align on a sample, the markers being replaced by numbers
+		// at most as wide. The right edge is the side margin, like the footer block on its left.
 		$sample = str_replace( [ '{PAGE_NUM}', '{PAGE_COUNT}' ], [ '00', '00' ], $text );
 		$width  = $metrics->getTextWidth( $sample, $font, $size );
-		$left   = max( 0.0, ( $canvas->get_width() - $width ) / 2 );
+		$side   = ( isset( $design['margin_sides'] ) && is_numeric( $design['margin_sides'] ) ? (float) $design['margin_sides'] : 16.0 ) * 72 / 25.4;
+		$left   = max( 0.0, $canvas->get_width() - $side - $width );
+		// The footer block ends 6 mm above the sheet edge (Styles: footer-bottom): same last line.
+		$top = $canvas->get_height() - ( 6 * 72 / 25.4 ) - $size * 1.5;
 
-		$canvas->page_text( $left, $canvas->get_height() - 14.0, $text, $font, $size, [ 0.45, 0.45, 0.45 ] );
+		$canvas->page_text( $left, $top, $text, $font, $size, [ 0.45, 0.45, 0.45 ] );
 	}
 
 	/**

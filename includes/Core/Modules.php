@@ -59,8 +59,6 @@ class Modules {
 			'invoices' => [
 				'name'        => __( 'Invoices', 'lumia-factures' ),
 				'description' => __( 'PDF invoices for WooCommerce orders.', 'lumia-factures' ),
-				'menu_label'  => __( 'Invoices', 'lumia-factures' ),
-				'menu_desc'   => __( 'Generate the invoices', 'lumia-factures' ),
 				'class'       => 'Lumia\\Factures\\Modules\\Invoices\\Module',
 				'icon'        => 'file-text',
 				'locked'      => true,
@@ -68,10 +66,10 @@ class Modules {
 			'bricks'   => [
 				'name'        => __( 'Bricks', 'lumia-factures' ),
 				'description' => __( 'Dynamic tags to display invoice data in Bricks.', 'lumia-factures' ),
-				'menu_label'  => __( 'Bricks', 'lumia-factures' ),
-				'menu_desc'   => __( 'Bricks dynamic tags', 'lumia-factures' ),
 				'class'       => 'Lumia\\Factures\\Modules\\Bricks\\Module',
 				'icon'        => 'blocks',
+				// Always on: its hooks are Bricks filters, which only fire on a Bricks site.
+				'locked'      => true,
 			],
 		];
 	}
@@ -133,8 +131,6 @@ class Modules {
 		return [
 			'name'        => '',
 			'description' => '',
-			'menu_label'  => '',
-			'menu_desc'   => '',
 			'class'       => '',
 			'icon'        => 'package',
 			'locked'      => false,
@@ -152,8 +148,6 @@ class Modules {
 
 		$normalized['name']        = is_string( $normalized['name'] ) ? $normalized['name'] : '';
 		$normalized['description'] = is_string( $normalized['description'] ) ? $normalized['description'] : '';
-		$normalized['menu_label']  = is_string( $normalized['menu_label'] ) ? $normalized['menu_label'] : '';
-		$normalized['menu_desc']   = is_string( $normalized['menu_desc'] ) ? $normalized['menu_desc'] : '';
 		$normalized['class']       = is_string( $normalized['class'] ) ? ltrim( $normalized['class'], '\\' ) : '';
 		$normalized['icon']        = is_string( $normalized['icon'] ) ? sanitize_key( $normalized['icon'] ) : 'package';
 		$normalized['locked']      = (bool) $normalized['locked'];

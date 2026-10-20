@@ -301,6 +301,69 @@ class RenderingTest extends TestCase {
 		$this->assertStringContainsString( '<img src="data:image/png;base64,', $html );
 	}
 
+	public function test_svg_logo_is_embedded(): void {
+		$file = trailingslashit( get_temp_dir() ) . 'lf-logo-' . wp_generate_password( 8, false ) . '.svg';
+		file_put_contents( $file, '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="40"><rect width="120" height="40" fill="#2f6b3f"/></svg>' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture.
+		$logo = self::factory()->attachment->create(
+			[
+				'file'           => $file,
+				'post_mime_type' => 'image/svg+xml',
+			]
+		);
+		update_attached_file( $logo, $file );
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$html  = Renderer::html( $order, $this->doc(), $this->settings( [ 'company' => [ 'logo_id' => $logo ] ] ) );
+		$this->assertStringContainsString( '<img src="data:image/svg+xml;base64,', $html );
+		$this->assertStringStartsWith( '%PDF-', Renderer::pdf( $order, $this->doc(), $this->settings( [ 'company' => [ 'logo_id' => $logo ] ] ) ) );
+
+		// A file named .svg that is not an SVG document is skipped.
+		file_put_contents( $file, 'not an image' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- Test fixture.
+		Images::flush();
+		$this->assertSame( '', Images::data_uri( $logo, 0 ) );
+		wp_delete_file( $file );
+	}
+
+	public function test_title_band_has_no_number(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$html  = Renderer::html( $order, $this->doc(), $this->settings() );
+
+		preg_match( '#<table class="lf-titlebar">.*?</table>#s', $html, $band );
+		$this->assertNotEmpty( $band );
+		$this->assertStringNotContainsString( $this->doc()->number, $band[0], 'The number is in the details block only.' );
+		$this->assertStringContainsString( $this->doc()->number, $html );
+	}
+
+	public function test_product_image_sits_in_the_product_column(): void {
+		$product = OrderFactory::simple_product( 10.0 );
+		$product->set_image_id( $this->attachment( 'png', 120 ) );
+		$product->save();
+		$order = OrderFactory::order( [ [ $product ] ] );
+
+		$html = Renderer::html( $order, $this->doc(), $this->settings( [ 'content' => [ 'col_image_enabled' => true ] ] ) );
+
+		$this->assertStringContainsString( 'lf-item__thumb', $html );
+		preg_match( '#<thead>.*?</thead>#s', $html, $head );
+		preg_match_all( '#<th #', $head[0], $headers );
+		preg_match_all( '#<col #', $html, $cols );
+		$this->assertSame( count( $cols[0] ), count( $headers[0] ), 'One column per header: no empty header above the images.' );
+	}
+
+	public function test_informational_totals_come_before_the_grand_total(): void {
+		OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 36.0 ) ] ], [ 'prices_include_tax' => true ] );
+		$html  = str_replace( "\u{00A0}", ' ', Renderer::html( $order, $this->doc(), $this->settings() ) );
+		$html  = substr( $html, (int) strpos( $html, '<table class="lf-totals">' ) );
+
+		$excl  = strpos( $html, 'Total excl. VAT' );
+		$vat   = strpos( $html, 'VAT 20' );
+		$grand = strpos( $html, 'lf-total-row--grand' );
+		$this->assertNotFalse( $excl );
+		$this->assertNotFalse( $vat );
+		$this->assertLessThan( $grand, $excl );
+		$this->assertLessThan( $grand, $vat );
+	}
+
 	public function test_logo_missing_file_still_renders(): void {
 		$logo = $this->attachment( 'png' );
 		wp_delete_file( (string) get_attached_file( $logo ) );

@@ -15,12 +15,11 @@ use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Core\Settings;
 
 /**
- * Admin shell: one WooCommerce submenu, the lumia-tools layout (sidebar +
- * pages), assets, toasts and modal.
+ * Admin shell: one WooCommerce submenu opening a single screen, assets, toasts and modal.
  *
- * Navigation between Overview, Modules, the active modules and Settings only
- * goes through the internal sidebar (`&tab=`): no top-level menu, no submenu
- * per module.
+ * The screen is the invoice settings (client-side tabs, plugin settings included). When the
+ * requirements fail no module runs, and the screen falls back to the plugin settings alone
+ * (updates and environment), so an update can still be checked.
  */
 class Admin {
 
@@ -132,7 +131,7 @@ class Admin {
 		}
 
 		return array_merge(
-			[ 'settings' => '<a href="' . esc_url( $this->tab_url( 'settings' ) ) . '">' . esc_html__( 'Settings', 'lumia-factures' ) . '</a>' ],
+			[ 'settings' => '<a href="' . esc_url( $this->page_url() ) . '">' . esc_html__( 'Settings', 'lumia-factures' ) . '</a>' ],
 			$links
 		);
 	}
@@ -159,7 +158,6 @@ class Admin {
 		wp_enqueue_style( 'lumia-factures-tokens', $css . 'tokens.css', [], $version );
 		wp_enqueue_style( 'lumia-factures-reset', $css . 'reset.css', [ 'lumia-factures-tokens' ], $version );
 		wp_enqueue_style( 'lumia-factures-layout', $css . 'layout.css', [ 'lumia-factures-reset' ], $version );
-		wp_enqueue_style( 'lumia-factures-sidebar', $css . 'sidebar.css', [ 'lumia-factures-layout' ], $version );
 		wp_enqueue_style( 'lumia-factures-components', $css . 'components.css', [ 'lumia-factures-tokens' ], $version );
 		wp_enqueue_style( 'lumia-factures-buttons', $css . 'buttons.css', [ 'lumia-factures-components' ], $version );
 		wp_enqueue_style( 'lumia-factures-notifications', $css . 'notifications.css', [ 'lumia-factures-tokens' ], $version );
@@ -193,48 +191,39 @@ class Admin {
 	}
 
 	/**
-	 * Loads the assets of the displayed module tab.
+	 * Loads the assets of the active modules: the single screen shows all of them.
 	 */
 	private function enqueue_module_assets(): void {
-		$tab = $this->current_tab();
-		if ( 0 !== strpos( $tab, 'module_' ) ) {
-			return;
-		}
-
-		$module_id = substr( $tab, strlen( 'module_' ) );
-		$instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;
-		if ( ! $instance ) {
-			return;
-		}
-
-		foreach ( $instance->get_admin_css() as $index => $style_url ) {
-			if ( '' !== $style_url ) {
-				wp_enqueue_style( 'lumia-factures-module-' . $module_id . '-' . $index, $style_url, [ 'lumia-factures-components', 'lumia-factures-buttons' ], LUMIA_FACTURES_VERSION );
-			}
-		}
-
-		foreach ( $instance->get_admin_js() as $index => $script_url ) {
-			if ( '' === $script_url ) {
-				continue;
+		foreach ( $this->modules->get_active_instances() as $module_id => $instance ) {
+			foreach ( $instance->get_admin_css() as $index => $style_url ) {
+				if ( '' !== $style_url ) {
+					wp_enqueue_style( 'lumia-factures-module-' . $module_id . '-' . $index, $style_url, [ 'lumia-factures-components', 'lumia-factures-buttons' ], LUMIA_FACTURES_VERSION );
+				}
 			}
 
-			$handle = 'lumia-factures-module-' . $module_id . '-' . $index;
-			$deps   = array_values( array_filter( array_merge( [ 'lumia-factures-admin' ], $instance->get_admin_js_deps() ) ) );
-			wp_enqueue_script( $handle, $script_url, $deps, LUMIA_FACTURES_VERSION, true );
+			foreach ( $instance->get_admin_js() as $index => $script_url ) {
+				if ( '' === $script_url ) {
+					continue;
+				}
 
-			// Module data merged into lumiaFacturesAdmin (i18n merged, other keys set).
-			$js_data = $instance->get_admin_js_data();
-			if ( empty( $js_data ) ) {
-				continue;
-			}
+				$handle = 'lumia-factures-module-' . $module_id . '-' . $index;
+				$deps   = array_values( array_filter( array_merge( [ 'lumia-factures-admin' ], $instance->get_admin_js_deps() ) ) );
+				wp_enqueue_script( $handle, $script_url, $deps, LUMIA_FACTURES_VERSION, true );
 
-			$inline = 'window.lumiaFacturesAdmin=window.lumiaFacturesAdmin||{};';
-			foreach ( $js_data as $key => $value ) {
-				$inline .= 'i18n' === $key
-					? 'window.lumiaFacturesAdmin.i18n=Object.assign(window.lumiaFacturesAdmin.i18n||{},' . wp_json_encode( $value ) . ');'
-					: 'window.lumiaFacturesAdmin[' . wp_json_encode( $key ) . ']=' . wp_json_encode( $value ) . ';';
+				// Module data merged into lumiaFacturesAdmin (i18n merged, other keys set).
+				$js_data = $instance->get_admin_js_data();
+				if ( empty( $js_data ) ) {
+					continue;
+				}
+
+				$inline = 'window.lumiaFacturesAdmin=window.lumiaFacturesAdmin||{};';
+				foreach ( $js_data as $key => $value ) {
+					$inline .= 'i18n' === $key
+						? 'window.lumiaFacturesAdmin.i18n=Object.assign(window.lumiaFacturesAdmin.i18n||{},' . wp_json_encode( $value ) . ');'
+						: 'window.lumiaFacturesAdmin[' . wp_json_encode( $key ) . ']=' . wp_json_encode( $value ) . ';';
+				}
+				wp_add_inline_script( $handle, $inline, 'before' );
 			}
-			wp_add_inline_script( $handle, $inline, 'before' );
 		}
 	}
 
@@ -247,12 +236,6 @@ class Admin {
 	 */
 	public function render_page(): void {
 		if ( ! current_user_can( self::CAPABILITY ) ) {
-			wp_die( esc_html__( 'You do not have the required permissions.', 'lumia-factures' ), '', [ 'response' => 403 ] );
-		}
-
-		// The tab URL is guessable: a module requiring more is refused here too.
-		$tab = $this->current_tab();
-		if ( 0 === strpos( $tab, 'module_' ) && ! current_user_can( self::module_capability( $this->modules, substr( $tab, strlen( 'module_' ) ) ) ) ) {
 			wp_die( esc_html__( 'You do not have the required permissions.', 'lumia-factures' ), '', [ 'response' => 403 ] );
 		}
 
@@ -272,7 +255,6 @@ class Admin {
 
 		$messages = [
 			'settings_saved'  => __( 'Settings saved successfully.', 'lumia-factures' ),
-			'modules_updated' => __( 'Modules updated.', 'lumia-factures' ),
 			'updates_checked' => __( 'Update check completed.', 'lumia-factures' ),
 		];
 
@@ -366,18 +348,17 @@ class Admin {
 	}
 
 	/**
-	 * URL of a tab of the admin page.
-	 *
-	 * @param string $tab Tab identifier.
+	 * URL of the admin page.
 	 */
-	public function tab_url( string $tab ): string {
-		return add_query_arg(
-			[
-				'page' => self::SLUG,
-				'tab'  => $tab,
-			],
-			admin_url( 'admin.php' )
-		);
+	public function page_url(): string {
+		return add_query_arg( 'page', self::SLUG, admin_url( 'admin.php' ) );
+	}
+
+	/**
+	 * Whether the screen shows the invoice settings: the Invoices module runs (requirements met).
+	 */
+	public function shows_invoices(): bool {
+		return isset( $this->modules->get_active_instances()['invoices'] );
 	}
 
 	/**
@@ -387,14 +368,6 @@ class Admin {
 	 */
 	public function requirement_errors(): array {
 		return $this->plugin->requirement_errors();
-	}
-
-	/**
-	 * Current tab (navigation read).
-	 */
-	public function current_tab(): string {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- navigation read, no action triggered.
-		return isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'dashboard';
 	}
 
 	/**

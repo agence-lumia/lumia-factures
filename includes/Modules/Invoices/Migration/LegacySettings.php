@@ -56,8 +56,10 @@ final class LegacySettings {
 			'total_refunded_enabled' => true,
 		],
 		'design'  => [
-			'template'   => 'default',
-			'custom_css' => '',
+			'template'        => 'default',
+			'custom_css'      => '',
+			// Removed after 2.0.0: the PDF template never printed it.
+			'color_secondary' => '#6b6b6b',
 		],
 	];
 
@@ -207,6 +209,7 @@ final class LegacySettings {
 			return in_array( $value, [ true, 1, '1', 'true', 'on', 'yes' ], true ) === $default_value;
 		}
 
-		return is_scalar( $value ) && (string) $default_value === (string) $value;
+		// Case-insensitive: the legacy colors were stored as typed ("#6B6B6B" is the default "#6b6b6b").
+		return is_scalar( $value ) && strtolower( (string) $default_value ) === strtolower( (string) $value );
 	}
 }
