@@ -37,6 +37,5 @@ defined( 'ABSPATH' ) || exit;
 <table class="lf-titlebar">
 	<tr>
 		<td class="lf-titlebar__label"><h1><?php echo esc_html( $header['title'] ); ?></h1></td>
-		<td class="lf-titlebar__number"><?php echo esc_html( $header['number'] ); ?></td>
 	</tr>
 </table>

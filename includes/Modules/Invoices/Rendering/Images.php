@@ -93,6 +93,12 @@ final class Images {
 	 * @param int    $max_width Maximum width in pixels, 0 to keep the size.
 	 */
 	private static function encode( string $path, int $max_width ): string {
+		// SVG logos (the legacy plugin accepted them): Dompdf draws them itself, the width comes from the CSS.
+		// wp_check_filetype() does not know SVG on a site that has not allowed the type.
+		if ( 'svg' === strtolower( pathinfo( $path, PATHINFO_EXTENSION ) ) ) {
+			return self::svg( $path );
+		}
+
 		$type = wp_check_filetype( $path );
 		$mime = (string) $type['type'];
 
@@ -112,6 +118,25 @@ final class Images {
 		}
 
 		return self::convert( $path, $max_width, 'image/jpeg' === $mime );
+	}
+
+	/**
+	 * Data URI of a local SVG file, '' when it is too big or not an SVG document.
+	 *
+	 * @param string $path Absolute path.
+	 */
+	private static function svg( string $path ): string {
+		$size = filesize( $path );
+		if ( false === $size || $size <= 0 || $size > self::REMOTE_MAX_BYTES ) {
+			return '';
+		}
+
+		$binary = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file.
+		if ( false === $binary || false === stripos( $binary, '<svg' ) ) {
+			return '';
+		}
+
+		return 'data:image/svg+xml;base64,' . base64_encode( $binary ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- Embedding an image in the PDF, not obfuscation.
 	}
 
 	/**
