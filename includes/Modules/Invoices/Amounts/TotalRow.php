@@ -17,7 +17,8 @@ final class TotalRow {
 	/**
 	 * Constructor.
 	 *
-	 * @param string      $key           `subtotal`, `discount`, `coupons`, `shipping`, `fee`, `rounding`,
+	 * @param string      $key           `subtotal`, `discount`, `coupons`, `shipping`, `fee`, `adjustment`
+	 *                                   (credit note: amount refunded beyond its items), `rounding`,
 	 *                                   `total_excl`, `tax` or `total`.
 	 * @param string      $label         Display label.
 	 * @param int|null    $amount        Minor units, null for `coupons`.
