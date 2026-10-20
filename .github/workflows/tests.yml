@@ -1,0 +1,74 @@
+name: Tests
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumia-factures-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phpunit:
+    name: PHPUnit (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.5']
+
+    env:
+      # Read by @wordpress/env: overrides "phpVersion" of .wp-env.json for the containers.
+      WP_ENV_PHP_VERSION: ${{ matrix.php }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Composer runs on the runner; composer.json pins the platform to PHP 8.1.99, so the
+      # installed vendor/ works in both containers. The containers run the plugin from
+      # this same folder (see "mappings" in .wp-env.json).
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # Node LTS 22: npm install failed on Node 26 (native transitive dependency).
+      # Plain `npm ci` works on 22, no --ignore-scripts needed.
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Start wp-env
+        run: npx wp-env start
+
+      - name: Show the PHP version of the container
+        run: npx wp-env run tests-cli php -v
+
+      - name: PHPUnit
+        run: npm test
+
+      # Same suite on the legacy (posts) order storage; once is enough, on the newest PHP.
+      - name: PHPUnit (legacy order storage)
+        if: matrix.php == '8.5'
+        run: npm run test:legacy
+
+      - name: Stop wp-env
+        if: always()
+        run: npx wp-env stop

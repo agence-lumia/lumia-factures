@@ -1,0 +1,126 @@
+name: Lint
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lumia-factures-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: PHPCS + PHPStan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2, cs2pr
+
+      - name: Install dev dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # PHP 8.1 compatibility is checked by PHPCompatibilityWP inside PHPCS.
+      - name: PHP syntax check
+        run: find . -name '*.php' -not -path './vendor/*' -not -path './node_modules/*' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: PHPCS
+        run: vendor/bin/phpcs -q --report=checkstyle | cs2pr
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=2G --no-progress --error-format=github
+
+  language:
+    name: English only
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # French lives in languages/ only. "Lümia" is the one accented word allowed.
+      - name: No accented French outside languages/
+        run: |
+          export LC_ALL=C.UTF-8
+          if grep -rnP '[\x{00C0}-\x{00FF}]' includes templates assets/admin docs/*.md docs/modules README.md CLAUDE.md .github | grep -v 'Lümia'; then
+            echo '::error::Accented French characters found outside languages/ (see above).'
+            exit 1
+          fi
+
+  i18n:
+    name: Language files
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - name: Test the language tooling
+        run: sh tools/i18n/test.sh
+
+      # The .pot is regenerated from the source, so a string added without
+      # touching the .po is caught here. Output goes outside the workspace.
+      # Same --exclude list as the i18n:pot composer script.
+      - name: Regenerate the .pot
+        run: |
+          docker run --rm --user "$(id -u):$(id -g)" \
+            -v "$PWD:/app:ro" -v "$RUNNER_TEMP:/out" -w /app \
+            wordpress:cli-php8.3 \
+            wp i18n make-pot . /out/lumia-factures.pot \
+              --slug=lumia-factures --domain=lumia-factures \
+              --exclude=vendor,tools,docs,dist,tests,node_modules
+
+      - name: Check .po against the .pot and .mo against the .po
+        run: php tools/i18n/build-po.php check "$RUNNER_TEMP/lumia-factures.pot" languages/lumia-factures-fr_FR.po languages/lumia-factures-fr_FR.mo
+
+  build:
+    name: Release zip
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Same setup as the release workflows: the zip is built here on every PR, so a
+      # broken build shows up before a release tag is pushed.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Build the zip
+        run: bash tools/build/build-zip.sh "0.0.0-pr" "$RUNNER_TEMP/lumia-factures.zip"
+
+      # The updater needs this exact layout: Dompdf shipped, French catalogue compiled.
+      - name: Check the zip content
+        run: |
+          set -euo pipefail
+          entries=$(unzip -Z1 "$RUNNER_TEMP/lumia-factures.zip")
+          grep -q '^lumia-factures/vendor/dompdf/dompdf/src/Dompdf.php$' <<< "$entries"
+          grep -q '^lumia-factures/languages/lumia-factures-fr_FR.l10n.php$' <<< "$entries"
+          grep -q '^lumia-factures/lumia-factures.php$' <<< "$entries"

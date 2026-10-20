@@ -1,0 +1,203 @@
+name: Release Dev Pre-release
+
+on:
+  push:
+    branches:
+      - dev
+
+permissions:
+  contents: write
+
+concurrency:
+  group: lumia-factures-release-dev
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      # Build tools (tools/build/build-zip.sh): PHP + Composer install the runtime dependencies
+      # (Dompdf) and run WP-CLI for the .l10n.php files, Node runs the pinned esbuild. Set up
+      # first: a setup failure stops the run before the version commit and the tag are pushed.
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+
+      - name: Fetch full tag history
+        run: git fetch --tags --force
+
+      - name: Determine dev release version
+        id: version
+        run: |
+          set -euo pipefail
+
+          # The 2.x line starts with this plugin rebuild. The legacy 1.x tags (v1.1.0, v1.1.1)
+          # must not decide the version: while the latest stable tag is older than this floor,
+          # pre-releases are 2.0.0-dev.N. Once a stable tag >= 2.0.0 exists, they target the
+          # next patch of the latest stable tag, as in lumia-tools.
+          floor_version="2.0.0"
+
+          file_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'LUMIA_FACTURES_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?'" lumia-factures.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]+)?)'/\1/")
+          if [[ -z "$file_version" ]]; then
+            echo "Unable to detect plugin version"
+            exit 1
+          fi
+
+          # Only plain vX.Y.Z tags are stable: v1.1.1-legacy and v*-dev.N are ignored.
+          latest_stable_tag=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          base_version="$floor_version"
+          if [[ -n "$latest_stable_tag" ]]; then
+            latest_stable="${latest_stable_tag#v}"
+            highest=$(printf '%s\n%s\n' "$floor_version" "$latest_stable" | sort -V | tail -n1)
+            # Pre-releases target the next patch (2.0.0 -> 2.0.1-dev.N): in SemVer and
+            # version_compare(), 2.0.0-dev.N is OLDER than 2.0.0, not newer.
+            if [[ "$highest" == "$latest_stable" ]]; then
+              IFS='.' read -r major minor patch <<< "$latest_stable"
+              base_version="${major}.${minor}.$((patch + 1))"
+            fi
+          fi
+
+          latest_dev_tag=$(git tag -l "v${base_version}-dev.*" | grep -E "^v${base_version}-dev\.[0-9]+$" | sort -V | tail -n1 || true)
+          if [[ -z "$latest_dev_tag" ]]; then
+            dev_build=1
+          else
+            dev_build=${latest_dev_tag##*.}
+            dev_build=$((dev_build + 1))
+          fi
+
+          target_version="${base_version}-dev.${dev_build}"
+          target_tag="v${target_version}"
+
+          echo "File version: $file_version"
+          echo "Latest stable tag: ${latest_stable_tag:-none}"
+          echo "Base version: $base_version"
+          echo "Latest dev tag: ${latest_dev_tag:-none}"
+          echo "Target version: $target_version"
+          echo "Target tag: $target_tag"
+
+          echo "version=$target_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$target_tag" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update plugin version in files
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" lumia-factures.php
+          sed -E -i "s/(define[[:space:]]*\([[:space:]]*'LUMIA_FACTURES_VERSION'[[:space:]]*,[[:space:]]*')[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]*)?/\1${VERSION}/" lumia-factures.php
+
+          # Both places must carry the new version, or the updater compares the wrong one.
+          grep -qF " * Version:     ${VERSION}" lumia-factures.php
+          grep -qF "'LUMIA_FACTURES_VERSION', '${VERSION}'" lumia-factures.php
+
+      # Built before the version commit and the tag are pushed: a failed build
+      # leaves no tag without a release.
+      - name: Build release zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: bash tools/build/build-zip.sh "$VERSION" "dist/lumia-factures-${VERSION}.zip"
+
+      # The updater installs the lumia-factures-<version>.zip asset. Its zipball fallback unpacks
+      # into a wrongly named folder, so a release without this asset must never be published.
+      - name: Check the release asset exists
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          asset="dist/lumia-factures-${VERSION}.zip"
+          [[ -s "$asset" ]] || { echo "Release asset ${asset} was not built"; exit 1; }
+          unzip -Z1 "$asset" | grep -qx 'lumia-factures/lumia-factures.php'
+
+      - name: Create and push tag
+        env:
+          TARGET_TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if git rev-parse "$TARGET_TAG" >/dev/null 2>&1; then
+            echo "Tag ${TARGET_TAG} already exists"
+            exit 1
+          fi
+
+          git add lumia-factures.php
+          git commit -m "chore(release): v${VERSION}"
+          git tag -a "$TARGET_TAG" -m "Dev release ${TARGET_TAG}"
+          git push origin HEAD:refs/heads/dev
+          git push origin "$TARGET_TAG"
+
+      - name: Publish GitHub pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: dist/lumia-factures-${{ steps.version.outputs.version }}.zip
+          fail_on_unmatched_files: true
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            Automatic dev pre-release for branch dev.
+
+            This release is published on every push to dev so it can be tested through the WordPress updater on a production-like environment.
+
+      # Fails the job, before any older pre-release is deleted, when the asset is not on the release.
+      - name: Verify the asset is attached to the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TARGET_TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          assets=$(gh release view "$TARGET_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+          if ! grep -qx "lumia-factures-${VERSION}.zip" <<< "$assets"; then
+            echo "Asset lumia-factures-${VERSION}.zip is missing from release ${TARGET_TAG}"
+            exit 1
+          fi
+
+      - name: Delete old dev pre-releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NEW_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Read the list first, then filter in bash: a `grep` that matches
+          # nothing exits 1 and, under pipefail, failed the step on a repository
+          # with no older dev pre-release.
+          tags=$(gh release list \
+            --repo "$GITHUB_REPOSITORY" \
+            --limit 100 \
+            --json tagName,isPrerelease \
+            --jq '.[] | select(.isPrerelease == true) | .tagName')
+
+          while IFS= read -r tag; do
+            [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+$ ]] || continue
+            [[ "$tag" == "$NEW_TAG" ]] && continue
+            echo "Deleting old dev pre-release: $tag"
+            gh release delete "$tag" --yes --cleanup-tag || true
+          done <<< "$tags"

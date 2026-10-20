@@ -1,0 +1,20 @@
+# Static analysis, level 8 without a baseline.
+# The szepeviktor/phpstan-wordpress extension is loaded automatically (phpstan/extension-installer),
+# as are the WooCommerce stubs (php-stubs/woocommerce-stubs), wired explicitly below.
+# Templates (templates/) are included from an Admin method: their scope ($this, $tab, ...) is
+# invisible to the analysis, so they are left to PHPCS.
+parameters:
+    level: 8
+    paths:
+        - lumia-factures.php
+        - uninstall.php
+        - includes
+    excludePaths:
+        - includes/Modules/*/settings-template.php
+    bootstrapFiles:
+        - tools/phpstan-bootstrap.php
+    scanFiles:
+        - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        - tools/phpstan-wp-cli-stubs.php
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true

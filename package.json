@@ -1,0 +1,14 @@
+{
+  "name": "lumia-factures",
+  "private": true,
+  "description": "Development tooling of the lumia-factures plugin (wp-env, tests). Nothing here is shipped.",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "env:start": "wp-env start",
+    "test": "wp-env run tests-cli --env-cwd=wp-content/plugins/lumia-factures vendor/bin/phpunit",
+    "test:legacy": "wp-env run tests-cli --env-cwd=wp-content/plugins/lumia-factures env LUMIA_FACTURES_TEST_LEGACY_ORDERS=1 vendor/bin/phpunit"
+  },
+  "devDependencies": {
+    "@wordpress/env": "11.17.0"
+  }
+}
