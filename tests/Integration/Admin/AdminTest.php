@@ -77,13 +77,10 @@ class AdminTest extends TestCase {
 	}
 
 	/**
-	 * Renders the admin page for a tab.
-	 *
-	 * @param string $tab Tab to render.
+	 * Renders the admin page (one screen).
 	 */
-	private function render_tab( string $tab ): string {
+	private function render_screen(): string {
 		$_GET['page'] = 'lumia-factures';
-		$_GET['tab']  = $tab;
 		ob_start();
 		try {
 			Plugin::instance()->admin()->render_page();
@@ -158,31 +155,33 @@ class AdminTest extends TestCase {
 		$this->assertSame( 'stable', Plugin::instance()->settings()->get( 'global.update_channel' ) );
 	}
 
-	public function test_modules_tab_toggles_optional_modules_but_never_locked_ones(): void {
+	public function test_invoices_form_saves_module_and_global_settings_together(): void {
 		$this->login_admin();
-		$modules = Plugin::instance()->modules();
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-
 		$location = $this->post_save(
 			array(
-				'lumia_factures_nonce'   => wp_create_nonce( 'lumia_factures_save_settings' ),
-				'lumia_factures_tab'     => 'modules',
-				'lumia_factures_modules' => array( 'bricks' ),
+				'lumia_factures_nonce'           => wp_create_nonce( 'lumia_factures_save_settings' ),
+				'lumia_factures_tab'             => 'module_invoices',
+				'lumia_factures_module_settings' => array( 'company' => array( 'phone' => '0102030405' ) ),
+				'lumia_factures_global'          => array( 'update_channel' => 'dev' ),
 			)
 		);
-		$this->assertTrue( $modules->is_active( 'bricks' ) );
-		$this->assertTrue( $modules->is_active( 'invoices' ) );
-		$this->assertStringContainsString( 'lumia_factures_notice=modules_updated', $location );
+		$this->assertSame( '0102030405', get_option( 'lumia_factures_module_invoices' )['company']['phone'] );
+		$this->assertSame( 'dev', Plugin::instance()->settings()->get( 'global.update_channel' ) );
+		$this->assertStringContainsString( 'lumia_factures_notice=settings_saved', $location );
+		$this->assertStringNotContainsString( 'tab=', $location, 'One screen: the open tab is restored by the browser.' );
+	}
 
-		// Nothing checked: the optional module goes off, the locked one stays on.
+	public function test_module_save_without_global_fields_leaves_them_alone(): void {
+		$this->login_admin();
+		Plugin::instance()->settings()->set( 'global.update_channel', 'dev' );
 		$this->post_save(
 			array(
-				'lumia_factures_nonce' => wp_create_nonce( 'lumia_factures_save_settings' ),
-				'lumia_factures_tab'   => 'modules',
+				'lumia_factures_nonce'           => wp_create_nonce( 'lumia_factures_save_settings' ),
+				'lumia_factures_tab'             => 'module_invoices',
+				'lumia_factures_module_settings' => array( 'company' => array( 'phone' => '0102030405' ) ),
 			)
 		);
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-		$this->assertTrue( $modules->is_active( 'invoices' ) );
+		$this->assertSame( 'dev', Plugin::instance()->settings()->get( 'global.update_channel' ) );
 	}
 
 	public function test_module_tab_saves_through_the_module(): void {
@@ -227,22 +226,6 @@ class AdminTest extends TestCase {
 		$this->assertFalse( $module->get_settings()['enabled'], 'A default-true boolean can be saved as false.' );
 	}
 
-	public function test_generic_module_form_emits_hidden_zero_before_checkbox(): void {
-		$this->login_admin();
-		$modules = Plugin::instance()->modules();
-		$modules->register(
-			'sample',
-			array(
-				'name'  => 'Sample',
-				'class' => SampleModule::class,
-			)
-		);
-		$modules->activate( 'sample' );
-		$modules->init_active_modules();
-		$html = $this->render_tab( 'module_sample' );
-		$this->assertMatchesRegularExpression( '/type="hidden" name="lumia_factures_module_settings\[enabled\]" value="0">\s*<input type="checkbox"/', $html );
-	}
-
 	public function test_shop_manager_cannot_change_update_channel(): void {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
 		$this->post_save(
@@ -269,9 +252,9 @@ class AdminTest extends TestCase {
 
 	public function test_channel_select_disabled_without_update_plugins(): void {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'shop_manager' ) ) );
-		$this->assertMatchesRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_tab( 'settings' ) );
+		$this->assertMatchesRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_screen() );
 		$this->login_admin();
-		$this->assertDoesNotMatchRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_tab( 'settings' ) );
+		$this->assertDoesNotMatchRegularExpression( '/<select id="lumia_factures_update_channel"[^>]*disabled/', $this->render_screen() );
 	}
 
 	public function test_assets_enqueued_only_on_plugin_page(): void {
@@ -285,11 +268,13 @@ class AdminTest extends TestCase {
 
 		set_current_screen( Plugin::instance()->admin()->get_hook_suffix() );
 		do_action( 'admin_enqueue_scripts', Plugin::instance()->admin()->get_hook_suffix() );
-		foreach ( array( 'tokens', 'reset', 'layout', 'sidebar', 'components', 'buttons', 'notifications' ) as $sheet ) {
+		foreach ( array( 'tokens', 'reset', 'layout', 'components', 'buttons', 'notifications', 'module-invoices-0' ) as $sheet ) {
 			$this->assertTrue( wp_style_is( 'lumia-factures-' . $sheet, 'enqueued' ), $sheet );
 		}
+		$this->assertFalse( wp_style_is( 'lumia-factures-sidebar', 'registered' ), 'No sidebar any more.' );
 		$this->assertTrue( wp_script_is( 'lumia-factures-admin', 'enqueued' ) );
 		$this->assertTrue( wp_script_is( 'lumia-factures-notifications', 'enqueued' ) );
+		$this->assertTrue( wp_script_is( 'lumia-factures-module-invoices-0', 'enqueued' ), 'The invoice screen script loads without any tab parameter.' );
 
 		$data = (string) wp_scripts()->get_data( 'lumia-factures-admin', 'data' );
 		$this->assertStringContainsString( 'lumiaFacturesAdmin', $data );
@@ -310,37 +295,31 @@ class AdminTest extends TestCase {
 		}
 	}
 
-	public function test_page_renders_sidebar_in_order_and_each_tab(): void {
+	public function test_page_is_the_invoice_screen_with_a_settings_tab(): void {
 		$this->login_admin();
 
-		$html = $this->render_tab( 'dashboard' );
+		$html = $this->render_screen();
 		$this->assertStringContainsString( 'lumia-admin-wrap lumia-factures-admin', $html );
-		$overview = strpos( $html, 'tab=dashboard' );
-		$modules  = strpos( $html, 'tab=modules' );
-		$invoices = strpos( $html, 'tab=module_invoices' );
-		$settings = strpos( $html, 'tab=settings' );
-		$this->assertNotFalse( $overview );
-		$this->assertTrue( $overview < $modules && $modules < $invoices && $invoices < $settings, 'Sidebar order: Overview, Modules, active modules, Settings.' );
-		$this->assertStringNotContainsString( 'tab=module_bricks', $html, 'Inactive modules stay out of the sidebar.' );
-		$this->assertStringContainsString( esc_html( LUMIA_FACTURES_VERSION ), $html );
+		$this->assertStringNotContainsString( 'lumia-sidebar', $html );
+		$this->assertDoesNotMatchRegularExpression( '/[?&;]tab=/', $html, 'No internal navigation by URL.' );
+		$this->assertStringContainsString( 'id="lumia-factures-module-form"', $html );
+		$this->assertStringContainsString( 'v' . esc_html( LUMIA_FACTURES_VERSION ), $html, 'The installed version shows in the Settings tab.' );
 
-		$html = $this->render_tab( 'modules' );
-		$this->assertMatchesRegularExpression( '/value="invoices"[^>]*disabled/', $html, 'The locked module toggle is disabled.' );
-		$this->assertStringContainsString( 'value="bricks"', $html );
-		$this->assertStringContainsString( 'lumia_factures_save_settings', $html );
+		// The Settings tab is the last one, and its fields belong to the invoices form.
+		$this->assertMatchesRegularExpression( '/data-lumia-tab="design"[^>]*>[^<]*<\/button>\s*<button[^>]*data-lumia-tab="settings"/', $html );
+		$form_end = strpos( $html, '</form>' );
+		$this->assertLessThan( $form_end, strpos( $html, 'name="lumia_factures_global[update_channel]"' ) );
+		$this->assertLessThan( $form_end, strpos( $html, 'name="lumia_factures_global[auto_update_initial]"' ) );
 
-		$html = $this->render_tab( 'settings' );
-		$this->assertStringContainsString( 'lumia_factures_global[update_channel]', $html );
-		$this->assertStringContainsString( 'name="lumia_factures_nonce"', $html );
-
-		$html = $this->render_tab( 'module_invoices' );
-		$this->assertStringContainsString( 'lumia-page__title', $html );
+		// The check button submits a standalone form printed after the invoices form (forms cannot nest).
+		$this->assertStringContainsString( 'form="lumia-factures-check-updates-form"', $html );
+		$this->assertGreaterThan( $form_end, strpos( $html, 'id="lumia-factures-check-updates-form"' ) );
 	}
 
 	public function test_render_page_requires_capability(): void {
 		wp_set_current_user( self::factory()->user->create( array( 'role' => 'subscriber' ) ) );
 		$this->expectException( WPDieException::class );
-		$this->render_tab( 'dashboard' );
+		$this->render_screen();
 	}
 
 	public function test_toast_reads_prefixed_query_args(): void {
@@ -349,13 +328,13 @@ class AdminTest extends TestCase {
 		set_current_screen( Plugin::instance()->admin()->get_hook_suffix() );
 
 		$_GET['lumia_notice'] = 'settings_saved';
-		$this->render_tab( 'settings' );
+		$this->render_screen();
 		$this->assertStringNotContainsString( 'Settings saved successfully.', $this->footer_html() );
 
 		unset( $_GET['lumia_notice'] );
 		$_GET['lumia_factures_notice']      = 'settings_saved';
 		$_GET['lumia_factures_notice_type'] = 'warning';
-		$this->render_tab( 'settings' );
+		$this->render_screen();
 		$footer = $this->footer_html();
 		$this->assertStringContainsString( 'Settings saved successfully.', $footer );
 		$this->assertStringContainsString( '"type":"warning"', $footer );
@@ -374,7 +353,7 @@ class AdminTest extends TestCase {
 		);
 
 		$_GET['lumia_factures_notice'] = 'invoice_issued';
-		$this->render_tab( 'settings' );
+		$this->render_screen();
 		$this->assertStringContainsString( 'Invoice issued.', $this->footer_html() );
 	}
 
@@ -388,7 +367,7 @@ class AdminTest extends TestCase {
 		$this->login_admin();
 		do_action( 'admin_menu' );
 		$_GET['lumia_factures_notice'] = 'settings_saved';
-		$this->render_tab( 'settings' );
+		$this->render_screen();
 
 		set_current_screen( 'edit.php' );
 		ob_start();
@@ -425,24 +404,27 @@ class AdminTest extends TestCase {
 
 		$this->login_admin();
 
-		$html = $this->render_tab( 'dashboard' );
+		// The plugin settings alone: the reason, the updates, no invoice form.
+		$html = $this->render_screen();
 		$this->assertStringContainsString( 'requires WooCommerce', $html );
-		$this->assertStringNotContainsString( 'tab=module_', $html );
+		$this->assertStringContainsString( 'id="lumia-factures-settings-form"', $html );
+		$this->assertStringContainsString( 'name="lumia_factures_global[update_channel]"', $html );
+		$this->assertStringContainsString( 'id="lumia-factures-check-updates-form"', $html );
+		$this->assertStringNotContainsString( 'lumia-factures-module-form', $html );
 
-		foreach ( array( 'modules', 'settings', 'module_invoices', 'unknown' ) as $tab ) {
-			$this->assertStringContainsString( 'lumia-factures-admin', $this->render_tab( $tab ), $tab );
-		}
-
-		// Saving the modules tab with an empty registry is a harmless no-op.
+		// An invoice save posted anyway (stale page) saves the global settings and nothing else.
+		$stored   = get_option( 'lumia_factures_module_invoices' );
 		$location = $this->post_save(
 			array(
-				'lumia_factures_nonce'   => wp_create_nonce( 'lumia_factures_save_settings' ),
-				'lumia_factures_tab'     => 'modules',
-				'lumia_factures_modules' => array( 'bricks' ),
+				'lumia_factures_nonce'           => wp_create_nonce( 'lumia_factures_save_settings' ),
+				'lumia_factures_tab'             => 'module_invoices',
+				'lumia_factures_module_settings' => array( 'company' => array( 'phone' => '0102030405' ) ),
+				'lumia_factures_global'          => array( 'update_channel' => 'dev' ),
 			)
 		);
-		$this->assertStringContainsString( 'lumia_factures_notice=modules_updated', $location );
-		$this->assertFalse( (bool) $plugin->settings()->get( 'modules.bricks', false ) );
+		$this->assertStringContainsString( 'lumia_factures_notice=settings_saved', $location );
+		$this->assertSame( 'dev', $plugin->settings()->get( 'global.update_channel' ) );
+		$this->assertSame( $stored, get_option( 'lumia_factures_module_invoices' ) );
 	}
 
 	public function test_coexists_with_lumia_tools(): void {

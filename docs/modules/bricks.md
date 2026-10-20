@@ -1,6 +1,6 @@
 # Bricks module
 
-Optional module (inactive by default): dynamic tags for the invoice in the Bricks editor. The code is `includes/Modules/Bricks/` (`Module` registers `Tags`).
+Locked module (always on, nothing to turn on): dynamic tags for the invoice in the Bricks editor. The code is `includes/Modules/Bricks/` (`Module` registers `Tags`).
 
 ## Tags
 
@@ -12,9 +12,9 @@ Optional module (inactive by default): dynamic tags for the invoice in the Brick
 
 They are listed in the Bricks picker under the group "Lümia Factures". The Facture PDF Lumia names `{fpl_invoice_url}`, `{fpl_invoice_number}` and `{fpl_invoice_status}` render the same values but are not listed: existing templates keep working untouched. Hooks, as in the old plugin: `bricks/dynamic_tags_list`, `bricks/dynamic_data/render_tag` (20, 3), `bricks/dynamic_data/render_content` (20, 3) and `bricks/frontend/render_data` (20, 2). They are added unconditionally: without Bricks the filters never fire.
 
-## Turning it on
+## Always on
 
-The legacy import turns the module on when a Bricks template (`_bricks_page_content_2`) contains `{fpl_invoice_`, and adds a note to the report. Otherwise it stays off until activated in the Modules tab. When `Modules::activate( 'bricks' )` fails (the modules are not registered when the plugin has not booted, which is why the plugin activation no longer runs the import), the report says so and the failure is logged: turn the module on by hand.
+The module was optional in 2.0.0: the legacy import turned it on when a Bricks template used `{fpl_invoice_`, and a failed activation had to be reported. Since its hooks are inert without Bricks, it is now locked (`'locked' => true`): a migrated site keeps its legacy tags rendering with no step, and the admin has no module to manage.
 
 ## Pitfalls
 

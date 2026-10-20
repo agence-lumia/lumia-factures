@@ -13,14 +13,11 @@ defined( 'ABSPATH' ) || exit;
 
 // phpcs:disable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound, WordPress.NamingConventions.ValidHookName.UseUnderscores -- The hooks under test are Bricks'.
 
-use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Modules\Bricks\Tags;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
-use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
-use Lumia\Factures\Tests\Support\LegacyFixture;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
 use WC_Order;
@@ -51,7 +48,6 @@ class TagsTest extends TestCase {
 				wp_delete_file( $path );
 			}
 		}
-		Plugin::instance()->modules()->deactivate( 'bricks' );
 		unset( $_GET['key'] );
 		parent::tear_down();
 	}
@@ -192,123 +188,6 @@ class TagsTest extends TestCase {
 		$this->assertNotNull( Register::import( 'invoice', $imported->get_id(), 'FA-LEGACY-1', 'invoice_legacy', 1, time() ) );
 		$this->assertSame( 'available', $status( $imported ) );
 		$this->assertStringContainsString( 'lumia_factures_invoice=' . $imported->get_id(), $url( $imported ) );
-	}
-
-	public function test_importer_enables_bricks_module_when_legacy_tags_used(): void {
-		$modules = Plugin::instance()->modules();
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-
-		// Without the legacy tag nothing changes.
-		$page = self::factory()->post->create( [ 'post_type' => 'page' ] );
-		update_post_meta(
-			$page,
-			'_bricks_page_content_2',
-			[
-				[
-					'id'       => 'abc',
-					'settings' => [ 'text' => '{post_title}' ],
-				],
-			]
-		);
-		$report = Importer::run( false )->to_array();
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-		$this->assertSame( [], $report['notes'] );
-
-		// A dry run reports it and writes nothing.
-		update_post_meta(
-			$page,
-			'_bricks_page_content_2',
-			[
-				[
-					'id'       => 'abc',
-					'settings' => [ 'link' => '{fpl_invoice_url}' ],
-				],
-			]
-		);
-		$dry = Importer::run( true )->to_array();
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-		$this->assertCount( 1, $dry['notes'] );
-
-		$real = Importer::run( false )->to_array();
-		$this->assertTrue( $modules->is_active( 'bricks' ) );
-		$this->assertSame( $dry['notes'], $real['notes'] );
-
-		// Already on: no second note.
-		$this->assertSame( [], Importer::run( false )->to_array()['notes'] );
-	}
-
-	public function test_migration_run_turns_the_bricks_module_on(): void {
-		$modules = Plugin::instance()->modules();
-		$this->assertNotNull( $modules->get( 'bricks' ), 'The modules are registered, as after a boot.' );
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
-
-		$legacy = new LegacyFixture();
-		try {
-			$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
-			$legacy->invoice( $order, 'FA-0005', 5, 'invoice_' . wp_date( 'Y' ), (int) strtotime( '-1 day' ), null );
-			$this->bricks_page( '{fpl_invoice_status}' );
-
-			delete_option( Migration::OPTION );
-			delete_transient( Migration::NO_DATA_TRANSIENT );
-			Migration::prepare();
-			Migration::maybe_run();
-		} finally {
-			$legacy->cleanup();
-		}
-
-		$state = Migration::state();
-		$this->assertSame( 'done', $state['status'] );
-		$this->assertTrue( $modules->is_active( 'bricks' ) );
-		$this->assertCount( 1, $state['report']['notes'] );
-		$this->assertStringContainsString( 'the Bricks module is turned on', $state['report']['notes'][0] );
-	}
-
-	/**
-	 * Inside activate_plugin() the plugin has not booted and no module is registered: turning the
-	 * Bricks module on fails, and the report must say so instead of failing silently.
-	 *
-	 * @runInSeparateProcess
-	 * @preserveGlobalState disabled
-	 */
-	public function test_bricks_module_that_cannot_be_turned_on_is_reported(): void {
-		$instance = new \ReflectionProperty( Plugin::class, 'instance' );
-		$instance->setValue( null, null );
-		$this->assertSame( [], Plugin::instance()->modules()->get_all(), 'Fresh instance expected.' );
-
-		// The child process fails on any output to stderr: the import log goes to a file.
-		$log = (string) tempnam( sys_get_temp_dir(), 'lf-log' );
-		ini_set( 'error_log', $log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation, child process.
-
-		$this->bricks_page( '{fpl_invoice_url}' );
-		$report = Importer::run( false )->to_array();
-
-		$this->assertStringContainsString( 'The Bricks module could not be turned on', (string) file_get_contents( $log ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local test file.
-		wp_delete_file( $log );
-
-		$this->assertFalse( Plugin::instance()->modules()->is_active( 'bricks' ) );
-		$this->assertCount( 1, $report['notes'] );
-		$this->assertStringContainsString( 'could not be turned on', $report['notes'][0] );
-	}
-
-	/**
-	 * A page whose Bricks content holds a tag.
-	 *
-	 * @param string $tag Tag.
-	 */
-	private function bricks_page( string $tag ): int {
-		$page = self::factory()->post->create( [ 'post_type' => 'page' ] );
-		update_post_meta(
-			$page,
-			'_bricks_page_content_2',
-			[
-				[
-					'id'       => 'abc',
-					'settings' => [ 'link' => $tag ],
-				],
-			]
-		);
-
-		return $page;
 	}
 
 	/**

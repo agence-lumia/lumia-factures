@@ -41,7 +41,7 @@ class BootTest extends TestCase {
 		delete_option( 'lumia_factures_settings' );
 		Activator::activate();
 		$this->assertSame( 'stable', Plugin::instance()->settings()->get( 'global.update_channel' ) );
-		$this->assertFalse( Plugin::instance()->settings()->get( 'modules.bricks' ) );
+		$this->assertTrue( Plugin::instance()->settings()->get( 'modules.bricks' ), 'Bricks is locked: on from the start.' );
 	}
 
 	public function test_requirements_pass_in_test_environment(): void {

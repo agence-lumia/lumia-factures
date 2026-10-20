@@ -1,6 +1,6 @@
 <?php
 /**
- * Bricks module (optional).
+ * Bricks module (always on).
  *
  * @package Lumia\Factures
  */
@@ -12,8 +12,9 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\AbstractModule;
 
 /**
- * Optional module: Bricks dynamic tags for the invoice. Inactive by default, turned on by the
- * legacy import when a Bricks template uses a `{fpl_invoice_*}` tag.
+ * Bricks dynamic tags for the invoice. Locked (always on): it only hooks Bricks filters, which
+ * never fire without Bricks, so there is nothing to turn on, and the legacy `{fpl_invoice_*}`
+ * templates of a migrated site keep rendering.
  */
 class Module extends AbstractModule {
 

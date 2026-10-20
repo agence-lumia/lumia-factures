@@ -59,16 +59,16 @@ Each module extends `AbstractModule` (implements `ModuleInterface`). Required: `
 
 **`init()` timing.** A module `init()` runs inside the `init` action at priority 10. `woocommerce_init`, `woocommerce_loaded` and `before_woocommerce_init` have therefore already fired: a callback hooked on them from a module never runs. Likewise, an `init` callback added from a module at priority <= 10 never runs (that priority is being dispatched); use a later priority.
 
-Modules are defined in `Modules::register_default_modules()` and extended through the `lumia_factures_module_definitions` filter (array of `id => [name, description, menu_label, menu_desc, class, icon, locked]`) plus the `lumia_factures_register_modules` action. Current modules:
+Modules are defined in `Modules::register_default_modules()` and extended through the `lumia_factures_module_definitions` filter (array of `id => [name, description, class, icon, locked]`) plus the `lumia_factures_register_modules` action. Current modules:
 
 | Id | Class | Notes |
 |---|---|---|
 | `invoices` | `Modules\Invoices\Module` | `locked => true`: always active, `activate()` / `deactivate()` are no-ops for it |
-| `bricks` | `Modules\Bricks\Module` | optional, inactive by default; turned on by the legacy import when a template uses `{fpl_invoice_*}` |
+| `bricks` | `Modules\Bricks\Module` | locked (always on): it only hooks Bricks filters, which never fire without Bricks |
 
 `get_uninstall_keys()` declares `options`, `meta` (**post** meta), `user_meta`, `post_type`, `taxonomy`, `tables` (own tables, without prefix) and `cron`; every key is optional. A key filed in the wrong channel is never deleted.
 
-`get_required_capability()` is `manage_woocommerce` (shop managers handle invoices). It guards the module tab in `Admin::render_page()` as well as the menu: the tab URL is guessable.
+`get_required_capability()` is `manage_woocommerce` (shop managers handle invoices). `SaveHandler` checks it before saving a module (on top of `manage_woocommerce`).
 
 ### Adding a module
 
@@ -84,9 +84,11 @@ Every PHP file carries `defined( 'ABSPATH' ) || exit;` after the `namespace` lin
 
 ## Admin page
 
-`Admin` registers **one** submenu, **WooCommerce > Invoices** (slug `lumia-factures`, capability `manage_woocommerce`, `admin_menu` priority 60). The parent is `woocommerce` and can be changed with the `lumia_factures_menu_parent` filter. There is no top-level menu: navigation is the internal sidebar, `admin.php?page=lumia-factures&tab=<tab>` with `dashboard` (default), `modules`, `settings`, and `module_{id}` for an active module. An unknown tab or an inactive module falls back to `dashboard`. Templates: `templates/admin/` (layout, dashboard, modules, settings, module-settings) and `templates/components/sidebar.php`.
+`Admin` registers **one** submenu, **WooCommerce > Invoices** (slug `lumia-factures`, capability `manage_woocommerce`, `admin_menu` priority 60). The parent is `woocommerce` and can be changed with the `lumia_factures_menu_parent` filter. There is no top-level menu and no internal navigation (no sidebar, no `&tab=`): the page **is** the invoice settings screen, client-side tabs General, Company, Numbering, Content, Design ("Appearance") and Settings (updates, environment). The Settings tab is part of the invoices form, so one Save button saves both. While the requirements fail no module runs: the page falls back to the plugin settings alone (`templates/admin/settings.php`, with the blocking reasons), so an update can still be checked. Templates: `templates/admin/` (`layout.php`, `invoices.php`, `settings.php`, `partials/plugin-settings.php`, `partials/check-updates-form.php`) and `includes/Modules/Invoices/settings-template.php` for the tabs.
 
-Assets load on the plugin page only (`$hook === hook_suffix`): `tokens.css` first (it only holds custom properties), then reset, layout, sidebar, components, buttons, notifications, `admin.js` and `notifications.js`, plus the CSS/JS of the displayed module tab. See [design-system.md](design-system.md).
+Assets load on the plugin page only (`$hook === hook_suffix`): `tokens.css` first (it only holds custom properties), then reset, layout, components, buttons, notifications, `admin.js` and `notifications.js`, plus the CSS/JS of every active module (only Invoices declares some). See [design-system.md](design-system.md).
+
+This shell was copied from lumia-tools, which has many modules; a single-purpose plugin does not need its overview, modules page or sidebar, so they were removed after 2.0.0. The module registry stays internal (both modules are locked).
 
 ### Forms
 
@@ -94,7 +96,7 @@ All forms post to `admin-post.php`; `SaveHandler` verifies a nonce and `manage_w
 
 | Action | Nonce field | Purpose |
 |---|---|---|
-| `lumia_factures_save_settings` | `lumia_factures_nonce` | global settings (update channel, automatic updates) and activation of the optional modules (locked ones are skipped) |
+| `lumia_factures_save_settings` | `lumia_factures_nonce` | the module settings when `lumia_factures_tab` is `module_{id}` (the module saves first, so a capability refusal writes nothing), then the global settings (update channel, automatic updates) when posted |
 | `lumia_factures_check_updates` | `lumia_factures_check_nonce` | purge the update caches and check now |
 
 The automatic-update toggle writes WordPress's own `auto_update_plugins` site option (single source of truth, nothing stored in the plugin settings).

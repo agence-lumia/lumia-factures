@@ -13,7 +13,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 - Write-once PDF archive in `wp-content/uploads/lumia-factures/`, protected from web access.
 - Settings screen (company, numbering, content, design) with a live PDF preview.
 - HPOS and legacy order storage.
-- One admin page, **WooCommerce > Invoices**, with an internal sidebar (`&tab=`) for the overview, the modules and the settings.
+- One admin screen, **WooCommerce > Invoices**: the invoice settings in tabs, with ready-made color themes, the live preview next to the fields, and a Settings tab for the updates.
 - Updates through GitHub, on a Stable or a Dev channel.
 - Coexists with lumia-tools on the same site.
 
@@ -22,7 +22,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 
 Planned, not delivered yet: customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
 
-Modules: **Invoices** (core, always active) and **Bricks** (optional dynamic tags, inactive by default).
+Modules: **Invoices** (core) and **Bricks** (dynamic tags), both always active: the Bricks hooks only fire on a Bricks site.
 
 ## Requirements
 
@@ -74,7 +74,7 @@ Before you start: if WordPress cron runs in a separate container or server (`wp 
 7. **Deny web access to the archives** with the rule below, for `wp-content/uploads/lumia-factures/` and for the old `wp-content/uploads/facture-pdf-lumia/` folder, if your server ignores `.htaccess` (Nginx).
 8. **Delete the old plugin files.** Its options, table, order meta and PDFs stay in place; do not remove them while you need the fallback.
 
-The links already sent to customers (`?fpl_download=1&order=...&key=...`), the `[facture_pdf_lumia]` shortcode and the `{fpl_invoice_url}`, `{fpl_invoice_number}` and `{fpl_invoice_status}` Bricks tags keep working. If a Bricks template uses them, the optional Bricks module is turned on by the import.
+The links already sent to customers (`?fpl_download=1&order=...&key=...`), the `[facture_pdf_lumia]` shortcode and the `{fpl_invoice_url}`, `{fpl_invoice_number}` and `{fpl_invoice_status}` Bricks tags keep working. The Bricks module that renders them is always on.
 
 ## Uninstalling
 

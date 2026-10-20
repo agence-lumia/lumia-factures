@@ -15,6 +15,7 @@ use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Core\Activator;
 use Lumia\Factures\Core\Modules;
 use Lumia\Factures\Core\Plugin;
+use Lumia\Factures\Tests\Support\SampleModule;
 use Lumia\Factures\Tests\Support\TestCase;
 
 /**
@@ -27,7 +28,7 @@ class ModulesTest extends TestCase {
 		$this->assertNotNull( $modules->get( 'invoices' ) );
 		$this->assertNotNull( $modules->get( 'bricks' ) );
 		$this->assertTrue( $modules->is_locked( 'invoices' ) );
-		$this->assertFalse( $modules->is_locked( 'bricks' ) );
+		$this->assertTrue( $modules->is_locked( 'bricks' ), 'Bricks is always on: its hooks only fire under Bricks.' );
 	}
 
 	public function test_invoices_module_cannot_be_deactivated(): void {
@@ -35,15 +36,30 @@ class ModulesTest extends TestCase {
 		$this->assertTrue( Plugin::instance()->modules()->is_active( 'invoices' ) );
 	}
 
+	public function test_bricks_module_is_active_and_cannot_be_deactivated(): void {
+		$modules = Plugin::instance()->modules();
+		$this->assertTrue( $modules->is_active( 'bricks' ) );
+		$this->assertArrayHasKey( 'bricks', $modules->get_active_instances() );
+		$this->assertFalse( $modules->deactivate( 'bricks' ) );
+		$this->assertTrue( $modules->is_active( 'bricks' ) );
+	}
+
 	public function test_optional_module_toggles(): void {
 		$modules = Plugin::instance()->modules();
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
+		$modules->register(
+			'sample',
+			array(
+				'name'  => 'Sample',
+				'class' => SampleModule::class,
+			)
+		);
+		$this->assertFalse( $modules->is_active( 'sample' ) );
 
-		$this->assertTrue( $modules->activate( 'bricks' ) );
-		$this->assertTrue( $modules->is_active( 'bricks' ) );
+		$this->assertTrue( $modules->activate( 'sample' ) );
+		$this->assertTrue( $modules->is_active( 'sample' ) );
 
-		$this->assertTrue( $modules->deactivate( 'bricks' ) );
-		$this->assertFalse( $modules->is_active( 'bricks' ) );
+		$this->assertTrue( $modules->deactivate( 'sample' ) );
+		$this->assertFalse( $modules->is_active( 'sample' ) );
 	}
 
 	/**
@@ -107,7 +123,7 @@ class ModulesTest extends TestCase {
 	public function test_activator_reads_locked_modules(): void {
 		$definitions = Modules::default_definitions();
 		$this->assertTrue( $definitions['invoices']['locked'] );
-		$this->assertEmpty( $definitions['bricks']['locked'] ?? false );
+		$this->assertTrue( $definitions['bricks']['locked'] );
 
 		delete_option( 'lumia_factures_settings' );
 		Activator::activate();

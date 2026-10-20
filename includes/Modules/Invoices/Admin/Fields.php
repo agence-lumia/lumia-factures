@@ -200,7 +200,8 @@ final class Fields {
 	}
 
 	/**
-	 * Color field.
+	 * Color field: a swatch (the native picker, the posted value) and a hex text box kept in sync by
+	 * invoices.js. The text box has no name: it is never posted, the swatch is the value.
 	 *
 	 * @param string $group Group.
 	 * @param string $key   Key.
@@ -210,11 +211,11 @@ final class Fields {
 		$id    = self::id( $group, $key );
 		$value = (string) $this->value( $group, $key );
 		?>
-		<div class="lumia-form__group">
+		<div class="lumia-form__group lumia-factures-inv-colorfield">
 			<label for="<?php echo esc_attr( $id ); ?>" class="lumia-form__label"><?php echo esc_html( $label ); ?></label>
-			<div class="lumia-inline">
-				<input type="color" class="lumia-input lumia-factures-inv-color" id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( self::name( $group, $key ) ); ?>" value="<?php echo esc_attr( $value ); ?>">
-				<code class="lumia-factures-inv-color__hex" data-lumia-factures-hex-for="<?php echo esc_attr( $id ); ?>"><?php echo esc_html( $value ); ?></code>
+			<div class="lumia-factures-inv-colorfield__control">
+				<input type="color" class="lumia-factures-inv-color" id="<?php echo esc_attr( $id ); ?>" name="<?php echo esc_attr( self::name( $group, $key ) ); ?>" value="<?php echo esc_attr( $value ); ?>">
+				<input type="text" class="lumia-input lumia-input--sm lumia-factures-inv-color__hex" data-lumia-factures-hex-for="<?php echo esc_attr( $id ); ?>" value="<?php echo esc_attr( $value ); ?>" maxlength="7" spellcheck="false" autocomplete="off" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: color label. */ __( '%s, hex code', 'lumia-factures' ), $label ) ); ?>">
 			</div>
 		</div>
 		<?php
