@@ -23,6 +23,7 @@ use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
 use Lumia\Factures\Modules\Invoices\Emails\EmailLinks;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
+use Lumia\Factures\Modules\Invoices\Front\CustomerLinks;
 use Lumia\Factures\Modules\Invoices\Front\Shortcode;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
@@ -73,6 +74,8 @@ class Module extends AbstractModule {
 		CreditNoteIssuer::schedule_sweep();
 
 		CustomerDownload::register();
+		// The documents on the My Account pages and the thank-you page (read only, nothing is issued).
+		CustomerLinks::register();
 		Shortcode::register();
 
 		// admin-post.php requests are is_admin() too.
