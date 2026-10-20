@@ -49,7 +49,9 @@ final class DocumentList {
 
 		$credit_notes = array_filter(
 			Register::for_parent( CreditNoteIssuer::TYPE, $order_id ),
-			static fn( IssuedDocument $doc ): bool => ( null === $only_refund_id || $doc->order_id === $only_refund_id ) && Availability::is_available( $doc )
+			static fn( IssuedDocument $doc ): bool => ( null === $only_refund_id || $doc->order_id === $only_refund_id )
+				&& CreditNoteIssuer::belongs_to( $doc, $order )
+				&& Availability::is_available( $doc )
 		);
 
 		// Issue order: by issue date, then by row id (a row reserved first may be numbered later).

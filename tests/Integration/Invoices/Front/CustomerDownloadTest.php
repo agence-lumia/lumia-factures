@@ -12,6 +12,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices\Front;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
@@ -420,6 +421,46 @@ class CustomerDownloadTest extends TestCase {
 
 		wp_set_current_user( $owner );
 		$this->assertFileExists( CustomerDownload::locate( $args )['path'] );
+	}
+
+	public function test_credit_note_of_a_deleted_order_is_404_for_the_order_given_its_id(): void {
+		global $wpdb;
+
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+
+		// Order X deleted for good after its credit note, then its id given to a new order (simulated
+		// on the same row: another key, created after the deletion).
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- backdates the credit note.
+		$wpdb->update( Installer::documents_table(), [ 'issued_at' => gmdate( 'Y-m-d H:i:s', time() - 2 * HOUR_IN_SECONDS ) ], [ 'id' => $doc->id ] );
+		CreditNoteIssuer::on_order_deleting( $order->get_id(), wc_get_order( $order->get_id() ) );
+		CreditNoteIssuer::on_order_deleted( $order->get_id() );
+		update_option( CreditNoteIssuer::DELETED_ORDERS_OPTION, [ $order->get_id() => time() - HOUR_IN_SECONDS ] );
+
+		$reused = wc_get_order( $order->get_id() );
+		$reused->set_order_key( wc_generate_order_key() );
+		$reused->set_date_created( time() - 60 );
+		$reused->save();
+
+		$this->refusal(
+			[
+				'lumia_factures_credit_note' => (string) $refund->get_id(),
+				'key'                        => wc_get_order( $order->get_id() )->get_order_key(),
+			]
+		);
+
+		// Before the id was reused, the same request with the order's own key served it.
+		update_option( CreditNoteIssuer::DELETED_ORDERS_OPTION, [] );
+		$this->assertSame(
+			Archive::path( $doc ),
+			CustomerDownload::locate(
+				[
+					'lumia_factures_credit_note' => (string) $refund->get_id(),
+					'key'                        => wc_get_order( $order->get_id() )->get_order_key(),
+				]
+			)['path']
+		);
 	}
 
 	public function test_credit_note_var_with_order_id_404(): void {

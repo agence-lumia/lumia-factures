@@ -1065,7 +1065,7 @@ class CreditNoteIssuerTest extends TestCase {
 		$since = (int) get_option( CreditNoteIssuer::SINCE_OPTION );
 		$this->assertGreaterThanOrEqual( $start, $since );
 
-		// Never moved once recorded (Module::init() and on_activate() call it on every boot).
+		// Never moved once recorded (Module::init() calls it on every boot).
 		update_option( CreditNoteIssuer::SINCE_OPTION, 1700000000 );
 		CreditNoteIssuer::ensure_since();
 		$this->assertSame( 1700000000, CreditNoteIssuer::since() );

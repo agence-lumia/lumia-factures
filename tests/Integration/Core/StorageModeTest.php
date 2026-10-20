@@ -187,9 +187,15 @@ final class StorageModeTest extends TestCase {
 		$other_refund = OrderFactory::refund( $other, [], 1.0 );
 		$this->track( Register::find( 'credit_note', $other_refund->get_id() ) );
 
+		$before = time();
 		$this->assertTrue( wc_get_order( $order->get_id() )->delete( true ) );
 
 		$this->assertFalse( wc_get_order( $order->get_id() ) );
+		// The deletion is recorded, so an order later given the freed id never shows these credit notes.
+		$deleted = get_option( CreditNoteIssuer::DELETED_ORDERS_OPTION );
+		$this->assertIsArray( $deleted );
+		$this->assertGreaterThanOrEqual( $before, $deleted[ $order->get_id() ] );
+		$this->assertArrayNotHasKey( $other->get_id(), $deleted );
 		foreach ( [ $first, $second ] as $refund ) {
 			$this->assertFalse( wc_get_order( $refund->get_id() ) );
 			if ( OrderUtil::custom_orders_table_usage_is_enabled() ) {

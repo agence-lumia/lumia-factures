@@ -204,7 +204,8 @@ final class CustomerDownload {
 		} else {
 			$doc   = Register::find( $type, $id );
 			$order = null !== $doc && $doc->parent_id > 0 ? wc_get_order( $doc->parent_id ) : false;
-			if ( ! $order instanceof WC_Order || ! self::can_access( $order, $key, $type ) ) {
+			// The live order with that id may be a later one given a freed id (CreditNoteIssuer::belongs_to()).
+			if ( ! $order instanceof WC_Order || null === $doc || ! CreditNoteIssuer::belongs_to( $doc, $order ) || ! self::can_access( $order, $key, $type ) ) {
 				self::not_found();
 			}
 		}

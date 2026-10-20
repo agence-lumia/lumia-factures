@@ -195,7 +195,9 @@ class Module extends AbstractModule {
 		// Before the installer, which records the schema version a fresh site would then seem to have.
 		Upgrader::maybe_upgrade();
 		Installer::install();
-		CreditNoteIssuer::ensure_since();
+		// No CreditNoteIssuer::ensure_since() here: activated next to Facture PDF Lumia 1.x, the
+		// module does not run yet and 1.x keeps handling the refunds. init() records it once the
+		// requirements are met.
 		Migration::forget_no_data();
 
 		if ( [] !== Requirements::check() ) {
@@ -219,6 +221,7 @@ class Module extends AbstractModule {
 				Migration::OPTION,
 				Migration::LOCK,
 				CreditNoteIssuer::SINCE_OPTION,
+				CreditNoteIssuer::DELETED_ORDERS_OPTION,
 				CreditNoteIssuer::SWEEP_CURSOR_OPTION,
 				Upgrader::OPTION,
 			],

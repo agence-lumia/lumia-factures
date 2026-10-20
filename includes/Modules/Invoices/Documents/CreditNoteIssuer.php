@@ -70,6 +70,13 @@ final class CreditNoteIssuer {
 	public const SINCE_OPTION = 'lumia_factures_credit_notes_since';
 
 	/**
+	 * Option mapping the id of each order deleted for good while it had credit notes to the UTC
+	 * timestamp of its deletion. Its register rows stay; an order given that id again (MySQL may
+	 * reuse a freed AUTO_INCREMENT value) never shows nor serves them (belongs_to()). Not autoloaded.
+	 */
+	public const DELETED_ORDERS_OPTION = 'lumia_factures_deleted_orders';
+
+	/**
 	 * Daily cron hook retrying the refunds left without a credit note.
 	 */
 	public const SWEEP_HOOK = 'lumia_factures_credit_notes_sweep';
@@ -702,7 +709,10 @@ final class CreditNoteIssuer {
 	}
 
 	/**
-	 * Records SINCE_OPTION when it is absent (install, upgrade to 2.1). Autoloaded: read on every boot.
+	 * Records SINCE_OPTION when it is absent (first boot of the module, upgrade to 2.1). Autoloaded:
+	 * read on every boot. Called only by Module::init(), which runs only when the requirements are
+	 * met: a site activated next to Facture PDF Lumia 1.x records it once 1.x is gone, never while
+	 * 1.x still handles the refunds.
 	 */
 	public static function ensure_since(): void {
 		if ( false === get_option( self::SINCE_OPTION ) ) {
@@ -716,8 +726,7 @@ final class CreditNoteIssuer {
 	 * An invalid value counts as now: no older order or refund is taken by itself.
 	 */
 	public static function since(): int {
-		self::ensure_since();
-
+		// Never recorded here: only a running module records it (ensure_since()).
 		$since = get_option( self::SINCE_OPTION );
 
 		return is_numeric( $since ) && (int) $since > 0 ? (int) $since : time();
@@ -741,11 +750,16 @@ final class CreditNoteIssuer {
 		self::$orders_deleting[ $order_id ] = true;
 
 		try {
+			$rows    = Register::for_parent( self::TYPE, $order_id );
 			$numbers = [];
-			foreach ( Register::for_parent( self::TYPE, $order_id ) as $doc ) {
+			foreach ( $rows as $doc ) {
 				if ( 'issued' === $doc->status && null !== $doc->number ) {
 					$numbers[] = $doc->number;
 				}
+			}
+
+			if ( [] !== $rows ) {
+				self::record_deleted_order( $order_id );
 			}
 
 			if ( [] !== $numbers ) {
@@ -753,6 +767,56 @@ final class CreditNoteIssuer {
 			}
 		} catch ( Throwable $e ) {
 			Pipeline::log( 'The deletion of order ' . $order_id . ' could not be logged: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+		}
+	}
+
+	/**
+	 * Whether a credit note row belongs to this live order: its parent is the order and was not an
+	 * earlier order deleted for good whose id the order was given again (DELETED_ORDERS_OPTION).
+	 *
+	 * Every customer surface checks it (DocumentList, CustomerDownload, so the Bricks tags and the
+	 * e-mail links too): the rows of a deleted order keep its id, and nothing else ties them to it.
+	 * An order created before the recorded deletion is the one that was being deleted (the deletion
+	 * failed): its credit notes stay its own. Reads only.
+	 *
+	 * @param IssuedDocument $doc   Credit note row.
+	 * @param WC_Order       $order Live order.
+	 */
+	public static function belongs_to( IssuedDocument $doc, WC_Order $order ): bool {
+		if ( self::TYPE !== $doc->type || $doc->parent_id <= 0 || $doc->parent_id !== $order->get_id() ) {
+			return false;
+		}
+
+		$deleted = get_option( self::DELETED_ORDERS_OPTION );
+		if ( ! is_array( $deleted ) || ! isset( $deleted[ $doc->parent_id ] ) || ! is_numeric( $deleted[ $doc->parent_id ] ) ) {
+			return true;
+		}
+
+		$deleted_at = (int) $deleted[ $doc->parent_id ];
+		$created    = $order->get_date_created();
+		if ( null !== $created && $created->getTimestamp() < $deleted_at ) {
+			return true;
+		}
+
+		// A new order with the freed id: only what was issued for it after the deletion is its own.
+		return $doc->issued_at > $deleted_at;
+	}
+
+	/**
+	 * Records that an order with credit notes is deleted for good (DELETED_ORDERS_OPTION).
+	 *
+	 * @param int $order_id Order id.
+	 */
+	private static function record_deleted_order( int $order_id ): void {
+		$deleted = get_option( self::DELETED_ORDERS_OPTION );
+		$deleted = is_array( $deleted ) ? $deleted : [];
+
+		$deleted[ $order_id ] = time();
+
+		if ( false === get_option( self::DELETED_ORDERS_OPTION ) ) {
+			add_option( self::DELETED_ORDERS_OPTION, $deleted, '', false );
+		} else {
+			update_option( self::DELETED_ORDERS_OPTION, $deleted, false );
 		}
 	}
 

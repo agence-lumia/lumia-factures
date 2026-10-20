@@ -107,6 +107,54 @@ class DocumentListTest extends TestCase {
 		$this->assertSame( [], DocumentList::for_order( wc_get_order( $order->get_id() ), false ) );
 	}
 
+	public function test_order_given_the_id_of_a_deleted_order_never_lists_its_credit_notes(): void {
+		$order = $this->issued_order();
+		$old   = Register::find( 'credit_note', $this->refund( $order, 2.0 )->get_id() );
+
+		// Order X was deleted for good an hour after its credit note was issued; MySQL then gave the
+		// freed id X to a new order of another customer (simulated on the same row: new key, new date).
+		$this->set_issued_at( $old, time() - 2 * HOUR_IN_SECONDS );
+		$old = Register::find( 'credit_note', $old->order_id );
+		CreditNoteIssuer::on_order_deleting( $order->get_id(), wc_get_order( $order->get_id() ) );
+		CreditNoteIssuer::on_order_deleted( $order->get_id() );
+		$this->assertArrayHasKey( $order->get_id(), get_option( CreditNoteIssuer::DELETED_ORDERS_OPTION ) );
+		update_option( CreditNoteIssuer::DELETED_ORDERS_OPTION, [ $order->get_id() => time() - HOUR_IN_SECONDS ] );
+
+		$reused = wc_get_order( $order->get_id() );
+		$reused->set_order_key( wc_generate_order_key() );
+		$reused->set_billing_email( 'new-customer@example.com' );
+		$reused->set_date_created( time() - 60 );
+		$reused->save();
+		$reused = wc_get_order( $order->get_id() );
+
+		$this->assertFalse( CreditNoteIssuer::belongs_to( $old, $reused ) );
+		$this->assertNotContains( $old->number, array_column( DocumentList::for_order( $reused, false ), 'number' ) );
+		$this->assertNotContains( $old->number, array_column( DocumentList::for_order( $reused, true ), 'number' ) );
+
+		// A credit note issued for the new order after the deletion is its own.
+		$new = Register::find( 'credit_note', $this->refund( $reused, 1.0 )->get_id() );
+		$this->assertTrue( CreditNoteIssuer::belongs_to( $new, wc_get_order( $order->get_id() ) ) );
+		$this->assertContains( $new->number, array_column( DocumentList::for_order( wc_get_order( $order->get_id() ), false ), 'number' ) );
+	}
+
+	public function test_order_whose_deletion_failed_keeps_its_credit_notes(): void {
+		$order = $this->issued_order();
+		$doc   = Register::find( 'credit_note', $this->refund( $order, 2.0 )->get_id() );
+		$live  = wc_get_order( $order->get_id() );
+		$live->set_date_created( time() - DAY_IN_SECONDS );
+		$live->save();
+
+		// The deletion was announced, then did not happen: the order created before it is the same one.
+		CreditNoteIssuer::on_order_deleting( $order->get_id(), wc_get_order( $order->get_id() ) );
+		CreditNoteIssuer::on_order_deleted( $order->get_id() );
+
+		$this->assertTrue( CreditNoteIssuer::belongs_to( $doc, wc_get_order( $order->get_id() ) ) );
+		$this->assertContains( $doc->number, array_column( DocumentList::for_order( wc_get_order( $order->get_id() ), false ), 'number' ) );
+
+		// Never another order's row.
+		$this->assertFalse( CreditNoteIssuer::belongs_to( $doc, $this->issued_order() ) );
+	}
+
 	public function test_includes_null_file_invoice(): void {
 		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		Register::import( 'invoice', $order->get_id(), '202610000077', 'invoice_2026', 77, 1760000000 );

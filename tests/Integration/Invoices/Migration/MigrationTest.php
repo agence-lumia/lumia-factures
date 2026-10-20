@@ -13,6 +13,7 @@ defined( 'ABSPATH' ) || exit;
 
 use Automattic\WooCommerce\Utilities\OrderUtil;
 use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
@@ -117,6 +118,30 @@ class MigrationTest extends TestCase {
 		$this->assertNotNull( $doc );
 		$this->assertSame( 'FA-0005', $doc->number );
 		$this->assertSame( 5, Sequences::current( $this->key ) );
+	}
+
+	public function test_activation_while_requirements_fail_records_no_credit_note_start(): void {
+		// Activated next to Facture PDF Lumia 1.x (any failing requirement: no module runs), 1.x keeps
+		// handling the refunds: none of them may later count as made since credit notes exist.
+		delete_option( CreditNoteIssuer::SINCE_OPTION );
+		add_filter( 'lumia_factures_requirements_wc_active', '__return_false' );
+		try {
+			$this->activate();
+			$this->assertFalse( get_option( CreditNoteIssuer::SINCE_OPTION ) );
+			// Reading it records nothing either.
+			$this->assertGreaterThan( 0, CreditNoteIssuer::since() );
+			$this->assertFalse( get_option( CreditNoteIssuer::SINCE_OPTION ) );
+		} finally {
+			remove_filter( 'lumia_factures_requirements_wc_active', '__return_false' );
+		}
+
+		// Activation with the requirements met records nothing either: the module's first boot does.
+		$this->activate();
+		$this->assertFalse( get_option( CreditNoteIssuer::SINCE_OPTION ) );
+
+		$start = time();
+		( new Module( 'invoices' ) )->init();
+		$this->assertGreaterThanOrEqual( $start, (int) get_option( CreditNoteIssuer::SINCE_OPTION ) );
 	}
 
 	public function test_site_without_legacy_data_is_unaffected(): void {
