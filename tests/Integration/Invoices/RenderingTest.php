@@ -432,6 +432,11 @@ class RenderingTest extends TestCase {
 
 		preg_match_all( '/<col style="width: ([0-9.]+)%;">/', $html, $matches );
 		$this->assertEqualsWithDelta( 100.0, array_sum( array_map( 'floatval', $matches[1] ) ), 0.05 );
+
+		// Dompdf only honours the widths of a fixed layout when the header cells carry them too.
+		preg_match_all( '/<th class="lf-col-[a-z]+" style="width: ([0-9.]+)%;">/', $html, $headers );
+		$this->assertSame( $matches[1], $headers[1] );
+		$this->assertStringContainsString( '<table class="lf-items" style="table-layout: fixed; width: 100%;">', $html );
 	}
 
 	public function test_description_column_kept_when_a_line_has_one(): void {

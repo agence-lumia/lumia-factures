@@ -610,6 +610,44 @@ msgstr "Le PDF archivé de cette facture est manquant ou endommagé. Utilisez «
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr "Le PDF de la facture %s était manquant ou endommagé : il a été reconstruit à partir des données actuelles de la commande."
 
+msgid "%1$s \"%2$s\" is not available: replaced with Inter."
+msgstr "%1$s « %2$s » n'est pas disponible : remplacée par Inter."
+
+msgid "%1$s had %2$d entry: re-enter it in \"Legal text\"."
+msgid_plural "%1$s had %2$d entries: re-enter them in \"Legal text\"."
+msgstr[0] "%1$s contenait %2$d mention : saisissez-la à nouveau dans « Texte légal »."
+msgstr[1] "%1$s contenait %2$d mentions : saisissez-les à nouveau dans « Texte légal »."
+
+msgid "%s was set and is no longer supported: it was not imported."
+msgstr "%s était renseigné et n'est plus pris en charge : il n'a pas été importé."
+
+msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
+msgstr "La facture %1$s de la commande %2$d n'avait pas de date de facture : la date de génération de son PDF a été utilisée."
+
+msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
+msgstr "La facture %1$s de la commande %2$d n'avait pas de date de facture : la date de création de la commande a été utilisée."
+
+msgid "Invoice %s imported from Facture PDF Lumia."
+msgstr "Facture %s importée depuis Facture PDF Lumia."
+
+msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
+msgstr "L'ancien PDF de la facture %1$s (commande %2$d, %3$s) n'est pas un PDF lisible de l'ancien dossier : il n'a pas été importé, le PDF sera généré au premier besoin."
+
+msgid "Order %d: part of the import could not be written (see the PHP error log)."
+msgstr "Commande %d : une partie de l'import n'a pas pu être enregistrée (voir le journal d'erreurs PHP)."
+
+msgid "The number is already used by another invoice."
+msgstr "Ce numéro est déjà utilisé par une autre facture."
+
+msgid "An invoice is being issued for this order."
+msgstr "Une facture est en cours d'émission pour cette commande."
+
+msgid "The order already has invoice %s."
+msgstr "La commande a déjà la facture %s."
+
+msgid "The invoice could not be recorded (database error, see the PHP error log)."
+msgstr "La facture n'a pas pu être enregistrée (erreur de base de données, voir le journal d'erreurs PHP)."
+
 msgid "You are not allowed to download invoices."
 msgstr "Vous n'êtes pas autorisé à télécharger les factures."
 
@@ -1147,3 +1185,94 @@ msgstr "Actualiser"
 msgctxt "watermark printed on the invoice preview"
 msgid "Preview"
 msgstr "Aperçu"
+
+msgid "Invoice URL"
+msgstr "URL de la facture"
+
+msgid "Invoice status"
+msgstr "Statut de la facture"
+
+msgid "Lümia Factures: no invoice is issued until the Facture PDF Lumia data is imported."
+msgstr "Lümia Factures : aucune facture n'est émise tant que les données de Facture PDF Lumia ne sont pas importées."
+
+msgid "Import status: %s."
+msgstr "Statut de l'import : %s."
+
+msgid "Last run: %1$d invoices imported, %2$d already imported, %3$d PDFs copied, %4$d PDFs missing, %5$d conflicts."
+msgstr "Dernier passage : %1$d factures importées, %2$d déjà importées, %3$d PDF copiés, %4$d PDF manquants, %5$d conflits."
+
+msgid "Last error: %s"
+msgstr "Dernière erreur : %s"
+
+msgid "Run the import now"
+msgstr "Lancer l'import maintenant"
+
+msgid "The Facture PDF Lumia data has been imported. Invoices are issued again."
+msgstr "Les données de Facture PDF Lumia ont été importées. Les factures sont de nouveau émises."
+
+msgid "The Facture PDF Lumia data has been imported, but some invoices were skipped: run \"wp lumia-factures migration-status\" or check the PHP error log."
+msgstr "Les données de Facture PDF Lumia ont été importées, mais certaines factures ont été ignorées : exécutez \"wp lumia-factures migration-status\" ou consultez le journal d'erreurs PHP."
+
+msgid "The Facture PDF Lumia import failed. See the PHP error log, then try again."
+msgstr "L'import de Facture PDF Lumia a échoué. Consultez le journal d'erreurs PHP, puis réessayez."
+
+msgid "The Facture PDF Lumia import is already running. Reload this page in a few minutes."
+msgstr "L'import de Facture PDF Lumia est déjà en cours. Rechargez cette page dans quelques minutes."
+
+msgid "There is no Facture PDF Lumia data to import."
+msgstr "Il n'y a aucune donnée Facture PDF Lumia à importer."
+
+msgid "waiting to run"
+msgstr "en attente de lancement"
+
+msgid "running"
+msgstr "en cours"
+
+msgid "failed"
+msgstr "échoué"
+
+msgid "not started"
+msgstr "non démarré"
+
+msgid "No invoice can be issued for this order until the Facture PDF Lumia data is imported."
+msgstr "Aucune facture ne peut être émise pour cette commande tant que les données de Facture PDF Lumia ne sont pas importées."
+
+msgid "Invoice not issued: this order has a Facture PDF Lumia invoice that could not be imported; see the migration report."
+msgstr "Facture non émise : cette commande a une facture Facture PDF Lumia qui n'a pas pu être importée ; consultez le rapport de migration."
+
+msgid "Invoice not issued: the Facture PDF Lumia data is being imported."
+msgstr "Facture non émise : les données de Facture PDF Lumia sont en cours d'import."
+
+msgid "Invoice not found."
+msgstr "Facture introuvable."
+
+msgid "Download my invoice"
+msgstr "Télécharger ma facture"
+
+msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
+msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia : le module Bricks est activé, il les affiche comme avant."
+
+msgid "Lümia Factures: %d Facture PDF Lumia invoice was not imported (conflict)."
+msgid_plural "Lümia Factures: %d Facture PDF Lumia invoices were not imported (conflicts)."
+msgstr[0] "Lümia Factures : %d facture Facture PDF Lumia n'a pas été importée (conflit)."
+msgstr[1] "Lümia Factures : %d factures Facture PDF Lumia n'ont pas été importées (conflits)."
+
+msgid "These orders get no invoice until the conflict is handled by hand. Fix the cause, then run \"wp lumia-factures migrate --force\"."
+msgstr "Ces commandes ne reçoivent aucune facture tant que le conflit n'est pas réglé à la main. Corrigez la cause, puis lancez « wp lumia-factures migrate --force »."
+
+msgid "Order #%d"
+msgstr "Commande n° %d"
+
+msgid "and %d more order."
+msgid_plural "and %d more orders."
+msgstr[0] "et %d autre commande."
+msgstr[1] "et %d autres commandes."
+
+msgid "Dismiss"
+msgstr "Masquer"
+
+msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
+msgstr "Aucune facture ne peut être émise pour cette commande : sa facture Facture PDF Lumia n'a pas pu être importée (conflit). Consultez le rapport de migration."
+
+msgid "A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render."
+msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia, mais le module Bricks n'a pas pu être activé : activez-le dans l'onglet Modules de Lümia Factures, sinon les balises ne s'afficheront pas."

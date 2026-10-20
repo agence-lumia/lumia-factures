@@ -144,4 +144,51 @@ class ArchiveTest extends TestCase {
 	private function doc( ?string $file, ?string $checksum ): IssuedDocument {
 		return new IssuedDocument( 1, 'invoice', 1, 'issued', 'FA-1', 'invoice', 1, time(), $file, $checksum );
 	}
+
+	public function test_import_file_copies_a_legacy_pdf_unchanged(): void {
+		$source = $this->legacy_file( '%PDF-1.4 legacy bytes' );
+		$time   = (int) strtotime( '2026-02-10 10:00:00 UTC' );
+
+		$stored = Archive::import_file( $source, '202602000042', $time );
+
+		$this->assertIsArray( $stored );
+		$this->written[] = Archive::root() . '/' . $stored['file'];
+		$this->assertMatchesRegularExpression( '#^2026/02/202602000042-[0-9a-f]{16}\.pdf$#', $stored['file'] );
+		$this->assertSame( hash( 'sha256', '%PDF-1.4 legacy bytes' ), $stored['checksum'] );
+		$this->assertSame( '%PDF-1.4 legacy bytes', file_get_contents( Archive::root() . '/' . $stored['file'] ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$this->assertTrue( Archive::verify( $this->doc( $stored['file'], $stored['checksum'] ) ) );
+
+		// The legacy file stays where it was.
+		$this->assertSame( '%PDF-1.4 legacy bytes', file_get_contents( $source ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+	}
+
+	public function test_import_file_refuses_what_is_not_a_legacy_pdf(): void {
+		$this->assertNull( Archive::import_file( $this->legacy_file( '<html>error page</html>' ), 'FA-X', time() ) );
+		$this->assertNull( Archive::import_file( $this->legacy_file( '' ), 'FA-X', time() ) );
+		$this->assertNull( Archive::import_file( Archive::legacy_root() . '/2026/01/missing.pdf', 'FA-X', time() ) );
+
+		// A PDF outside the legacy folder, directly or through `..`.
+		$outside = wp_upload_dir()['basedir'] . '/outside-' . wp_generate_password( 8, false ) . '.pdf';
+		file_put_contents( $outside, '%PDF-1.4 outside' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		$this->written[] = $outside;
+		$this->legacy_file( '%PDF-1.4 keeps the folder' );
+
+		$this->assertNull( Archive::import_file( $outside, 'FA-X', time() ) );
+		$this->assertNull( Archive::import_file( Archive::legacy_root() . '/../' . basename( $outside ), 'FA-X', time() ) );
+	}
+
+	/**
+	 * Writes a file in the legacy folder.
+	 *
+	 * @param string $bytes Content.
+	 * @return string Absolute path.
+	 */
+	private function legacy_file( string $bytes ): string {
+		$path = Archive::legacy_root() . '/2026/02/invoice-1-' . bin2hex( random_bytes( 16 ) ) . '.pdf';
+		wp_mkdir_p( dirname( $path ) );
+		file_put_contents( $path, $bytes ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+		$this->written[] = $path;
+
+		return $path;
+	}
 }

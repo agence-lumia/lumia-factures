@@ -103,6 +103,18 @@ final class OrderTools {
 			return;
 		}
 
+		// Checked before can_issue(), which would note the refusal on the order just for viewing it.
+		$gate = Issuer::gate_reason( $order );
+		if ( '' !== $gate ) {
+			printf(
+				'<p class="description">%s</p>',
+				'conflict' === $gate
+					? esc_html__( 'No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report.', 'lumia-factures' )
+					: esc_html__( 'No invoice can be issued for this order until the Facture PDF Lumia data is imported.', 'lumia-factures' )
+			);
+			return;
+		}
+
 		if ( Issuer::can_issue( $order ) ) {
 			printf(
 				'<p>%1$s</p><p><a href="%2$s" class="button button-primary">%3$s</a></p>',

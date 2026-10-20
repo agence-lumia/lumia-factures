@@ -9,6 +9,8 @@ namespace Lumia\Factures\Modules\Invoices\Documents;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Migration\LegacySource;
+use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
@@ -32,6 +34,11 @@ final class Issuer {
 	 * Document type of an invoice.
 	 */
 	public const TYPE = 'invoice';
+
+	/**
+	 * Order meta holding the reason of the last import gate note (`import` or `conflict`), so each note is written once per order.
+	 */
+	public const GATE_FLAG = '_lumia_factures_gate_noted';
 
 	/**
 	 * Age in seconds after which a reservation that never got a number is a crash leftover.
@@ -68,7 +75,12 @@ final class Issuer {
 	}
 
 	/**
-	 * Whether the order's status triggers an invoice.
+	 * Whether the order's status triggers an invoice, and the legacy import allows it.
+	 *
+	 * The legacy gate is applied after the filter, so no third-party code can bypass it: a number
+	 * issued before the import ends could take a number the legacy plugin already printed, and a
+	 * legacy-invoiced order must resolve to its imported invoice, never get a second one. Each
+	 * refusal by the gate notes the order, once.
 	 *
 	 * @param WC_Order $order Order.
 	 */
@@ -80,10 +92,76 @@ final class Issuer {
 		/**
 		 * Filters whether an invoice may be issued for the order.
 		 *
+		 * It cannot bypass the legacy import gate (see Issuer::gated()).
+		 *
 		 * @param bool     $can   True when the order status is a trigger status.
 		 * @param WC_Order $order Order.
 		 */
-		return (bool) apply_filters( 'lumia_factures_can_issue', $can, $order );
+		$can = (bool) apply_filters( 'lumia_factures_can_issue', $can, $order );
+
+		if ( $can ) {
+			$reason = self::gate_reason( $order );
+			if ( '' !== $reason ) {
+				self::guard( 'import gate note', $order->get_id(), static fn() => self::note_gate( $order, $reason ) );
+				return false;
+			}
+		}
+
+		return $can;
+	}
+
+	/**
+	 * Whether the legacy import forbids numbering the order now.
+	 *
+	 * True while the Facture PDF Lumia import is not finished and, whatever its state, for an order
+	 * carrying a legacy number without an issued invoice in the register (the import resolves those
+	 * orders; one it reported as a conflict stays refused until handled by hand).
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public static function gated( WC_Order $order ): bool {
+		return '' !== self::gate_reason( $order );
+	}
+
+	/**
+	 * Why the legacy import forbids numbering the order. Reads only (the order meta box uses it).
+	 *
+	 * @param WC_Order $order Order.
+	 * @return string `import` (the import is not finished), `conflict` (a legacy number the import
+	 *                could not record), '' when the order may be numbered.
+	 */
+	public static function gate_reason( WC_Order $order ): string {
+		if ( Migration::blocks_issuing() ) {
+			return 'import';
+		}
+
+		if ( '' === trim( (string) $order->get_meta( LegacySource::META_NUMBER ) ) ) {
+			return '';
+		}
+
+		$doc = Register::find( self::TYPE, $order->get_id() );
+
+		return null === $doc || 'issued' !== $doc->status ? 'conflict' : '';
+	}
+
+	/**
+	 * Notes on the order why it got no invoice, once per reason (the flag holds the last reason noted).
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param string   $reason `import` or `conflict`.
+	 */
+	private static function note_gate( WC_Order $order, string $reason ): void {
+		if ( $order->get_id() <= 0 || (string) $order->get_meta( self::GATE_FLAG ) === $reason ) {
+			return;
+		}
+
+		$order->update_meta_data( self::GATE_FLAG, $reason );
+		$order->save();
+		$order->add_order_note(
+			'conflict' === $reason
+				? __( 'Invoice not issued: this order has a Facture PDF Lumia invoice that could not be imported; see the migration report.', 'lumia-factures' )
+				: __( 'Invoice not issued: the Facture PDF Lumia data is being imported.', 'lumia-factures' )
+		);
 	}
 
 	/**
@@ -213,7 +291,8 @@ final class Issuer {
 	}
 
 	/**
-	 * Writes the invoice number and date on the order when they are absent or different.
+	 * Writes the invoice number and date on the order when they are absent or different, and
+	 * clears the import gate flag.
 	 *
 	 * @param IssuedDocument $doc   Issued document.
 	 * @param WC_Order       $order Order.
@@ -221,9 +300,15 @@ final class Issuer {
 	private static function sync_meta( IssuedDocument $doc, WC_Order $order ): void {
 		$number = (string) $doc->number;
 		$date   = (string) $doc->issued_at;
+		$noted  = '' !== (string) $order->get_meta( self::GATE_FLAG );
 
-		if ( (string) $order->get_meta( '_lumia_factures_invoice_number' ) === $number && (string) $order->get_meta( '_lumia_factures_invoice_date' ) === $date ) {
+		if ( ! $noted && (string) $order->get_meta( '_lumia_factures_invoice_number' ) === $number && (string) $order->get_meta( '_lumia_factures_invoice_date' ) === $date ) {
 			return;
+		}
+
+		// The order is invoiced: the import gate flag has served its purpose.
+		if ( $noted ) {
+			$order->delete_meta_data( self::GATE_FLAG );
 		}
 
 		$order->update_meta_data( '_lumia_factures_invoice_number', $number );

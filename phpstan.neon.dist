@@ -15,5 +15,6 @@ parameters:
         - tools/phpstan-bootstrap.php
     scanFiles:
         - vendor/php-stubs/woocommerce-stubs/woocommerce-stubs.php
+        - tools/phpstan-wp-cli-stubs.php
     treatPhpDocTypesAsCertain: false
     reportUnmatchedIgnoredErrors: true

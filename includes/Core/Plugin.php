@@ -114,6 +114,13 @@ class Plugin {
 	private function init(): void {
 		add_action( 'init', [ $this, 'load_textdomain' ] );
 		add_action( 'init', [ $this, 'boot' ] );
+
+		// Registered whatever the requirements, like the updater: the read-only migration commands
+		// (`migrate --dry-run`, `migration-status`) must work while the legacy plugin is still
+		// active. The command refuses a real run itself while a requirement fails.
+		if ( defined( 'WP_CLI' ) && WP_CLI && class_exists( 'WP_CLI' ) ) {
+			\WP_CLI::add_command( 'lumia-factures', \Lumia\Factures\Modules\Invoices\Cli\Command::class );
+		}
 	}
 
 	/**

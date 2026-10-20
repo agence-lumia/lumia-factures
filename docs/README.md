@@ -10,6 +10,7 @@ Internal plugin documentation, excluded from the release ZIPs. `CLAUDE.md` at th
 
 | Module | Page | What you will find there |
 |---|---|---|
-| Invoices | [modules/invoices.md](modules/invoices.md) | architecture, issue flow, invariants and the tests that pin them, pitfalls (numbering, rounding, archive), settings screen, live preview |
+| Invoices | [modules/invoices.md](modules/invoices.md) | architecture, issue flow, invariants and the tests that pin them, pitfalls (numbering, rounding, archive), settings screen, live preview, legacy migration, customer download |
+| Bricks | [modules/bricks.md](modules/bricks.md) | dynamic tags, legacy `{fpl_invoice_*}` aliases, pitfalls |
 
-Each module page documents the **pitfalls and decisions** (what broke, why the solution is the one it is), not the code itself: the code reads from `includes/Modules/<Module>/`. The Bricks module has no page yet (skeleton).
+Each module page documents the **pitfalls and decisions** (what broke, why the solution is the one it is), not the code itself: the code reads from `includes/Modules/<Module>/`.

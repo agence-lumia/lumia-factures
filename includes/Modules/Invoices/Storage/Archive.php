@@ -48,6 +48,62 @@ final class Archive {
 			return null;
 		}
 
+		return self::place( $pdf, $number, $issued_at );
+	}
+
+	/**
+	 * Absolute path of the legacy Facture PDF Lumia storage folder, without trailing slash.
+	 */
+	public static function legacy_root(): string {
+		return wp_upload_dir()['basedir'] . '/facture-pdf-lumia';
+	}
+
+	/**
+	 * Reads a legacy PDF, refusing anything that is not one.
+	 *
+	 * The source must resolve (symbolic links and `..` included) to a readable file inside the
+	 * legacy storage folder and start with the PDF signature `%PDF-`.
+	 *
+	 * @param string $source Absolute path of the legacy file.
+	 * @return string|null The bytes, null when refused.
+	 */
+	public static function read_legacy( string $source ): ?string {
+		$root = realpath( self::legacy_root() );
+		$path = realpath( $source );
+
+		if ( false === $root || false === $path || ! str_starts_with( $path, $root . DIRECTORY_SEPARATOR ) || ! is_file( $path ) || ! is_readable( $path ) ) {
+			return null;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local file, checked above.
+		$bytes = file_get_contents( $path );
+
+		return is_string( $bytes ) && str_starts_with( $bytes, '%PDF-' ) ? $bytes : null;
+	}
+
+	/**
+	 * Copies a legacy PDF, unchanged, into the archive under a new write-once file name.
+	 *
+	 * @param string $source    Absolute path of the legacy file (see read_legacy()).
+	 * @param string $number    Invoice number (part of the file name).
+	 * @param int    $issued_at UTC timestamp, gives the `Y/m` folder.
+	 * @return array{file: string, checksum: string}|null Relative path and SHA-256, null when refused or on failure.
+	 */
+	public static function import_file( string $source, string $number, int $issued_at ): ?array {
+		$bytes = self::read_legacy( $source );
+
+		return null === $bytes ? null : self::place( $bytes, $number, $issued_at );
+	}
+
+	/**
+	 * Writes bytes under `Y/m/{number}-{16 hex}.pdf` with the folder guards.
+	 *
+	 * @param string $pdf       PDF bytes, not empty.
+	 * @param string $number    Invoice number (part of the file name).
+	 * @param int    $issued_at UTC timestamp, gives the `Y/m` folder.
+	 * @return array{file: string, checksum: string}|null Relative path and SHA-256, null on failure.
+	 */
+	private static function place( string $pdf, string $number, int $issued_at ): ?array {
 		$root   = self::root();
 		$year   = gmdate( 'Y', $issued_at );
 		$month  = gmdate( 'm', $issued_at );
