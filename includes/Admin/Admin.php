@@ -286,6 +286,20 @@ class Admin {
 		if ( ! $this->is_plugin_screen() ) {
 			return;
 		}
+
+		self::render_modal_overlay();
+		?>
+		<div id="lumia-factures-toast-container" class="lumia-toast-container" role="region" aria-live="polite" aria-label="<?php esc_attr_e( 'Notifications', 'lumia-factures' ); ?>"></div>
+		<script>window.lumiaFacturesToast = <?php echo wp_json_encode( $this->toast ); ?>;</script>
+		<?php
+	}
+
+	/**
+	 * The confirmation modal singleton (`window.lumiaFacturesModal`, `[data-modal-confirm]`), printed
+	 * once per page: by the plugin screen footer, or by a module that loads `admin.js` on another
+	 * screen (the order screen's "Cancel invoice").
+	 */
+	public static function render_modal_overlay(): void {
 		?>
 		<div id="lumia-factures-modal-overlay" class="lumia-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
 			<div class="lumia-modal">
@@ -301,8 +315,6 @@ class Admin {
 				</div>
 			</div>
 		</div>
-		<div id="lumia-factures-toast-container" class="lumia-toast-container" role="region" aria-live="polite" aria-label="<?php esc_attr_e( 'Notifications', 'lumia-factures' ); ?>"></div>
-		<script>window.lumiaFacturesToast = <?php echo wp_json_encode( $this->toast ); ?>;</script>
 		<?php
 	}
 

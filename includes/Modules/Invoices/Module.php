@@ -12,6 +12,7 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Core\Requirements;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
+use Lumia\Factures\Modules\Invoices\Admin\CreditNoteNotice;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
@@ -75,6 +76,7 @@ class Module extends AbstractModule {
 			Counters::register();
 			Preview::register();
 			MigrationNotice::register();
+			CreditNoteNotice::register();
 			add_action( 'all_admin_notices', [ CreditNoteIssuer::class, 'render_deletion_notice' ] );
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
