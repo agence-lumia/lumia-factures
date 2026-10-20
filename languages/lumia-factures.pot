@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Lümia Factures 2.0.0-dev.3\n"
+"Project-Id-Version: Lümia Factures 2.0.1-dev.2\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/lumia-factures\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-20T08:00:12+00:00\n"
+"POT-Creation-Date: 2026-10-20T18:27:25+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -70,12 +70,14 @@ msgid "Are you sure?"
 msgstr ""
 
 #: includes/Admin/Admin.php:178
-#: includes/Admin/Admin.php:300
+#: includes/Admin/Admin.php:314
+#: includes/Modules/Invoices/Admin/OrderTools.php:126
 msgid "Confirm"
 msgstr ""
 
 #: includes/Admin/Admin.php:179
-#: includes/Admin/Admin.php:299
+#: includes/Admin/Admin.php:313
+#: includes/Modules/Invoices/Admin/OrderTools.php:127
 msgid "Cancel"
 msgstr ""
 
@@ -111,7 +113,7 @@ msgstr ""
 msgid "Update check completed."
 msgstr ""
 
-#: includes/Admin/Admin.php:304
+#: includes/Admin/Admin.php:292
 msgid "Notifications"
 msgstr ""
 
@@ -180,44 +182,130 @@ msgstr ""
 msgid "No release notes available."
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:47
+#: includes/Modules/Bricks/Tags.php:69
 msgid "Invoice URL"
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:48
-#: templates/admin/invoices/numbering.php:28
+#: includes/Modules/Bricks/Tags.php:70
+#: templates/admin/invoices/numbering.php:36
 msgid "Invoice number"
 msgstr ""
 
-#: includes/Modules/Bricks/Tags.php:49
+#: includes/Modules/Bricks/Tags.php:71
 msgid "Invoice status"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Counters.php:42
+#: includes/Modules/Bricks/Tags.php:72
+msgid "Latest credit note URL"
+msgstr ""
+
+#: includes/Modules/Bricks/Tags.php:73
+msgid "Latest credit note number"
+msgstr ""
+
+#: includes/Modules/Bricks/Tags.php:74
+msgid "Latest credit note status"
+msgstr ""
+
+#: includes/Modules/Bricks/Tags.php:75
+msgid "Order documents (HTML list)"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Counters.php:44
 msgid "The counter has been raised."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Counters.php:43
+#: includes/Modules/Invoices/Admin/Counters.php:45
 msgid "The counter was not raised: the new value must be higher than the current one."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Counters.php:70
+#: includes/Modules/Invoices/Admin/Counters.php:77
+#: includes/Modules/Invoices/Admin/OrderTools.php:96
+#: includes/Modules/Invoices/Admin/OrderTools.php:182
+#: includes/Modules/Invoices/Front/CustomerLinks.php:81
+#: includes/Modules/Invoices/Front/DocumentList.php:47
+#: includes/Modules/Invoices/Rendering/Context.php:219
+#: templates/admin/invoices/content.php:40
+msgid "Invoice"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Counters.php:80
+#: includes/Modules/Invoices/Front/DocumentList.php:62
+#: includes/Modules/Invoices/Rendering/Context.php:218
+#: templates/admin/invoices/content.php:62
+#: templates/admin/invoices/content.php:67
+msgid "Credit note"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Counters.php:109
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:169
 #: includes/Modules/Invoices/Admin/MigrationNotice.php:127
 #: includes/Modules/Invoices/Admin/MigrationNotice.php:232
-#: includes/Modules/Invoices/Admin/OrderTools.php:296
-#: includes/Modules/Invoices/Admin/Preview.php:52
+#: includes/Modules/Invoices/Admin/OrderTools.php:721
+#: includes/Modules/Invoices/Admin/Preview.php:53
 msgid "You are not allowed to do this."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Download.php:65
+#. translators: %d: number of refunds
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:144
+#, php-format
+msgid "Lümia Factures: %d refund has no credit note yet."
+msgid_plural "Lümia Factures: %d refunds have no credit note yet."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:148
+msgid "The reason is shown in the Invoice box of each order. Refunds made before credit notes existed are not counted: issue theirs from the order or with \"wp lumia-factures issue-credit-notes\"."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:160
+msgid "Issue the pending credit notes"
+msgstr ""
+
+#. translators: %d: number of credit notes
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:220
+#, php-format
+msgid "%d credit note issued."
+msgid_plural "%d credit notes issued."
+msgstr[0] ""
+msgstr[1] ""
+
+#. translators: %d: number of refunds
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:226
+#, php-format
+msgid "%d refund still has no credit note."
+msgid_plural "%d refunds still have no credit note."
+msgstr[0] ""
+msgstr[1] ""
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:231
+msgid "Sample customer"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:232
+msgid "Sample recipient"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:307
+msgid "Sample product"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:326
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:85
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:78
+#: templates/admin/invoices/content.php:168
+msgid "Shipping"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Download.php:238
 msgid "You are not allowed to download invoices."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Download.php:76
+#: includes/Modules/Invoices/Admin/Download.php:247
 msgid "The archived PDF of this invoice is missing or damaged. Use \"Rebuild missing PDF\" in the invoice box of the order."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Download.php:136
+#: includes/Modules/Invoices/Admin/Download.php:257
 msgid "This invoice does not exist."
 msgstr ""
 
@@ -325,67 +413,166 @@ msgstr ""
 msgid "not started"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:58
-#: includes/Modules/Invoices/Admin/OrderTools.php:142
-#: includes/Modules/Invoices/Rendering/Context.php:175
-#: templates/admin/invoices/content.php:40
-msgid "Invoice"
+#: includes/Modules/Invoices/Admin/OrderTools.php:327
+msgid "Invoice cancelled"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:91
+#: includes/Modules/Invoices/Admin/OrderTools.php:429
+#: includes/Modules/Invoices/Admin/OrderTools.php:535
+#: includes/Modules/Invoices/Admin/OrderTools.php:575
 msgid "Download PDF"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:98
+#: includes/Modules/Invoices/Admin/OrderTools.php:436
+#: includes/Modules/Invoices/Admin/OrderTools.php:582
 msgid "Rebuild missing PDF"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:112
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Admin/OrderTools.php:448
+#, php-format
+msgid "Cancel invoice %s?"
+msgstr ""
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Admin/OrderTools.php:450
+#, php-format
+msgid "No money is moved: this records a full refund and issues a credit note that cancels invoice %s."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:451
+msgid "Cancel invoice"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:464
 msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:113
+#: includes/Modules/Invoices/Admin/OrderTools.php:465
 msgid "No invoice can be issued for this order until the Facture PDF Lumia data is imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:121
+#: includes/Modules/Invoices/Admin/OrderTools.php:473
 msgid "No invoice has been issued for this order yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:123
+#: includes/Modules/Invoices/Admin/OrderTools.php:475
 msgid "Issue invoice now"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:130
+#: includes/Modules/Invoices/Admin/OrderTools.php:482
 msgid "The current order status does not allow an invoice yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:281
+#. translators: %d: refund id
+#: includes/Modules/Invoices/Admin/OrderTools.php:533
+#, php-format
+msgid "Refund #%d deleted"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:543
+#: templates/admin/invoices/general.php:62
+msgid "Credit notes"
+msgstr ""
+
+#. translators: 1: refund id, 2: refunded amount
+#: includes/Modules/Invoices/Admin/OrderTools.php:563
+#, php-format
+msgid "Refund #%1$d (%2$s)"
+msgstr ""
+
+#. translators: %s: why the credit note was not issued
+#: includes/Modules/Invoices/Admin/OrderTools.php:598
+#, php-format
+msgid "No credit note yet (was: %s)"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:601
+msgid "No credit note yet."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:606
+msgid "Issue credit note"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:622
+msgid "Nothing was refunded: no credit note."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:623
+msgid "The refunded order no longer exists."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:624
+msgid "Waiting for the Facture PDF Lumia import."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:625
+msgid "The Facture PDF Lumia invoice of this order could not be imported (conflict)."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:626
+msgid "This refund reuses the id of a deleted refund that carries a credit note: no credit note can be issued for it."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:627
+msgid "Refused by the lumia_factures_can_issue_credit_note filter."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:628
+msgid "The order has no invoice: issue the invoice first."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:689
 msgid "The invoice has been issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:282
+#: includes/Modules/Invoices/Admin/OrderTools.php:690
 msgid "The invoice could not be issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:283
+#: includes/Modules/Invoices/Admin/OrderTools.php:691
 msgid "The invoice PDF has been rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:284
+#: includes/Modules/Invoices/Admin/OrderTools.php:692
 msgid "The invoice PDF could not be rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Preview.php:87
+#: includes/Modules/Invoices/Admin/OrderTools.php:693
+msgid "The credit note has been issued."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:694
+msgid "The credit note could not be issued. The reason is shown in the Invoice box."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:695
+msgid "The credit note PDF has been rebuilt."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:696
+msgid "The credit note PDF could not be rebuilt."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:697
+msgid "The invoice has been cancelled by a credit note."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:698
+msgid "The full refund has been recorded, but its credit note is not issued yet. The reason is shown in the Invoice box."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:699
+msgid "The invoice could not be cancelled."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Preview.php:111
 msgid "This order does not exist."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/Preview.php:88
-msgid "Create a first order to preview the invoice."
-msgstr ""
-
-#: includes/Modules/Invoices/Admin/Preview.php:104
-#: includes/Modules/Invoices/Module.php:145
+#: includes/Modules/Invoices/Admin/Preview.php:155
+#: includes/Modules/Invoices/Module.php:177
 msgid "The preview could not be generated."
 msgstr ""
 
@@ -409,147 +596,228 @@ msgstr ""
 msgid "Plum"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:72
-#: templates/admin/invoices/content.php:152
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:76
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:54
+#: templates/admin/invoices/content.php:165
 msgid "Subtotal"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:76
-#: templates/admin/invoices/content.php:153
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:109
+msgid "Other refunded amount"
+msgstr ""
+
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:112
+msgid "Total refunded"
+msgstr ""
+
+#. translators: %s: formatted tax rate, e.g. "20 %"
+#: includes/Modules/Invoices/Amounts/Lines.php:204
+#, php-format
+msgid "VAT %s"
+msgstr ""
+
+#: includes/Modules/Invoices/Amounts/Lines.php:252
+msgid "Total excl. VAT"
+msgstr ""
+
+#: includes/Modules/Invoices/Amounts/Lines.php:261
+msgid "Rounding"
+msgstr ""
+
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:58
+#: templates/admin/invoices/content.php:166
 msgid "Discount"
 msgstr ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:83
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:65
 msgid "Coupon code"
 msgid_plural "Coupon codes"
 msgstr[0] ""
 msgstr[1] ""
 
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:96
-#: templates/admin/invoices/content.php:155
-msgid "Shipping"
-msgstr ""
-
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:109
-msgid "Total excl. VAT"
-msgstr ""
-
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:118
-msgid "Rounding"
-msgstr ""
-
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:121
+#: includes/Modules/Invoices/Amounts/StatementBuilder.php:95
 msgctxt "grand total row of the invoice, VAT included"
 msgid "Total"
 msgstr ""
 
-#. translators: %s: formatted tax rate, e.g. "20 %"
-#: includes/Modules/Invoices/Amounts/StatementBuilder.php:328
+#. translators: 1: credit note number, 2: refund id, 3: invoice number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:280
 #, php-format
-msgid "VAT %s"
+msgid "Credit note %1$s issued for refund #%2$d (invoice %3$s)."
 msgstr ""
 
-#: includes/Modules/Invoices/Documents/Issuer.php:162
+#. translators: 1: refund id, 2: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:802
+#, php-format
+msgid "Refund #%1$d was deleted; credit note %2$s stays issued and the order no longer matches it."
+msgstr ""
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:839
+#, php-format
+msgid "This refund carries credit note %s and cannot be deleted."
+msgstr ""
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:903
+#, php-format
+msgid "Credit note PDF %s was missing or damaged and has been rebuilt from the current order data."
+msgstr ""
+
+#: includes/Modules/Invoices/Documents/Issuer.php:155
 msgid "Invoice not issued: this order has a Facture PDF Lumia invoice that could not be imported; see the migration report."
 msgstr ""
 
-#: includes/Modules/Invoices/Documents/Issuer.php:163
+#: includes/Modules/Invoices/Documents/Issuer.php:156
 msgid "Invoice not issued: the Facture PDF Lumia data is being imported."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:215
+#: includes/Modules/Invoices/Documents/Issuer.php:209
 #, php-format
 msgid "Invoice %s issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Documents/Issuer.php:343
-#: includes/Modules/Invoices/Documents/Issuer.php:385
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Documents/Issuer.php:313
+#, php-format
+msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
+msgstr ""
+
+#: includes/Modules/Invoices/Documents/Notes.php:44
 msgid "Invoice could not be numbered."
 msgstr ""
 
 #. translators: %d: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:355
+#: includes/Modules/Invoices/Documents/Notes.php:46
 #, php-format
 msgid "Invoice sequence value %d could not be turned into a number; this sequence value is skipped."
 msgstr ""
 
 #. translators: 1: invoice number, 2: sequence value
-#: includes/Modules/Invoices/Documents/Issuer.php:372
+#: includes/Modules/Invoices/Documents/Notes.php:48
 #, php-format
 msgid "Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
 msgstr ""
 
+#. translators: 1: invoice number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:50
+#, php-format
+msgid "Invoice number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the invoice is not numbered. Give each document type its own number prefix."
+msgstr ""
+
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:399
+#: includes/Modules/Invoices/Documents/Notes.php:52
 #, php-format
 msgid "The PDF of invoice %s could not be stored; the PDF will be built on first download."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:403
+#: includes/Modules/Invoices/Documents/Notes.php:54
 #, php-format
 msgid "The PDF of invoice %s could not be generated; the PDF will be built on first download."
 msgstr ""
 
-#. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:463
+#. translators: %d: refund id
+#: includes/Modules/Invoices/Documents/Notes.php:66
 #, php-format
-msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
+msgid "Credit note for refund #%d could not be numbered."
 msgstr ""
 
-#: includes/Modules/Invoices/Front/CustomerDownload.php:253
-msgid "Invoice not found."
+#. translators: %d: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:68
+#, php-format
+msgid "Credit note sequence value %d could not be turned into a number; this sequence value is skipped."
 msgstr ""
 
-#: includes/Modules/Invoices/Front/Shortcode.php:54
+#. translators: 1: credit note number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:70
+#, php-format
+msgid "Credit note number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
+msgstr ""
+
+#. translators: 1: credit note number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:72
+#, php-format
+msgid "Credit note number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the credit note is not numbered. Give each document type its own number prefix."
+msgstr ""
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/Notes.php:74
+#, php-format
+msgid "The PDF of credit note %s could not be stored; the PDF will be built on first download."
+msgstr ""
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/Notes.php:76
+#, php-format
+msgid "The PDF of credit note %s could not be generated; the PDF will be built on first download."
+msgstr ""
+
+#: includes/Modules/Invoices/Front/CustomerDownload.php:355
+msgid "Document not found."
+msgstr ""
+
+#. translators: %s: invoice number.
+#: includes/Modules/Invoices/Front/CustomerLinks.php:83
+#, php-format
+msgid "Download invoice %s"
+msgstr ""
+
+#: includes/Modules/Invoices/Front/Shortcode.php:140
 msgid "Download my invoice"
 msgstr ""
 
+#. translators: 1: imported invoice number format, 2: default credit note number format, 3: credit note number format used instead
+#: includes/Modules/Invoices/Migration/Importer.php:260
+#, php-format
+msgid "The invoice number format %1$s starts like the default credit note number format %2$s: credit notes will be numbered %3$s. Another format can be chosen in the Numbering tab."
+msgstr ""
+
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:247
+#: includes/Modules/Invoices/Migration/Importer.php:334
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:254
+#: includes/Modules/Invoices/Migration/Importer.php:341
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:297
+#: includes/Modules/Invoices/Migration/Importer.php:384
 #, php-format
 msgid "Invoice %s imported from Facture PDF Lumia."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id, 3: file path
-#: includes/Modules/Invoices/Migration/Importer.php:364
+#: includes/Modules/Invoices/Migration/Importer.php:451
 #, php-format
 msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:418
+#: includes/Modules/Invoices/Migration/Importer.php:505
 msgid "An invoice is being issued for this order."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:422
+#: includes/Modules/Invoices/Migration/Importer.php:509
 #, php-format
 msgid "The order already has invoice %s."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:428
+#: includes/Modules/Invoices/Migration/Importer.php:515
 msgid "The number is already used by another invoice."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:434
+#: includes/Modules/Invoices/Migration/Importer.php:521
 msgid "The invoice could not be recorded (database error, see the PHP error log)."
 msgstr ""
 
 #. translators: %d: order id
-#: includes/Modules/Invoices/Migration/Importer.php:457
+#: includes/Modules/Invoices/Migration/Importer.php:544
 #, php-format
 msgid "Order %d: part of the import could not be written (see the PHP error log)."
 msgstr ""
@@ -574,29 +842,29 @@ msgstr[1] ""
 msgid "%s was set and is no longer supported: it was not imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:142
+#: includes/Modules/Invoices/Module.php:174
 #: templates/admin/invoices/company.php:35
 msgid "Choose a logo"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:143
+#: includes/Modules/Invoices/Module.php:175
 msgid "Use this image"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:144
+#: includes/Modules/Invoices/Module.php:176
 msgid "Invalid format"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:146
+#: includes/Modules/Invoices/Module.php:178
 msgid "Raise this counter?"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:147
+#: includes/Modules/Invoices/Module.php:179
 msgid "Raise the counter"
 msgstr ""
 
 #. translators: 1: counter key, 2: current value, 3: new value.
-#: includes/Modules/Invoices/Module.php:149
+#: includes/Modules/Invoices/Module.php:181
 #, php-format
 msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
 msgstr ""
@@ -627,122 +895,150 @@ msgstr ""
 msgid "With a monthly reset, the format must contain {year} and {month}, otherwise two months would print the same numbers."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:197
-#: includes/Modules/Invoices/Rendering/Context.php:459
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Rendering/Context.php:244
+#, php-format
+msgid "Credit note for invoice %s"
+msgstr ""
+
+#. translators: 1: invoice number, 2: invoice date
+#: includes/Modules/Invoices/Rendering/Context.php:248
+#, php-format
+msgid "Credit note for invoice %1$s of %2$s"
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:263
+#: includes/Modules/Invoices/Rendering/Context.php:588
 msgid "Tel"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:198
-#: includes/Modules/Invoices/Rendering/Context.php:460
+#: includes/Modules/Invoices/Rendering/Context.php:264
+#: includes/Modules/Invoices/Rendering/Context.php:589
 msgid "Mob"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:225
-#: templates/admin/invoices/content.php:66
+#: includes/Modules/Invoices/Rendering/Context.php:291
+#: templates/admin/invoices/content.php:79
 msgid "Bill to"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:240
-#: templates/admin/invoices/content.php:71
+#: includes/Modules/Invoices/Rendering/Context.php:306
+#: templates/admin/invoices/content.php:84
 msgid "Ship to"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:279
+#: includes/Modules/Invoices/Rendering/Context.php:350
+msgid "Credit note no."
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:351
+msgid "Credit note date"
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:352
+msgid "Refund date"
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:355
 msgid "Invoice no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:280
+#: includes/Modules/Invoices/Rendering/Context.php:356
 msgid "Invoice date"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:281
+#: includes/Modules/Invoices/Rendering/Context.php:362
 msgid "Order no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:282
+#: includes/Modules/Invoices/Rendering/Context.php:363
 msgid "Order date"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:283
+#: includes/Modules/Invoices/Rendering/Context.php:364
 msgid "Payment method"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:335
+#: includes/Modules/Invoices/Rendering/Context.php:417
 #: templates/admin/invoices/content.php:25
 msgid "Product"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:336
+#: includes/Modules/Invoices/Rendering/Context.php:418
 #: templates/admin/invoices/content.php:26
 msgid "Description"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:337
+#: includes/Modules/Invoices/Rendering/Context.php:419
 #: templates/admin/invoices/content.php:27
 msgid "SKU"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:338
+#: includes/Modules/Invoices/Rendering/Context.php:420
 #: templates/admin/invoices/content.php:28
 msgid "Qty"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:339
+#: includes/Modules/Invoices/Rendering/Context.php:421
 #: templates/admin/invoices/content.php:29
 msgid "Unit price"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:340
+#: includes/Modules/Invoices/Rendering/Context.php:422
 #: templates/admin/invoices/content.php:30
 msgid "VAT"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:341
+#: includes/Modules/Invoices/Rendering/Context.php:423
 #: templates/admin/invoices/content.php:31
 msgid "Total"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:446
-#: templates/admin/invoices/content.php:166
-#: templates/admin/invoices/content.php:171
+#: includes/Modules/Invoices/Rendering/Context.php:561
+msgid "Refund reason"
+msgstr ""
+
+#: includes/Modules/Invoices/Rendering/Context.php:575
+#: templates/admin/invoices/content.php:179
+#: templates/admin/invoices/content.php:184
 msgid "Customer note"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:463
+#: includes/Modules/Invoices/Rendering/Context.php:592
 #: templates/admin/invoices/company.php:84
-#: templates/admin/invoices/content.php:189
+#: templates/admin/invoices/content.php:202
 msgid "SIRET"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:464
+#: includes/Modules/Invoices/Rendering/Context.php:593
 #: templates/admin/invoices/company.php:85
-#: templates/admin/invoices/content.php:190
+#: templates/admin/invoices/content.php:203
 msgid "RCS"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:465
+#: includes/Modules/Invoices/Rendering/Context.php:594
 msgid "VAT no."
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:466
+#: includes/Modules/Invoices/Rendering/Context.php:595
 #: templates/admin/invoices/company.php:87
-#: templates/admin/invoices/content.php:192
+#: templates/admin/invoices/content.php:205
 msgid "Share capital"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:467
+#: includes/Modules/Invoices/Rendering/Context.php:596
 msgid "APE"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:468
+#: includes/Modules/Invoices/Rendering/Context.php:597
 #: templates/admin/invoices/company.php:89
-#: templates/admin/invoices/content.php:194
+#: templates/admin/invoices/content.php:207
 msgid "IBAN"
 msgstr ""
 
-#: includes/Modules/Invoices/Rendering/Context.php:469
+#: includes/Modules/Invoices/Rendering/Context.php:598
 #: templates/admin/invoices/company.php:90
-#: templates/admin/invoices/content.php:195
+#: templates/admin/invoices/content.php:208
 msgid "BIC"
 msgstr ""
 
@@ -770,6 +1066,20 @@ msgstr ""
 
 #: includes/Modules/Invoices/settings-template.php:36
 msgid "Design"
+msgstr ""
+
+#. translators: %s: why the credit note number format is refused.
+#: includes/Modules/Invoices/Settings/Schema.php:111
+#, php-format
+msgid "Credit note number: %s"
+msgstr ""
+
+#: includes/Modules/Invoices/Settings/Schema.php:147
+msgid "The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-."
+msgstr ""
+
+#: includes/Modules/Invoices/Settings/Schema.php:149
+msgid "A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number."
 msgstr ""
 
 #: templates/admin/invoices.php:20
@@ -843,22 +1153,22 @@ msgid "Contact"
 msgstr ""
 
 #: templates/admin/invoices/company.php:69
-#: templates/admin/invoices/content.php:185
+#: templates/admin/invoices/content.php:198
 msgid "Phone"
 msgstr ""
 
 #: templates/admin/invoices/company.php:70
-#: templates/admin/invoices/content.php:186
+#: templates/admin/invoices/content.php:199
 msgid "Mobile"
 msgstr ""
 
 #: templates/admin/invoices/company.php:71
-#: templates/admin/invoices/content.php:187
+#: templates/admin/invoices/content.php:200
 msgid "Email"
 msgstr ""
 
 #: templates/admin/invoices/company.php:72
-#: templates/admin/invoices/content.php:188
+#: templates/admin/invoices/content.php:201
 msgid "Website"
 msgstr ""
 
@@ -871,12 +1181,12 @@ msgid "Printed in the footer when the matching switch is on in the Content tab."
 msgstr ""
 
 #: templates/admin/invoices/company.php:86
-#: templates/admin/invoices/content.php:191
+#: templates/admin/invoices/content.php:204
 msgid "VAT number"
 msgstr ""
 
 #: templates/admin/invoices/company.php:88
-#: templates/admin/invoices/content.php:193
+#: templates/admin/invoices/content.php:206
 msgid "APE code"
 msgstr ""
 
@@ -911,10 +1221,13 @@ msgid "Line total"
 msgstr ""
 
 #: templates/admin/invoices/content.php:36
+#: templates/admin/invoices/numbering.php:97
+#: templates/front/order-documents.php:24
 msgid "Document"
 msgstr ""
 
 #: templates/admin/invoices/content.php:40
+#: templates/admin/invoices/content.php:67
 msgid "Document title"
 msgstr ""
 
@@ -954,148 +1267,160 @@ msgstr ""
 msgid "Show the payment method"
 msgstr ""
 
-#: templates/admin/invoices/content.php:62
-msgid "Addresses"
-msgstr ""
-
-#: templates/admin/invoices/content.php:66
-msgid "Billing block title"
-msgstr ""
-
-#: templates/admin/invoices/content.php:67
-msgid "Show the billing address"
+#: templates/admin/invoices/content.php:63
+msgid "A credit note uses the layout of the invoice and always names the number and date of the invoice it credits."
 msgstr ""
 
 #: templates/admin/invoices/content.php:68
-msgid "Show the billing email"
+msgid "Show the refund reason"
 msgstr ""
 
-#: templates/admin/invoices/content.php:69
-msgid "Show the billing phone"
+#: templates/admin/invoices/content.php:68
+msgid "The reason entered with the refund, when there is one."
 msgstr ""
 
-#: templates/admin/invoices/content.php:70
-msgid "Show the shipping block"
+#: templates/admin/invoices/content.php:75
+msgid "Addresses"
 msgstr ""
 
-#: templates/admin/invoices/content.php:71
-msgid "Shipping block title"
+#: templates/admin/invoices/content.php:79
+msgid "Billing block title"
 msgstr ""
 
-#: templates/admin/invoices/content.php:72
-msgid "Hide it when it equals the billing address"
-msgstr ""
-
-#: templates/admin/invoices/content.php:73
-msgid "Hide it for orders without shipping"
-msgstr ""
-
-#: templates/admin/invoices/content.php:74
-msgid "Show the shipping phone"
+#: templates/admin/invoices/content.php:80
+msgid "Show the billing address"
 msgstr ""
 
 #: templates/admin/invoices/content.php:81
-#: templates/admin/invoices/content.php:88
-msgid "Message"
+msgid "Show the billing email"
 msgstr ""
 
 #: templates/admin/invoices/content.php:82
-msgid "A free text printed before the product table."
+msgid "Show the billing phone"
+msgstr ""
+
+#: templates/admin/invoices/content.php:83
+msgid "Show the shipping block"
+msgstr ""
+
+#: templates/admin/invoices/content.php:84
+msgid "Shipping block title"
+msgstr ""
+
+#: templates/admin/invoices/content.php:85
+msgid "Hide it when it equals the billing address"
 msgstr ""
 
 #: templates/admin/invoices/content.php:86
-msgid "Show the message"
+msgid "Hide it for orders without shipping"
 msgstr ""
 
 #: templates/admin/invoices/content.php:87
-msgid "Message title"
+msgid "Show the shipping phone"
+msgstr ""
+
+#: templates/admin/invoices/content.php:94
+#: templates/admin/invoices/content.php:101
+msgid "Message"
 msgstr ""
 
 #: templates/admin/invoices/content.php:95
+msgid "A free text printed before the product table."
+msgstr ""
+
+#: templates/admin/invoices/content.php:99
+msgid "Show the message"
+msgstr ""
+
+#: templates/admin/invoices/content.php:100
+msgid "Message title"
+msgstr ""
+
+#: templates/admin/invoices/content.php:108
 msgid "Product table"
 msgstr ""
 
-#: templates/admin/invoices/content.php:96
+#: templates/admin/invoices/content.php:109
 msgid "Columns, their label (empty keeps the default one) and their relative width."
 msgstr ""
 
-#: templates/admin/invoices/content.php:102
+#: templates/admin/invoices/content.php:115
 msgid "Column"
 msgstr ""
 
-#: templates/admin/invoices/content.php:103
+#: templates/admin/invoices/content.php:116
 msgid "Show"
 msgstr ""
 
-#: templates/admin/invoices/content.php:104
+#: templates/admin/invoices/content.php:117
 msgid "Label"
 msgstr ""
 
-#: templates/admin/invoices/content.php:105
+#: templates/admin/invoices/content.php:118
 msgid "Width (%)"
 msgstr ""
 
-#: templates/admin/invoices/content.php:139
+#: templates/admin/invoices/content.php:152
 msgid "Show variation attributes and product options"
 msgstr ""
 
-#: templates/admin/invoices/content.php:140
+#: templates/admin/invoices/content.php:153
 msgid "Show the parent product name for variations"
 msgstr ""
 
-#: templates/admin/invoices/content.php:147
+#: templates/admin/invoices/content.php:160
 msgid "Totals"
 msgstr ""
 
-#: templates/admin/invoices/content.php:148
+#: templates/admin/invoices/content.php:161
 msgid "Rows of the totals block. The amounts always add up to the WooCommerce order total."
 msgstr ""
 
-#: templates/admin/invoices/content.php:154
+#: templates/admin/invoices/content.php:167
 msgid "Show the coupon code in the discount row"
 msgstr ""
 
-#: templates/admin/invoices/content.php:156
+#: templates/admin/invoices/content.php:169
 msgid "Show the shipping row even when it is free"
 msgstr ""
 
-#: templates/admin/invoices/content.php:157
+#: templates/admin/invoices/content.php:170
 msgid "Fees"
 msgstr ""
 
-#: templates/admin/invoices/content.php:158
+#: templates/admin/invoices/content.php:171
 msgid "Tax"
 msgstr ""
 
-#: templates/admin/invoices/content.php:159
+#: templates/admin/invoices/content.php:172
 msgid "Grand total"
 msgstr ""
 
-#: templates/admin/invoices/content.php:170
+#: templates/admin/invoices/content.php:183
 msgid "Show the customer note"
 msgstr ""
 
-#: templates/admin/invoices/content.php:171
+#: templates/admin/invoices/content.php:184
 msgid "Customer note title"
 msgstr ""
 
-#: templates/admin/invoices/content.php:178
+#: templates/admin/invoices/content.php:191
 msgid "Footer"
 msgstr ""
 
-#: templates/admin/invoices/content.php:179
+#: templates/admin/invoices/content.php:192
 msgid "The company details come from the Company tab."
 msgstr ""
 
-#: templates/admin/invoices/content.php:183
+#: templates/admin/invoices/content.php:196
 msgid "Footer text"
 msgstr ""
 
-#: templates/admin/invoices/content.php:184
+#: templates/admin/invoices/content.php:197
 msgid "Show the page numbers"
 msgstr ""
 
-#: templates/admin/invoices/content.php:196
+#: templates/admin/invoices/content.php:209
 msgid "Legal text"
 msgstr ""
 
@@ -1242,143 +1567,202 @@ msgctxt "page margin"
 msgid "Sides"
 msgstr ""
 
-#: templates/admin/invoices/general.php:33
+#: templates/admin/invoices/general.php:42
 msgid "Issuing"
 msgstr ""
 
-#: templates/admin/invoices/general.php:34
+#: templates/admin/invoices/general.php:43
 msgid "The invoice is issued once, when an order reaches one of these statuses. An issued invoice never changes."
 msgstr ""
 
-#: templates/admin/invoices/general.php:37
+#: templates/admin/invoices/general.php:46
 msgid "Issue the invoice when the order status becomes"
 msgstr ""
 
-#: templates/admin/invoices/general.php:43
+#: templates/admin/invoices/general.php:52
 msgid "Emails"
 msgstr ""
 
-#: templates/admin/invoices/general.php:44
+#: templates/admin/invoices/general.php:53
 msgid "The issued invoice is attached to these WooCommerce emails."
 msgstr ""
 
-#: templates/admin/invoices/general.php:47
+#: templates/admin/invoices/general.php:56
 msgid "Attach the invoice to"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:17
-msgid "Counter. {number:5} pads it with zeros to 5 digits. Required."
+#: templates/admin/invoices/general.php:63
+msgid "Each refund of an invoiced order issues a credit note. An issued credit note never changes, and the refund email never carries the invoice."
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:18
-msgid "Year. {year:2} gives the last two digits."
+#: templates/admin/invoices/general.php:66
+msgid "Attach the credit note to"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:19
-msgid "Month, two digits."
+#: templates/admin/invoices/general.php:72
+msgid "Customer access"
+msgstr ""
+
+#: templates/admin/invoices/general.php:73
+msgid "Where customers find the links to their invoice and credit notes. A link appears once the document is issued."
+msgstr ""
+
+#: templates/admin/invoices/general.php:77
+msgid "Invoice button in the My Account orders list"
+msgstr ""
+
+#: templates/admin/invoices/general.php:78
+msgid "Documents on the order page"
+msgstr ""
+
+#: templates/admin/invoices/general.php:78
+msgid "The order view of My Account and the thank-you page."
+msgstr ""
+
+#: templates/admin/invoices/general.php:79
+msgid "Add the document links to"
+msgstr ""
+
+#: templates/admin/invoices/general.php:82
+msgid "Bricks is active: if your templates already show the documents with the Lümia Factures dynamic tags, turn off the matching options to avoid showing them twice."
 msgstr ""
 
 #: templates/admin/invoices/numbering.php:20
-msgid "Day, two digits."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:21
-msgid "WooCommerce order number."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:22
-msgid "WooCommerce order id."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:23
-msgid "Customer id."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:29
-msgid "Numbers are continuous and never reused. Changing the format only affects the next invoices."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:32
-msgid "Format"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:32
-msgid "The {number} tag is required. The characters / \\ : * ? \" < > | are not allowed."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:35
-msgid "Next invoice number"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:37
-msgid "Sample with today's date, order 14243 and customer 27."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:41
-msgid "Available tags"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:51
-msgid "First number"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:51
-msgid "Used when a counter starts. An existing counter is never changed by this setting."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:52
-msgid "Restart the counter each period"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:52
-msgid "When on, the format must contain the year (and the month for a monthly reset)."
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:57
-msgid "Restart every"
-msgstr ""
-
-#: templates/admin/invoices/numbering.php:59
 msgid "Year"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:60
+#: templates/admin/invoices/numbering.php:21
 msgid "Month"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:69
-msgid "Counters"
+#: templates/admin/invoices/numbering.php:25
+msgid "Counter. {number:5} pads it with zeros to 5 digits. Required."
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:70
-msgid "A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices created elsewhere."
+#: templates/admin/invoices/numbering.php:26
+msgid "Year. {year:2} gives the last two digits."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:27
+msgid "Month, two digits."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:28
+msgid "Day, two digits."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:29
+msgid "WooCommerce order number."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:30
+msgid "WooCommerce order id."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:31
+msgid "Customer id."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:37
+msgid "Numbers are continuous and never reused. Changing the format only affects the next invoices."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:40
+#: templates/admin/invoices/numbering.php:71
+msgid "Format"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:40
+msgid "The {number} tag is required. The characters / \\ : * ? \" < > | are not allowed."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:43
+msgid "Next invoice number"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:45
+#: templates/admin/invoices/numbering.php:76
+msgid "Sample with today's date, order 14243 and customer 27."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:49
+msgid "Available tags"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:59
+#: templates/admin/invoices/numbering.php:79
+msgid "First number"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:59
+#: templates/admin/invoices/numbering.php:79
+msgid "Used when a counter starts. An existing counter is never changed by this setting."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:60
+#: templates/admin/invoices/numbering.php:80
+msgid "Restart the counter each period"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:60
+#: templates/admin/invoices/numbering.php:80
+msgid "When on, the format must contain the year (and the month for a monthly reset)."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:61
+#: templates/admin/invoices/numbering.php:81
+msgid "Restart every"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:67
+msgid "Credit note number"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:68
+msgid "Credit notes have their own continuous series. Their format must start with a prefix that differs from the invoice one, e.g. AV- and FA-, so that a credit note never shares an invoice number."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:71
+msgid "Same tags as the invoice number; the order tags refer to the refunded order."
 msgstr ""
 
 #: templates/admin/invoices/numbering.php:74
-msgid "No counter yet. The first one is created with the first invoice."
+msgid "Next credit note number"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:79
+#: templates/admin/invoices/numbering.php:87
+msgid "Counters"
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:88
+msgid "A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices or credit notes created elsewhere."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:92
+msgid "No counter yet. The first one is created with the first invoice or credit note."
+msgstr ""
+
+#: templates/admin/invoices/numbering.php:98
 msgid "Counter"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:80
+#: templates/admin/invoices/numbering.php:99
 msgid "Last number used"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:81
+#: templates/admin/invoices/numbering.php:100
 msgid "Updated"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:82
+#: templates/admin/invoices/numbering.php:101
 msgid "Raise to"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:97
+#: templates/admin/invoices/numbering.php:117
 msgid "New last number used"
 msgstr ""
 
-#: templates/admin/invoices/numbering.php:99
+#: templates/admin/invoices/numbering.php:119
 msgid "Raise"
 msgstr ""
 
@@ -1420,6 +1804,10 @@ msgstr ""
 
 #: templates/admin/invoices/preview.php:43
 msgid "Sample: the next invoice number, nothing is saved or numbered."
+msgstr ""
+
+#: templates/admin/invoices/preview.php:44
+msgid "No order yet: demo order built from your products and shop address, without order number. Nothing is saved."
 msgstr ""
 
 #: templates/admin/partials/plugin-settings.php:23
@@ -1514,7 +1902,20 @@ msgstr ""
 msgid "Invoices are paused until these requirements are met:"
 msgstr ""
 
-#: templates/pdf/invoice.php:41
+#: templates/front/emails/order-documents.php:19
+#: templates/front/emails/plain/order-documents.php:20
+msgid "Your documents"
+msgstr ""
+
+#: templates/front/order-documents.php:20
+msgid "Documents"
+msgstr ""
+
+#: templates/front/order-documents.php:25
+msgid "Date"
+msgstr ""
+
+#: templates/pdf/invoice.php:42
 msgctxt "watermark printed on the invoice preview"
 msgid "Preview"
 msgstr ""
