@@ -1,12 +1,13 @@
 <?php
 /**
- * Invoice document.
+ * Invoice or credit note document (`$type`).
  *
  * Included by Renderer with the context keys as variables. Every value is plain text and is
  * escaped where it is printed.
  *
  * @package Lumia\Factures
  *
+ * @var string                                   $type       Document type, `invoice` or `credit_note`.
  * @var string                                   $css        Compiled stylesheet.
  * @var array<string, mixed>                     $header
  * @var array<int, array<string, string>>        $shop

@@ -94,6 +94,14 @@ p {
 	line-height: 1.1;
 }
 
+/* Credit note: the invoice it credits, right under the title band. */
+.lf-reference {
+	margin-bottom: var(--lf-space-lg);
+	color: var(--lf-color-primary);
+	font-family: var(--lf-font-heading);
+	font-weight: var(--lf-heading-weight);
+}
+
 /* Parties and details ------------------------------------------------ */
 .lf-parties {
 	table-layout: fixed;

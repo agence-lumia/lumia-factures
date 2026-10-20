@@ -9,26 +9,33 @@ namespace Lumia\Factures\Modules\Invoices\Rendering;
 
 defined( 'ABSPATH' ) || exit;
 
+use InvalidArgumentException;
+use Lumia\Factures\Modules\Invoices\Amounts\Statement;
 use WC_Order;
 
 /**
- * Order + settings -> HTML -> PDF.
+ * Order + settings -> HTML -> PDF, for an invoice or a credit note.
+ *
+ * A credit note is rendered with the refunded order and the statement of its refund
+ * (`CreditNoteStatementBuilder`), see `Context::build()`.
  */
 final class Renderer {
 
 	/**
-	 * Invoice HTML (a complete document, styles inline), in the site language.
+	 * Document HTML (a complete document, styles inline), in the site language.
 	 *
-	 * An invoice is archived for good: it is rendered in the site locale, never in the language
+	 * A document is archived for good: it is rendered in the site locale, never in the language
 	 * of the admin who happens to issue, rebuild or preview it.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings (`Module::settings()`).
+	 * @param WC_Order             $order     Order; for a credit note, the refunded order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings (`Module::settings()`).
+	 * @param Statement|null       $statement Amounts, null for the order's own (invoice). Required for a credit note.
 	 * @return string HTML, '' when the template is missing.
+	 * @throws InvalidArgumentException For a credit note without its statement or its invoice reference.
 	 */
-	public static function html( WC_Order $order, DocumentData $doc, array $settings ): string {
-		return self::in_site_locale( static fn(): string => self::build_html( $order, $doc, $settings ) );
+	public static function html( WC_Order $order, DocumentData $doc, array $settings, ?Statement $statement = null ): string {
+		return self::in_site_locale( static fn(): string => self::build_html( $order, $doc, $settings, $statement ) );
 	}
 
 	/**
@@ -54,15 +61,16 @@ final class Renderer {
 	}
 
 	/**
-	 * Builds the invoice HTML in the current locale.
+	 * Builds the document HTML in the current locale.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings.
+	 * @param WC_Order             $order     Order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings.
+	 * @param Statement|null       $statement Amounts, null for the order's own.
 	 */
-	private static function build_html( WC_Order $order, DocumentData $doc, array $settings ): string {
+	private static function build_html( WC_Order $order, DocumentData $doc, array $settings, ?Statement $statement ): string {
 		$design = isset( $settings['design'] ) && is_array( $settings['design'] ) ? $settings['design'] : [];
-		$vars   = Context::build( $order, $doc, $settings );
+		$vars   = Context::build( $order, $doc, $settings, $statement );
 
 		$vars['doc']   = $doc;
 		$vars['order'] = $order;
@@ -77,30 +85,33 @@ final class Renderer {
 		}
 
 		/**
-		 * Filters the final invoice HTML, before it is turned into a PDF.
+		 * Filters the final HTML of an invoice or a credit note, before it is turned into a PDF.
 		 *
 		 * @param string       $html  Complete HTML document.
-		 * @param WC_Order     $order Order.
+		 * @param WC_Order     $order Order (the refunded order for a credit note).
 		 * @param DocumentData $doc   Document.
+		 * @param string       $type  Document type, `invoice` or `credit_note` (`$doc->type`).
 		 */
-		$filtered = apply_filters( 'lumia_factures_invoice_html', $html, $order, $doc );
+		$filtered = apply_filters( 'lumia_factures_invoice_html', $html, $order, $doc, $doc->type );
 
 		return is_string( $filtered ) ? $filtered : $html;
 	}
 
 	/**
-	 * Invoice PDF bytes.
+	 * Document PDF bytes.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings (`Module::settings()`).
+	 * @param WC_Order             $order     Order; for a credit note, the refunded order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings (`Module::settings()`).
+	 * @param Statement|null       $statement Amounts, null for the order's own (invoice). Required for a credit note.
 	 * @return string `%PDF` bytes, '' on failure.
+	 * @throws InvalidArgumentException For a credit note without its statement or its invoice reference.
 	 */
-	public static function pdf( WC_Order $order, DocumentData $doc, array $settings ): string {
+	public static function pdf( WC_Order $order, DocumentData $doc, array $settings, ?Statement $statement = null ): string {
 		// The page footer label is translated by the engine: the whole render runs in the site locale.
 		return self::in_site_locale(
-			static function () use ( $order, $doc, $settings ): string {
-				$html = self::build_html( $order, $doc, $settings );
+			static function () use ( $order, $doc, $settings, $statement ): string {
+				$html = self::build_html( $order, $doc, $settings, $statement );
 				if ( '' === $html ) {
 					return '';
 				}
