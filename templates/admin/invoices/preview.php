@@ -5,7 +5,7 @@
  * Included by includes/Modules/Invoices/settings-template.php: $this is the Admin instance. Shown
  * next to the tabs listed in `data-lumia-factures-preview-tabs` only; the PDF pages are drawn by
  * assets/admin/js/invoices.js (pdf.js). The order field has no name: it is never saved and never
- * marks the form as unsaved.
+ * marks the form as unsaved. The demo note shows when the shop has no order yet (`demo` of the response).
  *
  * @package Lumia\Factures
  */
@@ -41,5 +41,6 @@ defined( 'ABSPATH' ) || exit;
 		<div class="lumia-notice lumia-notice--error" role="alert" data-lumia-factures-preview-error hidden></div>
 		<div class="lumia-factures-inv-preview__pages" data-lumia-factures-preview-pages></div>
 		<p class="lumia-factures-inv-preview__note"><?php echo esc_html__( 'Sample: the next invoice number, nothing is saved or numbered.', 'lumia-factures' ); ?></p>
+		<p class="lumia-factures-inv-preview__note" data-lumia-factures-preview-demo hidden><?php echo esc_html__( 'No order yet: demo order built from your products and shop address, without order number. Nothing is saved.', 'lumia-factures' ); ?></p>
 	</div>
 </aside>

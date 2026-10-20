@@ -304,7 +304,8 @@
   /* ---------------- Live preview ---------------- */
 
   /**
-   * Renders the unsaved form against a real order (Admin\Preview, nothing is saved or numbered).
+   * Renders the unsaved form against a real order, or the demo order of a shop without any
+   * (Admin\Preview, nothing is saved or numbered; the demo note shows then).
    * The whole module form is posted as FormData, like a save. Requests are debounced, and only the
    * latest response is shown.
    *
@@ -322,6 +323,7 @@
     var stage = root.querySelector("[data-lumia-factures-preview-stage]");
     var pagesBox = root.querySelector("[data-lumia-factures-preview-pages]");
     var errorBox = root.querySelector("[data-lumia-factures-preview-error]");
+    var demoNote = root.querySelector("[data-lumia-factures-preview-demo]");
     var orderInput = root.querySelector("[data-lumia-factures-preview-order]");
     var refresh = root.querySelector("[data-lumia-factures-preview-refresh]");
     var zoomValue = root.querySelector('[data-lumia-factures-preview-zoom="0"]');
@@ -513,6 +515,8 @@
           if (current !== counter) return null; // A newer request is on its way.
           if (json && json.success && json.data && json.data.pdf) {
             showError("");
+            // No order yet: the server rendered its demo order.
+            if (demoNote) demoNote.hidden = !json.data.demo;
             return show(json.data.pdf, current);
           }
           showError((json && json.data && json.data.message) || t("previewFailed"));

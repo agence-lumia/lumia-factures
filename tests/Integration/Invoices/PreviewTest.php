@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Admin\DemoOrder;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
@@ -225,11 +226,152 @@ class PreviewTest extends TestCase {
 		$this->assertSame( 2, Sequences::current( $key ) );
 	}
 
-	public function test_preview_without_orders_returns_error(): void {
+	/**
+	 * Every place a preview could leave a trace: orders, items, register, counters, files, settings.
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function traces(): array {
+		global $wpdb;
+
+		// phpcs:disable WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- Test: reads the tables themselves.
+		$counts = [];
+		foreach ( [ $wpdb->posts, $wpdb->postmeta, $wpdb->comments, $wpdb->prefix . 'woocommerce_order_items', $wpdb->prefix . 'woocommerce_order_itemmeta', $wpdb->prefix . 'wc_orders', $wpdb->prefix . 'wc_orders_meta', $wpdb->prefix . 'lumia_factures_documents' ] as $table ) {
+			if ( $table === $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) ) ) {
+				$counts[ $table ] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- Test, table names from $wpdb.
+			}
+		}
+		// phpcs:enable
+
+		return [
+			'counts'    => $counts,
+			'sequences' => Sequences::all(),
+			'files'     => $this->pdf_files(),
+			'settings'  => get_option( 'lumia_factures_module_invoices' ),
+		];
+	}
+
+	/**
+	 * Posts a valid nonce for the AJAX endpoint.
+	 */
+	private function nonce(): void {
+		$nonce             = wp_create_nonce( 'lumia_factures_admin_nonce' );
+		$_POST['nonce']    = $nonce;
+		$_REQUEST['nonce'] = $nonce;
+	}
+
+	public function test_preview_without_orders_renders_demo_order(): void {
+		OrderFactory::simple_product( 10.0, '', 'Demo shirt' );
+
+		$this->assertInstanceOf( DemoOrder::class, Preview::source( 0 ) );
+
+		$html = Preview::render( [], 0, 'html' );
+
+		$this->assertIsString( $html );
+		$this->assertStringContainsString( 'Demo shirt', $html );
+		$this->assertStringContainsString( 'Sample customer', $html );
+		$this->assertStringContainsString( 'lf-watermark', $html );
+		$this->assertStringNotContainsString( 'Order no.', $html );
+	}
+
+	public function test_checkout_draft_is_not_the_latest_order(): void {
+		$real  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$draft = OrderFactory::order( [ [ OrderFactory::simple_product( 20.0 ) ] ] );
+		$draft->set_status( 'checkout-draft' );
+		$draft->set_date_created( time() + HOUR_IN_SECONDS );
+		$draft->save();
+		$this->assertSame( 'checkout-draft', wc_get_order( $draft->get_id() )->get_status() );
+
+		$source = Preview::source( 0 );
+
+		$this->assertNotInstanceOf( DemoOrder::class, $source );
+		$this->assertSame( $real->get_id(), $source->get_id() );
+	}
+
+	public function test_checkout_draft_alone_gives_the_demo_order(): void {
+		$draft = OrderFactory::order( [ [ OrderFactory::simple_product( 20.0 ) ] ] );
+		$draft->set_status( 'checkout-draft' );
+		$draft->save();
+
+		$this->assertInstanceOf( DemoOrder::class, Preview::source( 0 ) );
+	}
+
+	public function test_demo_preview_has_no_side_effect(): void {
+		OrderFactory::simple_product( 10.0 );
+		$before = $this->traces();
+
+		$this->nonce();
+		$_POST['lumia_factures_module_settings'] = [ 'content' => [ 'invoice_title' => 'Proforma' ] ];
+		$json                                    = $this->call();
+
+		$this->assertTrue( $json['success'] );
+		$this->assertStringStartsWith( '%PDF-', (string) base64_decode( $json['data']['pdf'], true ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Reads the PDF payload.
+		$this->assertSame( $before, $this->traces() );
+		$this->assertSame( [], wc_get_orders( [ 'limit' => -1 ] ) );
+	}
+
+	public function test_demo_preview_number_is_the_next_sample(): void {
+		$key = Sequences::key( Issuer::TYPE, time(), [ 'reset_enabled' => false ] );
+		Sequences::next( $key, 1 );
+		Sequences::next( $key, 1 );
+
+		$html = Preview::render(
+			[
+				'numbering' => [
+					'format'        => 'PV-{number:4}',
+					'reset_enabled' => '0',
+				],
+			],
+			0,
+			'html'
+		);
+
+		$this->assertStringContainsString( 'PV-0003', (string) $html );
+		$this->assertSame( 2, Sequences::current( $key ) );
+	}
+
+	public function test_demo_preview_survives_throwing_hook(): void {
+		add_filter(
+			'lumia_factures_invoice_html',
+			static function () {
+				throw new \RuntimeException( 'A hook that needs a saved order.' );
+			}
+		);
+		$level = ob_get_level();
+
 		$result = Preview::render( [], 0, 'html' );
 
 		$this->assertWPError( $result );
-		$this->assertSame( 'Create a first order to preview the invoice.', $result->get_error_message() );
+		$this->assertSame( 'lumia_factures_preview_failed', $result->get_error_code() );
+		$this->assertSame( $level, ob_get_level() );
+	}
+
+	public function test_handle_reports_demo_flag(): void {
+		$this->nonce();
+		$json = $this->call();
+
+		$this->assertTrue( $json['success'] );
+		$this->assertTrue( $json['data']['demo'] );
+		$this->assertSame( '', $json['data']['order'] );
+
+		$order             = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$_POST['order_id'] = (string) $order->get_id();
+		$json              = $this->call();
+
+		$this->assertTrue( $json['success'] );
+		$this->assertFalse( $json['data']['demo'] );
+		$this->assertSame( '#' . $order->get_order_number(), $json['data']['order'] );
+	}
+
+	public function test_latest_real_order_wins_over_demo(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0, '', 'Real product' ) ] ] );
+
+		$source = Preview::source( 0 );
+		$html   = Preview::render( [], 0, 'html' );
+
+		$this->assertNotInstanceOf( DemoOrder::class, $source );
+		$this->assertSame( $order->get_id(), $source->get_id() );
+		$this->assertStringContainsString( 'Real product', (string) $html );
 	}
 
 	public function test_preview_refuses_unknown_order_and_refunds(): void {
