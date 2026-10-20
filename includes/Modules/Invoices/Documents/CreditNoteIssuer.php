@@ -122,9 +122,10 @@ final class CreditNoteIssuer {
 	private static array $deletions_noted = [];
 
 	/**
-	 * Ids of the orders being deleted for good in this request (see on_order_deleting()).
+	 * Ids of the orders being deleted for good in this request (see on_order_deleting()), each with
+	 * whether it has credit note rows, recorded once the deletion succeeds (on_order_deleted()).
 	 *
-	 * @var array<int, true>
+	 * @var array<int, bool>
 	 */
 	private static array $orders_deleting = [];
 
@@ -736,7 +737,8 @@ final class CreditNoteIssuer {
 	 * Hook `woocommerce_before_delete_order`: the order is about to be deleted for good, its refunds
 	 * with it. Both storages fire it before deleting anything; HPOS then deletes each refund through
 	 * `woocommerce_pre_delete_order_refund`, which block_deletion() lets through for this order until
-	 * `woocommerce_delete_order` (on_order_deleted()). Logs the credit notes that stay issued.
+	 * `woocommerce_delete_order` (on_order_deleted()). Logs the credit notes that stay issued; the
+	 * deletion itself is recorded by on_order_deleted() only, once it has succeeded.
 	 *
 	 * @param mixed $order_id Order id.
 	 * @param mixed $order    Order being deleted.
@@ -747,7 +749,7 @@ final class CreditNoteIssuer {
 			return;
 		}
 
-		self::$orders_deleting[ $order_id ] = true;
+		self::$orders_deleting[ $order_id ] = false;
 
 		try {
 			$rows    = Register::for_parent( self::TYPE, $order_id );
@@ -758,9 +760,7 @@ final class CreditNoteIssuer {
 				}
 			}
 
-			if ( [] !== $rows ) {
-				self::record_deleted_order( $order_id );
-			}
+			self::$orders_deleting[ $order_id ] = [] !== $rows;
 
 			if ( [] !== $numbers ) {
 				Pipeline::log( 'Order ' . $order_id . ' is deleted for good with its refunds; credit notes ' . implode( ', ', $numbers ) . ' stay issued.' );
@@ -776,8 +776,9 @@ final class CreditNoteIssuer {
 	 *
 	 * Every customer surface checks it (DocumentList, CustomerDownload, so the Bricks tags and the
 	 * e-mail links too): the rows of a deleted order keep its id, and nothing else ties them to it.
-	 * An order created before the recorded deletion is the one that was being deleted (the deletion
-	 * failed): its credit notes stay its own. Reads only.
+	 * The deletion is recorded only once it has succeeded (on_order_deleted()), so a recorded id was
+	 * freed for good: only what was issued after it belongs to the live order. Never decided on the
+	 * order's creation date, which a manager or an import can set to any value. Reads only.
 	 *
 	 * @param IssuedDocument $doc   Credit note row.
 	 * @param WC_Order       $order Live order.
@@ -792,14 +793,8 @@ final class CreditNoteIssuer {
 			return true;
 		}
 
-		$deleted_at = (int) $deleted[ $doc->parent_id ];
-		$created    = $order->get_date_created();
-		if ( null !== $created && $created->getTimestamp() < $deleted_at ) {
-			return true;
-		}
-
 		// A new order with the freed id: only what was issued for it after the deletion is its own.
-		return $doc->issued_at > $deleted_at;
+		return $doc->issued_at > (int) $deleted[ $doc->parent_id ];
 	}
 
 	/**
@@ -821,12 +816,31 @@ final class CreditNoteIssuer {
 	}
 
 	/**
-	 * Hook `woocommerce_delete_order`: the order is gone, its refunds are protected again.
+	 * Hook `woocommerce_delete_order`: the order is gone, its refunds are protected again. Records
+	 * the deletion of an order with credit notes (DELETED_ORDERS_OPTION) here, once it succeeded:
+	 * recorded at `woocommerce_before_delete_order`, a deletion that then failed would hide the
+	 * credit notes of an order that still exists.
 	 *
 	 * @param mixed $order_id Order id.
 	 */
 	public static function on_order_deleted( $order_id ): void {
-		unset( self::$orders_deleting[ (int) $order_id ] );
+		$order_id = (int) $order_id;
+		if ( ! isset( self::$orders_deleting[ $order_id ] ) ) {
+			return;
+		}
+
+		$has_rows = self::$orders_deleting[ $order_id ];
+		unset( self::$orders_deleting[ $order_id ] );
+
+		if ( ! $has_rows ) {
+			return;
+		}
+
+		try {
+			self::record_deleted_order( $order_id );
+		} catch ( Throwable $e ) {
+			Pipeline::log( 'The deletion of order ' . $order_id . ' could not be recorded: ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+		}
 	}
 
 	/**
