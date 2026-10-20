@@ -128,6 +128,10 @@ Every public hook is prefixed `lumia_factures_`. Filters return their value; the
 | `lumia_factures_admin_notices` | filter | `Admin/Admin.php` | Notice messages printed on the plugin page. |
 | `lumia_factures_can_issue` | filter | `Documents/Issuer.php` | Whether an invoice may be issued for an order (default: its status is a trigger status). |
 | `lumia_factures_invoice_issued` | action | `Documents/Issuer.php` | Fires once an invoice is numbered (`$doc`, `$order`); the PDF may be missing if rendering failed. |
+| `lumia_factures_can_issue_credit_note` | filter | `Documents/CreditNoteIssuer.php` | Whether a credit note may be issued for a refund (`true`, `$refund`, `$order`); veto only, applied after the import gate. A veto flags the refund pending (`vetoed`). |
+| `lumia_factures_credit_note_issued` | action | `Documents/CreditNoteIssuer.php` | Fires once a credit note is numbered (`$doc`, `$refund`, `$order` the refunded order); the PDF may be missing if rendering failed. |
+| `lumia_factures_allow_credited_refund_deletion` | filter | `Documents/CreditNoteIssuer.php` | Whether a refund carrying a credit note may be deleted (`false`, `$refund`, `$doc`); the register row and the PDF stay either way. |
+| `lumia_factures_tables_exist` | filter | `Database/Installer.php` | Whether the module tables exist (tests: a test cannot drop a table). |
 | `lumia_factures_number_tags` | filter | `Numbering/NumberFormat.php` | Tag names accepted in a number format. |
 | `lumia_factures_number_tag` | filter | `Numbering/NumberFormat.php` | Value of a custom number tag (`''`, `$tag`, `$argument`, `$sequence`, `$order`). |
 | `lumia_factures_invoice_context` | filter | `Rendering/Context.php` | Rendering context passed to the PDF templates. |
@@ -141,6 +145,7 @@ Every public hook is prefixed `lumia_factures_`. Filters return their value; the
 | `lumia_factures_can_access_invoice` | filter | `Front/CustomerDownload.php` | Whether the visitor may download the order's invoice (`$can`, `$order`, `$key`), invoices only; applies to the endpoint, the shortcode and the Bricks tags. |
 | `lumia_factures_can_access_document` | filter | `Front/CustomerDownload.php` | Whether the visitor may download a document of the order (`$can`, `$order`, `$key`, `$type`), invoices and credit notes; runs after `lumia_factures_can_access_invoice`. |
 | `lumia_factures_customer_credit_note_url` | filter | `Front/CustomerDownload.php` | Customer download URL of a credit note (`$url`, `$doc`, `$order` the refunded order). |
+| `lumia_factures_show_customer_links` | filter | `Front/CustomerLinks.php`, `Emails/EmailLinks.php` | Whether a customer surface shows the order's documents (`$show` from the `customer` settings, `$placement`: `account_orders`, `order_details`, `email` or `shortcode`, `$order`). |
 
 ## Translations
 
@@ -158,7 +163,7 @@ Text domain `lumia-factures`, loaded on `init`. The procedure to add a string is
 
 ## Database schema
 
-The Invoices module owns two tables, created and upgraded with `dbDelta()` by `Modules\Invoices\Database\Installer`: `{prefix}lumia_factures_sequences` (numbering counters) and `{prefix}lumia_factures_documents` (register of documents). The installed version is the option `lumia_factures_db_version`. `Module::init()` calls `Installer::maybe_upgrade()`, which runs `install()` whenever the stored version is lower than `Installer::DB_VERSION` (updating a plugin never runs its activation hook); `Module::on_activate()` runs `install()` too.
+The Invoices module owns two tables, created and upgraded with `dbDelta()` by `Modules\Invoices\Database\Installer`: `{prefix}lumia_factures_sequences` (numbering counters) and `{prefix}lumia_factures_documents` (register of documents). The installed version is the option `lumia_factures_db_version`. `Module::init()` calls `Installer::maybe_upgrade()`, which runs `install()` whenever the stored version is lower than `Installer::DB_VERSION` (updating a plugin never runs its activation hook); `Module::on_activate()` runs `install()` too. In both places `Settings\Upgrader::maybe_upgrade()` (the stored settings, versioned in `lumia_factures_invoices_settings_version`) runs first, because the DB version it reads is one of the signs of an existing installation (see [modules/invoices.md](modules/invoices.md#customer-access)).
 
 | `DB_VERSION` | Release | Change |
 |---|---|---|

@@ -19,8 +19,11 @@ The interface is in English and ships with a French translation (`fr_FR`).
 
 - Imports the invoices, numbers, counters, settings and PDFs of the former Facture PDF Lumia plugin (see [Migrating from Facture PDF Lumia](#migrating-from-facture-pdf-lumia)); the old customer download links and shortcode keep working.
 - Customer download of the invoice by link (order key for guests), by the `[lumia_factures_invoice]` shortcode, and by the Bricks dynamic tags.
+- Credit notes (2.1): one numbered, archived credit note per refund, in its own series (`AV-{year}-{number:5}` by default), attached to the refund e-mail; "Cancel invoice" credits the invoice of an unpaid order without moving money; `wp lumia-factures issue-credit-notes` issues the credit notes of refunds made before 2.1.
+- Customer access (2.1): the invoice and credit notes in My Account, on the thank-you page, as links in the customer e-mails, with the `[lumia_factures_documents]` shortcode and the Bricks tags. On a site updated from 2.0 the My Account and order page links start off (turn them on under General > Customer access).
+- A demo order built from the shop's products for the live preview while the shop has no order.
 
-Planned, not delivered yet: customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
+Planned for 2.2: no-VAT mode, customer VAT number, the 2026 invoice mentions and Factur-X.
 
 Modules: **Invoices** (core) and **Bricks** (dynamic tags), both always active: the Bricks hooks only fire on a Bricks site.
 
