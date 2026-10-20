@@ -36,20 +36,37 @@ final class Register {
 			return null;
 		}
 
-		$issued_at = null === $row['issued_at'] ? 0 : (int) strtotime( $row['issued_at'] . ' UTC' );
+		return self::hydrate( $row );
+	}
 
-		return new IssuedDocument(
-			(int) $row['id'],
-			(string) $row['type'],
-			(int) $row['order_id'],
-			(string) $row['status'],
-			null === $row['number'] ? null : (string) $row['number'],
-			null === $row['sequence_key'] ? null : (string) $row['sequence_key'],
-			null === $row['sequence'] ? null : (int) $row['sequence'],
-			$issued_at,
-			null === $row['file'] ? null : (string) $row['file'],
-			null === $row['checksum'] ? null : (string) $row['checksum']
-		);
+	/**
+	 * Lists the documents of a type that belong to an order (the credit notes of its refunds).
+	 *
+	 * @param string $type      Document type.
+	 * @param int    $parent_id Parent order id.
+	 * @return list<IssuedDocument> Reserved and issued rows, oldest first (by row id).
+	 */
+	public static function for_parent( string $type, int $parent_id ): array {
+		global $wpdb;
+
+		// 0 is "no parent" (every invoice): never a list to return.
+		if ( $parent_id <= 0 ) {
+			return [];
+		}
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		$rows = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$table} WHERE type = %s AND parent_id = %d ORDER BY id", $type, $parent_id ), ARRAY_A );
+
+		$documents = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			if ( is_array( $row ) ) {
+				$documents[] = self::hydrate( $row );
+			}
+		}
+
+		return $documents;
 	}
 
 	/**
@@ -68,27 +85,52 @@ final class Register {
 	}
 
 	/**
+	 * Whether a number is already recorded for any other document type.
+	 *
+	 * The unique key (type, number) only separates numbers within one type: an invoice and a
+	 * credit note could both print "FA-2026-00001". The issuer refuses such a number.
+	 *
+	 * @param string $type   Document type about to use the number.
+	 * @param string $number Printed number.
+	 */
+	public static function number_exists_in_other_type( string $type, string $number ): bool {
+		global $wpdb;
+
+		$table = Installer::documents_table();
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name from Installer.
+		return null !== $wpdb->get_var( $wpdb->prepare( "SELECT id FROM {$table} WHERE type <> %s AND number = %s LIMIT 1", $type, $number ) );
+	}
+
+	/**
 	 * Reserves the right to issue a document for an order.
 	 *
-	 * @param string $type     Document type.
-	 * @param int    $order_id Order id.
+	 * @param string $type      Document type.
+	 * @param int    $order_id  Order id (the refund id for a credit note).
+	 * @param int    $parent_id Order the document belongs to (credit note), 0 for none.
 	 * @return int|null Row id, or null when the order already has a row (or on failure).
 	 */
-	public static function reserve( string $type, int $order_id ): ?int {
+	public static function reserve( string $type, int $order_id, int $parent_id = 0 ): ?int {
 		global $wpdb;
+
+		$data   = [
+			'type'       => $type,
+			'order_id'   => $order_id,
+			'status'     => 'reserved',
+			'created_at' => gmdate( 'Y-m-d H:i:s' ),
+		];
+		$format = [ '%s', '%d', '%s', '%s' ];
+
+		// Without a parent the column keeps its default (0): an invoice is still reserved on a
+		// table whose upgrade to v2 failed (see Installer::install()).
+		if ( $parent_id > 0 ) {
+			$data['parent_id'] = $parent_id;
+			$format[]          = '%d';
+		}
 
 		$suppressed = $wpdb->suppress_errors( true );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- register write.
-		$result = $wpdb->insert(
-			Installer::documents_table(),
-			[
-				'type'       => $type,
-				'order_id'   => $order_id,
-				'status'     => 'reserved',
-				'created_at' => gmdate( 'Y-m-d H:i:s' ),
-			],
-			[ '%s', '%d', '%s', '%s' ]
-		);
+		$result = $wpdb->insert( Installer::documents_table(), $data, $format );
 		$error  = (string) $wpdb->last_error;
 		$wpdb->suppress_errors( $suppressed );
 
@@ -253,5 +295,29 @@ final class Register {
 		$affected = $wpdb->query( $wpdb->prepare( "DELETE FROM {$table} WHERE id = %d AND status = 'reserved' AND number IS NULL AND created_at < %s", $id, gmdate( 'Y-m-d H:i:s', time() - $older_than ) ) );
 
 		return 1 === $affected;
+	}
+
+	/**
+	 * Builds the value object of a register row.
+	 *
+	 * @param array<mixed> $row Row read with ARRAY_A.
+	 */
+	private static function hydrate( array $row ): IssuedDocument {
+		$issued_at = null === $row['issued_at'] ? 0 : (int) strtotime( $row['issued_at'] . ' UTC' );
+
+		return new IssuedDocument(
+			(int) $row['id'],
+			(string) $row['type'],
+			(int) $row['order_id'],
+			(string) $row['status'],
+			null === $row['number'] ? null : (string) $row['number'],
+			null === $row['sequence_key'] ? null : (string) $row['sequence_key'],
+			null === $row['sequence'] ? null : (int) $row['sequence'],
+			$issued_at,
+			null === $row['file'] ? null : (string) $row['file'],
+			null === $row['checksum'] ? null : (string) $row['checksum'],
+			// Absent only while the upgrade to schema v2 has not run.
+			isset( $row['parent_id'] ) ? (int) $row['parent_id'] : 0
+		);
 	}
 }

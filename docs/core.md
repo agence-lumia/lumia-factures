@@ -154,6 +154,20 @@ Text domain `lumia-factures`, loaded on `init`. The procedure to add a string is
 - **Changelog.** Requested as `application/vnd.github.html+json` (already rendered), passed through `wp_kses_post()`; on the dev channel the notes of the last 10 versions are cached.
 - **Always on.** The updater runs even when `Requirements::check()` fails.
 
+## Database schema
+
+The Invoices module owns two tables, created and upgraded with `dbDelta()` by `Modules\Invoices\Database\Installer`: `{prefix}lumia_factures_sequences` (numbering counters) and `{prefix}lumia_factures_documents` (register of documents). The installed version is the option `lumia_factures_db_version`. `Module::init()` calls `Installer::maybe_upgrade()`, which runs `install()` whenever the stored version is lower than `Installer::DB_VERSION` (updating a plugin never runs its activation hook); `Module::on_activate()` runs `install()` too.
+
+| `DB_VERSION` | Release | Change |
+|---|---|---|
+| 1 | 2.0 | Both tables. |
+| 2 | 2.1 | `parent_id BIGINT(20) UNSIGNED NOT NULL DEFAULT 0` and `KEY parent_id` on the documents table: the order a credit note belongs to (its `order_id` is the refund id), 0 for an invoice. The unique keys `type_order` and `type_number` are unchanged. |
+
+- **The version is recorded last.** `dbDelta()` reports nothing when an `ALTER` fails (missing privilege, locked table). `install()` records the version only once `SHOW COLUMNS ... LIKE 'parent_id'` finds the column; otherwise it logs and the next request tries again (`DatabaseTest::test_version_not_recorded_when_column_missing`). `Register::reserve()` leaves `parent_id` out of the `INSERT` when it is 0, so invoices are still issued on a table whose upgrade failed.
+- **No row is touched.** The upgrade adds a column and a key: ids, numbers, counters, dates, files and checksums stay as they are, `parent_id` is 0 on every existing row (`DatabaseTest::test_upgrade_from_v1_keeps_issued_rows`). That test upgrades a separate copy built with the v1 definition (`{prefix}lumia_factures_documents_v1test`) in `set_up_before_class()`: any `ALTER`, whatever the table, commits the transaction a test runs in. On an existing table `dbDelta()` appends the new column at the end; rows are always read by name.
+- **Integer display width.** Integers are written `BIGINT(20) UNSIGNED`, as in WordPress core. MariaDB reports the width, so with `BIGINT UNSIGNED` `dbDelta()` re-issued an `ALTER TABLE ... CHANGE COLUMN` for every integer column on each run; MySQL 8 ignores the width and the storage is the same (`DatabaseTest::test_install_alters_nothing_on_current_schema`).
+- **Rolling back to 2.0.1 is safe.** 2.0.1 only reads and writes `invoice` rows and never names `parent_id` (its `INSERT` leaves the default 0). It does not run `dbDelta()` on `init`, its version (1) being lower than the stored one (2). Reactivated, it runs its v1 `install()`, which drops nothing (`dbDelta()` never removes a column or a key) and records version 1: the next update to 2.1 upgrades again. Credit note rows stay in the register, unseen by 2.0.1.
+
 ## Uninstall
 
 `uninstall.php` does **nothing** unless `LUMIA_FACTURES_REMOVE_ALL_DATA` is defined to `true` in `wp-config.php`: invoices must be kept 10 years. When set, it deletes the global option and, for each class of `Activator::MODULE_CLASSES`, the module option and whatever `get_uninstall_keys()` declares. Order meta goes through `Core\Uninstaller::delete_order_meta()`, which reaches `wp_postmeta` and, on HPOS, `{prefix}wc_orders_meta`. The archive folder `uploads/lumia-factures/` is **never** deleted, even with the constant: the PDFs are the legal record and only the site owner removes them by hand. The purge drops the sequence counters while the archived PDFs stay, so a reinstall restarts the numbering: before issuing again, set the start number above the last issued number, or raise the counters. Never add data deletion outside this gate.
