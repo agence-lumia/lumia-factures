@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
+use Lumia\Factures\Modules\Invoices\Documents\Notes;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
@@ -505,6 +506,77 @@ class IssuerTest extends TestCase {
 				sprintf( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'FA-' . $next, $next )
 			)
 		);
+	}
+
+	public function test_invoice_order_notes_unchanged(): void {
+		// The texts 2.0.1 wrote on the order, byte for byte: the shared pipeline must not reword them.
+		$notes = Notes::invoice();
+
+		$this->assertSame( 'Invoice could not be numbered.', $notes->not_numbered );
+		$this->assertSame( 'Invoice sequence value %d could not be turned into a number; this sequence value is skipped.', $notes->not_built );
+		$this->assertSame( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', $notes->not_recorded );
+		$this->assertSame( 'The PDF of invoice %s could not be stored; the PDF will be built on first download.', $notes->store_failed );
+		$this->assertSame( 'The PDF of invoice %s could not be generated; the PDF will be built on first download.', $notes->render_failed );
+		$this->assertSame( 'The PDF of invoice FA-7 could not be stored; the PDF will be built on first download.', $notes->pdf_failure( 'store_failed', 'FA-7' ) );
+		$this->assertSame( 'The PDF of invoice FA-7 could not be generated; the PDF will be built on first download.', $notes->pdf_failure( 'render_failed', 'FA-7' ) );
+
+		// And the order really receives them through the pipeline.
+		$this->flat_format();
+		$next  = Sequences::current( $this->key() ) + 1;
+		$break = static function ( string $query ): string {
+			return str_contains( $query, "SET status = 'issued'" ) ? 'SELECT 0 FROM DUAL WHERE 1 = 0' : $query;
+		};
+		add_filter( 'query', $break );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		remove_filter( 'query', $break );
+
+		$this->assertTrue( $this->has_note( $order, sprintf( 'Invoice number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'FA-' . $next, $next ) ) );
+	}
+
+	public function test_number_used_by_other_type_is_refused_not_skipped(): void {
+		$this->flat_format();
+		$key  = $this->key();
+		$next = Sequences::current( $key ) + 1;
+
+		// A document of another type already prints the number the next invoice value gives.
+		$other = (int) Register::reserve( 'credit_note', 987650, 987651 );
+		$this->assertTrue( Register::assign( $other, 'FA-' . $next, 'credit_note', 1, time() ) );
+
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		// Refused, never skipped to the next value: the counter moved by exactly one.
+		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
+		$this->assertSame( $next, Sequences::current( $key ) );
+		$this->assertTrue(
+			$this->has_note(
+				$order,
+				sprintf(
+					'Invoice number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the invoice is not numbered. Give each document type its own number prefix.',
+					'FA-' . $next,
+					$next
+				)
+			)
+		);
+		$this->assertStringContainsString( 'already used by another document type', (string) file_get_contents( $this->log_file ) ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- Local log file.
+
+		// The other document is untouched.
+		$kept = Register::find( 'credit_note', 987650 );
+		$this->assertNotNull( $kept );
+		$this->assertSame( $other, $kept->id );
+		$this->assertSame( 'issued', $kept->status );
+		$this->assertSame( 'FA-' . $next, $kept->number );
+		$this->assertSame( 987651, $kept->parent_id );
+
+		// The next call takes the next value: the refused one stays burned, never reused.
+		$again = Issuer::issue( wc_get_order( $order->get_id() ) );
+		$this->assertNotNull( $again );
+		$this->track( $again );
+		$this->assertSame( 'FA-' . ( $next + 1 ), $again->number );
+		$this->assertSame( $next + 1, Sequences::current( $key ) );
 	}
 
 	public function test_switch_yearly_to_no_reset_continues_the_series(): void {
