@@ -200,7 +200,7 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK, CreditNoteIssuer::SINCE_OPTION ],
+			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK, CreditNoteIssuer::SINCE_OPTION, CreditNoteIssuer::SWEEP_CURSOR_OPTION ],
 			'meta'      => [
 				'_lumia_factures_invoice_number',
 				'_lumia_factures_invoice_date',

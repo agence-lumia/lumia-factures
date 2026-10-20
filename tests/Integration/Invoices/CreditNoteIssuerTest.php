@@ -801,6 +801,81 @@ class CreditNoteIssuerTest extends TestCase {
 		$this->assertSame( '', $this->refund_of( $old )->get_meta( CreditNoteIssuer::PENDING_META ) );
 	}
 
+	public function test_sweep_resumes_after_the_last_refund_read_and_starts_over(): void {
+		update_option( CreditNoteIssuer::SINCE_OPTION, time() - HOUR_IN_SECONDS );
+		delete_option( CreditNoteIssuer::SWEEP_CURSOR_OPTION );
+
+		$order = $this->invoiced_order();
+		$first = $this->refund_without_hook( $order, 1.0 );
+		$next  = $this->refund_without_hook( $order, 2.0 );
+		$last  = $this->refund_without_hook( $order, 3.0 );
+
+		// Each run goes on after the refund the previous one stopped at, even when it was not issued.
+		$this->assertSame( [ $first->get_id() ], CreditNoteIssuer::sweep_ids( 1 ) );
+		$this->assertSame( [ $next->get_id() ], CreditNoteIssuer::sweep_ids( 1 ) );
+		$this->assertSame( [ $last->get_id() ], CreditNoteIssuer::sweep_ids( 1 ) );
+
+		// Past the newest refund, it starts over from the oldest one.
+		$this->assertSame( [ $first->get_id() ], CreditNoteIssuer::sweep_ids( 1 ) );
+		$this->assertSame( [ $next->get_id(), $last->get_id() ], CreditNoteIssuer::sweep_ids( 2 ) );
+		$this->assertSame( [ $first->get_id(), $next->get_id(), $last->get_id() ], CreditNoteIssuer::sweep_ids( 50 ) );
+	}
+
+	public function test_sweep_never_starves_behind_refunds_pending_for_good(): void {
+		update_option( CreditNoteIssuer::SINCE_OPTION, time() - HOUR_IN_SECONDS );
+		delete_option( CreditNoteIssuer::SWEEP_CURSOR_OPTION );
+
+		// More refunds than one run takes that never get a credit note by themselves: refunded
+		// before the order reached a trigger status (`no_invoice`), or vetoed by a filter for good.
+		$unpaid  = $this->order();
+		$waiting = [];
+		for ( $i = 0; $i <= CreditNoteIssuer::SWEEP_LIMIT; $i++ ) {
+			$waiting[] = $this->amount_refund( $unpaid, 0.4 )->get_id();
+		}
+
+		$order = $this->invoiced_order();
+		// The filter vetoes the refunds of 0.50 only, whenever they are retried.
+		$veto   = static fn( bool $can, WC_Order_Refund $refund ): bool => $can && abs( (float) $refund->get_amount() - 0.5 ) > 0.001;
+		add_filter( 'lumia_factures_can_issue_credit_note', $veto, 10, 2 );
+		$vetoed = [];
+		for ( $i = 0; $i <= CreditNoteIssuer::SWEEP_LIMIT; $i++ ) {
+			$vetoed[] = $this->amount_refund( $order, 0.5 )->get_id();
+		}
+
+		// Then a refund flagged while the import blocked issuing, and one the hook missed.
+		update_option( Migration::OPTION, [ 'status' => 'pending' ] );
+		$blocked = $this->amount_refund( $order, 1.0 );
+		update_option( Migration::OPTION, [ 'status' => 'done' ] );
+		$missed = $this->refund_without_hook( $order, 1.5 );
+
+		$this->assertSame( 'no_invoice', $this->refund_of( wc_get_order( $waiting[0] ) )->get_meta( CreditNoteIssuer::PENDING_META ) );
+		$this->assertSame( 'vetoed', $this->refund_of( wc_get_order( $vetoed[0] ) )->get_meta( CreditNoteIssuer::PENDING_META ) );
+		$this->assertSame( 'import', $this->refund_of( $blocked )->get_meta( CreditNoteIssuer::PENDING_META ) );
+
+		// The missed refund comes first; `no_invoice` lifts with the invoice, never through the sweep.
+		CreditNoteIssuer::sweep();
+		$found = Register::find( 'credit_note', $missed->get_id() );
+		$this->assertNotNull( $found );
+		$this->track( $found );
+		$this->assertSame( 'issued', $found->status );
+		$this->assertNull( Register::find( 'credit_note', $blocked->get_id() ) );
+
+		// The next run goes on past the vetoed refunds it already retried and reaches the import one.
+		CreditNoteIssuer::sweep();
+		$late = Register::find( 'credit_note', $blocked->get_id() );
+		$this->assertNotNull( $late );
+		$this->track( $late );
+		$this->assertSame( 'issued', $late->status );
+		$this->assertSame( '', $this->refund_of( $blocked )->get_meta( CreditNoteIssuer::PENDING_META ) );
+
+		foreach ( $waiting as $refund_id ) {
+			$this->assertNull( Register::find( 'credit_note', $refund_id ) );
+		}
+		$this->assertSame( [], array_intersect( $waiting, CreditNoteIssuer::sweep_ids( 50 ) ) );
+
+		remove_filter( 'lumia_factures_can_issue_credit_note', $veto, 10 );
+	}
+
 	public function test_sweep_is_scheduled_daily_and_unscheduled_on_deactivation(): void {
 		$this->assertSame( 10, has_action( CreditNoteIssuer::SWEEP_HOOK, [ CreditNoteIssuer::class, 'sweep' ] ) );
 

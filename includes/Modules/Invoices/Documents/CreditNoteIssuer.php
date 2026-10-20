@@ -88,6 +88,19 @@ final class CreditNoteIssuer {
 	private const SWEEP_PAGES = 5;
 
 	/**
+	 * Option holding where each part of the sweep resumes (see scan()). Not autoloaded.
+	 */
+	public const SWEEP_CURSOR_OPTION = 'lumia_factures_credit_notes_sweep_cursor';
+
+	/**
+	 * Pending reasons the sweep retries: those that can lift without any hook issuing the credit
+	 * note (the import finishing, a conflict fixed by hand, a filter changing its mind).
+	 * `no_invoice` lifts when the invoice is issued, whose action issues the order's credit notes;
+	 * `no_order` and `reused_id` never lift.
+	 */
+	private const SWEEP_RETRIED = [ 'import', 'conflict', 'vetoed' ];
+
+	/**
 	 * Prefix of the per-user transient listing the credit notes whose refund deletion was refused.
 	 */
 	private const KEPT_TRANSIENT = 'lumia_factures_refund_kept_';
@@ -424,14 +437,17 @@ final class CreditNoteIssuer {
 	}
 
 	/**
-	 * Refunds the sweep retries, by increasing id: first those created since SINCE_OPTION that
-	 * carry neither a credit note number nor a pending flag and refund something, then the pending
-	 * ones. A pending refund waits for something outside the sweep (the import, its invoice, a
-	 * manager): it never takes the place of a refund the hook simply missed.
+	 * Refunds the sweep retries: first those created since SINCE_OPTION that carry neither a
+	 * credit note number nor a pending flag and refund something (missed by the hook), then the
+	 * pending ones whose reason can lift without any hook issuing their credit note
+	 * (SWEEP_RETRIED). A pending refund never takes the place of a refund the hook simply missed.
 	 *
-	 * The storages share one meta clause only (see pending_refund_ids()): the refunds without a
-	 * number are read by pages of SWEEP_PAGE_SIZE, SWEEP_PAGES at most, and the refunds of 0 (never
-	 * flagged, they would come back every day) and the pending ones are left out here.
+	 * The storages share one meta clause only (see pending_refund_ids()): each part reads its
+	 * refunds by pages of SWEEP_PAGE_SIZE, SWEEP_PAGES at most per run, and leaves out in PHP what
+	 * it does not retry. Each part resumes after the last refund the previous run read
+	 * (SWEEP_CURSOR_OPTION) and starts over once it has read them all, so refunds that never
+	 * become issuable (pending for good, refunds of 0) can delay a refund but never hide it.
+	 * Moves the cursors.
 	 *
 	 * @param int $limit Maximum number of ids.
 	 * @return int[]
@@ -441,43 +457,143 @@ final class CreditNoteIssuer {
 			return [];
 		}
 
-		$ids   = [];
-		$since = self::since();
+		$missed = self::scan(
+			'missed',
+			[
+				'meta_key'     => self::NUMBER_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Daily sweep, bounded by SWEEP_PAGES.
+				'meta_compare' => 'NOT EXISTS',
+			],
+			self::since(),
+			static fn( WC_Order_Refund $refund ): bool => self::has_amount( $refund ) && '' === (string) $refund->get_meta( self::PENDING_META ),
+			$limit
+		);
 
-		for ( $page = 1; $page <= self::SWEEP_PAGES; $page++ ) {
-			$batch = self::ids(
-				wc_get_orders(
-					[
-						'type'         => 'shop_order_refund',
-						'limit'        => self::SWEEP_PAGE_SIZE,
-						'paged'        => $page,
-						'orderby'      => 'ID',
-						'order'        => 'ASC',
-						'return'       => 'ids',
-						'date_created' => '>=' . $since,
-						'meta_key'     => self::NUMBER_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Daily sweep, bounded by SWEEP_PAGES.
-						'meta_compare' => 'NOT EXISTS',
-					]
-				)
-			);
+		if ( count( $missed ) >= $limit ) {
+			return $missed;
+		}
 
-			foreach ( $batch as $refund_id ) {
-				$refund = wc_get_order( $refund_id );
-				if ( $refund instanceof WC_Order_Refund && self::has_amount( $refund ) && '' === (string) $refund->get_meta( self::PENDING_META ) ) {
-					$ids[] = $refund_id;
+		$pending = self::scan(
+			'pending',
+			[
+				'meta_key'     => self::PENDING_META, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- Daily sweep, bounded by SWEEP_PAGES.
+				'meta_compare' => 'EXISTS',
+			],
+			0,
+			static fn( WC_Order_Refund $refund ): bool => in_array( (string) $refund->get_meta( self::PENDING_META ), self::SWEEP_RETRIED, true ),
+			$limit - count( $missed )
+		);
+
+		return array_values( array_unique( array_merge( $missed, $pending ) ) );
+	}
+
+	/**
+	 * One part of the sweep: the refunds matching the query and accepted by the callback, by
+	 * increasing id, read from the part's cursor (the creation date and id of the last refund read)
+	 * to the newest refund, then from $from back to the cursor. Saves where it stopped, or clears
+	 * the cursor once every refund has been read.
+	 *
+	 * The cursor is a creation date: `wc_get_orders()` filters ids by list only, not by range.
+	 *
+	 * @param string                          $part   Cursor key (`missed`, `pending`).
+	 * @param array<string, mixed>            $query  Meta clause of the part.
+	 * @param int                             $from   Oldest creation date read (UTC timestamp, 0 for none).
+	 * @param callable(WC_Order_Refund): bool $accept Whether the refund is retried.
+	 * @param int                             $limit  Maximum number of ids.
+	 * @return int[]
+	 */
+	private static function scan( string $part, array $query, int $from, callable $accept, int $limit ): array {
+		$cursors = get_option( self::SWEEP_CURSOR_OPTION, [] );
+		$cursors = is_array( $cursors ) ? $cursors : [];
+		$start   = isset( $cursors[ $part ] ) && is_array( $cursors[ $part ] ) ? $cursors[ $part ] : [];
+		$after   = [ max( 0, (int) ( $start['date'] ?? 0 ) ), max( 0, (int) ( $start['id'] ?? 0 ) ) ];
+
+		// From the cursor to the newest refund, then from the oldest one back to the cursor.
+		$passes = [ [ max( $from, $after[0] ), 0 ] ];
+		if ( $after[0] > $from ) {
+			$passes[] = [ $from, $after[0] ];
+		}
+
+		$ids      = [];
+		$position = $after;
+		$pages    = self::SWEEP_PAGES;
+
+		foreach ( $passes as $pass => [ $lower, $upper ] ) {
+			for ( $page = 1; ; $page++ ) {
+				if ( $pages <= 0 ) {
+					self::save_cursor( $cursors, $part, $position );
+					return $ids;
+				}
+				--$pages;
+
+				$args = $query + [
+					'type'    => 'shop_order_refund',
+					'limit'   => self::SWEEP_PAGE_SIZE,
+					'paged'   => $page,
+					'orderby' => 'ID',
+					'order'   => 'ASC',
+					'return'  => 'ids',
+				];
+				if ( $upper > 0 ) {
+					$args['date_created'] = $lower > 0 ? $lower . '...' . $upper : '<=' . $upper;
+				} elseif ( $lower > 0 ) {
+					$args['date_created'] = '>=' . $lower;
 				}
 
-				if ( count( $ids ) >= $limit ) {
-					break 2;
-				}
-			}
+				$batch = self::ids( wc_get_orders( $args ) );
+				foreach ( $batch as $refund_id ) {
+					$refund = wc_get_order( $refund_id );
+					if ( ! $refund instanceof WC_Order_Refund || in_array( $refund_id, $ids, true ) ) {
+						continue;
+					}
 
-			if ( count( $batch ) < self::SWEEP_PAGE_SIZE ) {
-				break;
+					$created = $refund->get_date_created();
+					$stamp   = null !== $created ? $created->getTimestamp() : 0;
+
+					// Read by the previous run already (same second as the cursor, lower or equal id).
+					if ( 0 === $pass && $stamp === $after[0] && $refund_id <= $after[1] ) {
+						continue;
+					}
+
+					$position = [ $stamp, $refund_id ];
+					if ( $accept( $refund ) ) {
+						$ids[] = $refund_id;
+						if ( count( $ids ) >= $limit ) {
+							self::save_cursor( $cursors, $part, $position );
+							return $ids;
+						}
+					}
+				}
+
+				if ( count( $batch ) < self::SWEEP_PAGE_SIZE ) {
+					break;
+				}
 			}
 		}
 
-		return array_values( array_unique( array_merge( $ids, self::pending_refund_ids( $limit - count( $ids ) ) ) ) );
+		// Every refund was read: the next run starts over.
+		self::save_cursor( $cursors, $part, [ 0, 0 ] );
+
+		return $ids;
+	}
+
+	/**
+	 * Saves the cursor of one part of the sweep (see scan()), [0, 0] clearing it.
+	 *
+	 * @param array<string, mixed> $cursors  Every cursor, as stored.
+	 * @param string               $part     Cursor key.
+	 * @param array{int, int}      $position Creation date and id of the last refund read.
+	 */
+	private static function save_cursor( array $cursors, string $part, array $position ): void {
+		if ( $position[0] <= 0 && $position[1] <= 0 ) {
+			unset( $cursors[ $part ] );
+		} else {
+			$cursors[ $part ] = [
+				'date' => $position[0],
+				'id'   => $position[1],
+			];
+		}
+
+		update_option( self::SWEEP_CURSOR_OPTION, $cursors, false );
 	}
 
 	/**
