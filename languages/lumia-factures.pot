@@ -2,14 +2,14 @@
 # This file is distributed under the GPL-2.0+.
 msgid ""
 msgstr ""
-"Project-Id-Version: Lümia Factures 2.0.0-dev.2\n"
+"Project-Id-Version: Lümia Factures 2.0.0-dev.3\n"
 "Report-Msgid-Bugs-To: https://wordpress.org/support/plugin/lumia-factures\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-19T23:03:30+00:00\n"
+"POT-Creation-Date: 2026-10-20T08:00:12+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -28,7 +28,8 @@ msgstr ""
 #: lumia-factures.php
 #: includes/Core/Modules.php:61
 #: includes/Core/Updater.php:320
-#: templates/admin/dashboard.php:45
+#: templates/admin/invoices.php:16
+#: templates/admin/settings.php:19
 msgid "PDF invoices for WooCommerce orders."
 msgstr ""
 
@@ -42,110 +43,95 @@ msgstr ""
 msgid "https://agence-lumia.com"
 msgstr ""
 
+#: includes/Admin/Admin.php:102
 #: includes/Admin/Admin.php:103
-#: includes/Admin/Admin.php:104
 #: includes/Core/Modules.php:60
-#: includes/Core/Modules.php:62
+#: templates/admin/invoices.php:15
+#: templates/admin/settings.php:18
 msgid "Invoices"
 msgstr ""
 
-#: includes/Admin/Admin.php:135
-#: templates/admin/dashboard.php:27
-#: templates/admin/settings.php:30
-#: templates/components/sidebar.php:31
+#: includes/Admin/Admin.php:134
+#: includes/Modules/Invoices/settings-template.php:37
 msgid "Settings"
 msgstr ""
 
-#: includes/Admin/Admin.php:177
-#: includes/Admin/Admin.php:274
+#: includes/Admin/Admin.php:175
+#: includes/Admin/Admin.php:257
 msgid "Settings saved successfully."
 msgstr ""
 
-#: includes/Admin/Admin.php:178
+#: includes/Admin/Admin.php:176
 msgid "An error occurred."
 msgstr ""
 
-#: includes/Admin/Admin.php:179
+#: includes/Admin/Admin.php:177
 msgid "Are you sure?"
 msgstr ""
 
-#: includes/Admin/Admin.php:180
-#: includes/Admin/Admin.php:318
+#: includes/Admin/Admin.php:178
+#: includes/Admin/Admin.php:300
 msgid "Confirm"
 msgstr ""
 
-#: includes/Admin/Admin.php:181
-#: includes/Admin/Admin.php:317
+#: includes/Admin/Admin.php:179
+#: includes/Admin/Admin.php:299
 msgid "Cancel"
 msgstr ""
 
-#: includes/Admin/Admin.php:182
+#: includes/Admin/Admin.php:180
 msgid "Close"
 msgstr ""
 
-#: includes/Admin/Admin.php:183
+#: includes/Admin/Admin.php:181
 msgid "Error"
 msgstr ""
 
-#: includes/Admin/Admin.php:184
+#: includes/Admin/Admin.php:182
 msgid "Unsaved changes"
 msgstr ""
 
-#: includes/Admin/Admin.php:185
+#: includes/Admin/Admin.php:183
 msgid "You have unsaved changes. Leave without saving?"
 msgstr ""
 
-#: includes/Admin/Admin.php:186
+#: includes/Admin/Admin.php:184
 msgid "Leave without saving"
 msgstr ""
 
-#: includes/Admin/Admin.php:187
+#: includes/Admin/Admin.php:185
 msgid "Stay on this page"
 msgstr ""
 
-#: includes/Admin/Admin.php:250
-#: includes/Admin/Admin.php:256
+#: includes/Admin/Admin.php:239
 msgid "You do not have the required permissions."
 msgstr ""
 
-#: includes/Admin/Admin.php:275
-msgid "Modules updated."
-msgstr ""
-
-#: includes/Admin/Admin.php:276
+#: includes/Admin/Admin.php:258
 msgid "Update check completed."
 msgstr ""
 
-#: includes/Admin/Admin.php:322
+#: includes/Admin/Admin.php:304
 msgid "Notifications"
 msgstr ""
 
 #: includes/Admin/SaveHandler.php:82
-#: includes/Admin/SaveHandler.php:173
+#: includes/Admin/SaveHandler.php:175
 msgid "Invalid nonce."
 msgstr ""
 
 #: includes/Admin/SaveHandler.php:86
-#: includes/Admin/SaveHandler.php:177
-#: includes/Admin/SaveHandler.php:234
+#: includes/Admin/SaveHandler.php:179
+#: includes/Admin/SaveHandler.php:201
 msgid "Insufficient permissions."
 msgstr ""
 
-#: includes/Core/Modules.php:63
-msgid "Generate the invoices"
-msgstr ""
-
-#: includes/Core/Modules.php:69
-#: includes/Core/Modules.php:71
+#: includes/Core/Modules.php:67
 msgid "Bricks"
 msgstr ""
 
-#: includes/Core/Modules.php:70
+#: includes/Core/Modules.php:68
 msgid "Dynamic tags to display invoice data in Bricks."
-msgstr ""
-
-#: includes/Core/Modules.php:72
-msgid "Bricks dynamic tags"
 msgstr ""
 
 #: includes/Core/Plugin.php:167
@@ -235,8 +221,14 @@ msgstr ""
 msgid "This invoice does not exist."
 msgstr ""
 
+#. translators: %s: color label.
+#: includes/Modules/Invoices/Admin/Fields.php:218
+#, php-format
+msgid "%s, hex code"
+msgstr ""
+
 #. translators: %s: field label.
-#: includes/Modules/Invoices/Admin/Fields.php:276
+#: includes/Modules/Invoices/Admin/Fields.php:277
 #, php-format
 msgid "Show \"%s\" on the invoice"
 msgstr ""
@@ -393,8 +385,28 @@ msgid "Create a first order to preview the invoice."
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/Preview.php:104
-#: includes/Modules/Invoices/Module.php:143
+#: includes/Modules/Invoices/Module.php:145
 msgid "The preview could not be generated."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Themes.php:42
+msgid "Black"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Themes.php:46
+msgid "Navy"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Themes.php:50
+msgid "Forest"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Themes.php:54
+msgid "Terracotta"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/Themes.php:58
+msgid "Plum"
 msgstr ""
 
 #: includes/Modules/Invoices/Amounts/StatementBuilder.php:72
@@ -494,70 +506,62 @@ msgstr ""
 msgid "Download my invoice"
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:186
-msgid "A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render."
-msgstr ""
-
-#: includes/Modules/Invoices/Migration/Importer.php:191
-msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
-msgstr ""
-
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:287
+#: includes/Modules/Invoices/Migration/Importer.php:247
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:294
+#: includes/Modules/Invoices/Migration/Importer.php:254
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:337
+#: includes/Modules/Invoices/Migration/Importer.php:297
 #, php-format
 msgid "Invoice %s imported from Facture PDF Lumia."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id, 3: file path
-#: includes/Modules/Invoices/Migration/Importer.php:404
+#: includes/Modules/Invoices/Migration/Importer.php:364
 #, php-format
 msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:458
+#: includes/Modules/Invoices/Migration/Importer.php:418
 msgid "An invoice is being issued for this order."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:462
+#: includes/Modules/Invoices/Migration/Importer.php:422
 #, php-format
 msgid "The order already has invoice %s."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:468
+#: includes/Modules/Invoices/Migration/Importer.php:428
 msgid "The number is already used by another invoice."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:474
+#: includes/Modules/Invoices/Migration/Importer.php:434
 msgid "The invoice could not be recorded (database error, see the PHP error log)."
 msgstr ""
 
 #. translators: %d: order id
-#: includes/Modules/Invoices/Migration/Importer.php:497
+#: includes/Modules/Invoices/Migration/Importer.php:457
 #, php-format
 msgid "Order %d: part of the import could not be written (see the PHP error log)."
 msgstr ""
 
 #. translators: 1: setting name, e.g. design.font_body, 2: legacy font name
-#: includes/Modules/Invoices/Migration/LegacySettings.php:150
+#: includes/Modules/Invoices/Migration/LegacySettings.php:152
 #, php-format
 msgid "%1$s \"%2$s\" is not available: replaced with Inter."
 msgstr ""
 
 #. translators: 1: setting name, 2: number of legal mentions
-#: includes/Modules/Invoices/Migration/LegacySettings.php:184
+#: includes/Modules/Invoices/Migration/LegacySettings.php:186
 #, php-format
 msgid "%1$s had %2$d entry: re-enter it in \"Legal text\"."
 msgid_plural "%1$s had %2$d entries: re-enter them in \"Legal text\"."
@@ -565,34 +569,34 @@ msgstr[0] ""
 msgstr[1] ""
 
 #. translators: %s: setting name, e.g. design.custom_css
-#: includes/Modules/Invoices/Migration/LegacySettings.php:196
+#: includes/Modules/Invoices/Migration/LegacySettings.php:198
 #, php-format
 msgid "%s was set and is no longer supported: it was not imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:140
+#: includes/Modules/Invoices/Module.php:142
 #: templates/admin/invoices/company.php:35
 msgid "Choose a logo"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:141
+#: includes/Modules/Invoices/Module.php:143
 msgid "Use this image"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:142
+#: includes/Modules/Invoices/Module.php:144
 msgid "Invalid format"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:144
+#: includes/Modules/Invoices/Module.php:146
 msgid "Raise this counter?"
 msgstr ""
 
-#: includes/Modules/Invoices/Module.php:145
+#: includes/Modules/Invoices/Module.php:147
 msgid "Raise the counter"
 msgstr ""
 
 #. translators: 1: counter key, 2: current value, 3: new value.
-#: includes/Modules/Invoices/Module.php:147
+#: includes/Modules/Invoices/Module.php:149
 #, php-format
 msgid "Counter %1$s goes from %2$s to %3$s. The numbers in between will never be used, and a counter can never be lowered."
 msgstr ""
@@ -748,88 +752,29 @@ msgstr ""
 msgid "Page %1$s / %2$s"
 msgstr ""
 
-#: includes/Modules/Invoices/settings-template.php:29
+#: includes/Modules/Invoices/settings-template.php:32
 msgid "General"
 msgstr ""
 
-#: includes/Modules/Invoices/settings-template.php:30
+#: includes/Modules/Invoices/settings-template.php:33
 msgid "Company"
 msgstr ""
 
-#: includes/Modules/Invoices/settings-template.php:31
+#: includes/Modules/Invoices/settings-template.php:34
 msgid "Numbering"
 msgstr ""
 
-#: includes/Modules/Invoices/settings-template.php:32
+#: includes/Modules/Invoices/settings-template.php:35
 msgid "Content"
 msgstr ""
 
-#: includes/Modules/Invoices/settings-template.php:33
+#: includes/Modules/Invoices/settings-template.php:36
 msgid "Design"
 msgstr ""
 
-#: templates/admin/dashboard.php:22
-#: templates/components/sidebar.php:23
-msgid "Manage modules"
-msgstr ""
-
-#: templates/admin/dashboard.php:36
-msgid "WooCommerce orders"
-msgstr ""
-
-#: templates/admin/dashboard.php:44
-#: templates/components/sidebar.php:16
-msgid "Overview"
-msgstr ""
-
-#: templates/admin/dashboard.php:56
-msgid "Plugin version"
-msgstr ""
-
-#: templates/admin/dashboard.php:66
-msgid "OK"
-msgstr ""
-
-#: templates/admin/dashboard.php:67
-msgid "Requirements met"
-msgstr ""
-
-#: templates/admin/dashboard.php:75
-msgid "Requirements not met"
-msgstr ""
-
-#: templates/admin/dashboard.php:86
-#: templates/admin/dashboard.php:107
-msgid "Active modules"
-msgstr ""
-
-#: templates/admin/dashboard.php:94
-msgid "Requirements"
-msgstr ""
-
-#: templates/admin/dashboard.php:95
-msgid "The modules do not start until these problems are solved."
-msgstr ""
-
-#: templates/admin/dashboard.php:108
-msgid "These are the modules currently active on your site."
-msgstr ""
-
-#: templates/admin/dashboard.php:118
-msgid "Active"
-msgstr ""
-
-#: templates/admin/dashboard.php:123
-#: templates/admin/modules.php:71
-msgid "Configure"
-msgstr ""
-
-#: templates/admin/dashboard.php:132
-msgid "No module is running."
-msgstr ""
-
-#: templates/admin/dashboard.php:142
-msgid "Shortcuts"
+#: templates/admin/invoices.php:20
+#: templates/admin/settings.php:23
+msgid "Save"
 msgstr ""
 
 #: templates/admin/invoices/company.php:17
@@ -1154,32 +1099,20 @@ msgstr ""
 msgid "Legal text"
 msgstr ""
 
-#: templates/admin/invoices/design.php:13
-msgid "Primary"
-msgstr ""
-
-#: templates/admin/invoices/design.php:14
-msgid "Secondary"
-msgstr ""
-
-#: templates/admin/invoices/design.php:15
-msgid "Text"
-msgstr ""
-
 #: templates/admin/invoices/design.php:16
-msgid "Muted text"
-msgstr ""
-
-#: templates/admin/invoices/design.php:17
 msgid "Table header background"
 msgstr ""
 
+#: templates/admin/invoices/design.php:17
+msgid "Header text"
+msgstr ""
+
 #: templates/admin/invoices/design.php:18
-msgid "Table header text"
+msgid "Text"
 msgstr ""
 
 #: templates/admin/invoices/design.php:19
-msgid "Alternate row"
+msgid "Muted text"
 msgstr ""
 
 #: templates/admin/invoices/design.php:20
@@ -1187,112 +1120,126 @@ msgid "Block background"
 msgstr ""
 
 #: templates/admin/invoices/design.php:21
-msgid "Borders"
+msgid "Alternate row"
 msgstr ""
 
 #: templates/admin/invoices/design.php:22
+msgid "Borders"
+msgstr ""
+
+#: templates/admin/invoices/design.php:23
 msgid "Page background"
 msgstr ""
 
+#: templates/admin/invoices/design.php:33
+msgid "Theme"
+msgstr ""
+
 #: templates/admin/invoices/design.php:34
+msgid "Start from a ready-made palette, then adjust any color."
+msgstr ""
+
+#: templates/admin/invoices/design.php:59
 msgid "Colors"
 msgstr ""
 
-#: templates/admin/invoices/design.php:45
-msgid "Typography"
-msgstr ""
-
-#: templates/admin/invoices/design.php:49
-msgid "Heading font"
-msgstr ""
-
-#: templates/admin/invoices/design.php:50
-msgid "Body font"
-msgstr ""
-
-#: templates/admin/invoices/design.php:51
-msgid "Body font size (pt)"
-msgstr ""
-
-#: templates/admin/invoices/design.php:52
-msgid "Heading size (times the body size)"
-msgstr ""
-
-#: templates/admin/invoices/design.php:53
-msgid "Line height"
-msgstr ""
-
-#: templates/admin/invoices/design.php:57
-msgid "Bold headings"
+#: templates/admin/invoices/design.php:60
+msgid "The primary color fills the title band and the grand total, and colors the headings."
 msgstr ""
 
 #: templates/admin/invoices/design.php:63
-msgid "Layout"
+msgid "Primary"
 msgstr ""
 
-#: templates/admin/invoices/design.php:70
-msgid "Density"
-msgstr ""
-
-#: templates/admin/invoices/design.php:72
-msgid "Compact"
-msgstr ""
-
-#: templates/admin/invoices/design.php:73
-msgid "Normal"
-msgstr ""
-
-#: templates/admin/invoices/design.php:74
-msgid "Airy"
-msgstr ""
-
-#: templates/admin/invoices/design.php:77
-msgid "Corner radius (px)"
-msgstr ""
-
-#: templates/admin/invoices/design.php:78
-msgid "Border width (px)"
-msgstr ""
-
-#: templates/admin/invoices/design.php:79
-msgid "Product image width (px)"
-msgstr ""
-
-#: templates/admin/invoices/design.php:79
-msgid "0 hides the image."
-msgstr ""
-
-#: templates/admin/invoices/design.php:80
-msgid "Top margin (mm)"
+#: templates/admin/invoices/design.php:67
+msgid "Advanced colors"
 msgstr ""
 
 #: templates/admin/invoices/design.php:81
-msgid "Bottom margin (mm)"
+msgid "Typography"
 msgstr ""
 
-#: templates/admin/invoices/design.php:82
-msgid "Side margins (mm)"
+#: templates/admin/invoices/design.php:86
+msgid "Heading font"
 msgstr ""
 
-#: templates/admin/invoices/design.php:88
-#: templates/admin/invoices/design.php:96
-msgid "Invoice preview"
-msgstr ""
-
-#: templates/admin/invoices/design.php:90
-msgid "Preview"
+#: templates/admin/invoices/design.php:87
+msgid "Body font"
 msgstr ""
 
 #: templates/admin/invoices/design.php:92
-msgid "Latest order"
-msgstr ""
-
-#: templates/admin/invoices/design.php:92
-msgid "Order ID"
+msgid "Body size (pt)"
 msgstr ""
 
 #: templates/admin/invoices/design.php:93
-msgid "Refresh"
+msgid "Heading scale"
+msgstr ""
+
+#: templates/admin/invoices/design.php:93
+msgid "Times the body size."
+msgstr ""
+
+#: templates/admin/invoices/design.php:94
+msgid "Line height"
+msgstr ""
+
+#: templates/admin/invoices/design.php:97
+msgid "Bold headings"
+msgstr ""
+
+#: templates/admin/invoices/design.php:103
+msgid "Layout"
+msgstr ""
+
+#: templates/admin/invoices/design.php:111
+msgid "Density"
+msgstr ""
+
+#: templates/admin/invoices/design.php:113
+msgid "Compact"
+msgstr ""
+
+#: templates/admin/invoices/design.php:114
+msgid "Normal"
+msgstr ""
+
+#: templates/admin/invoices/design.php:115
+msgid "Airy"
+msgstr ""
+
+#: templates/admin/invoices/design.php:118
+msgid "Product image width (px)"
+msgstr ""
+
+#: templates/admin/invoices/design.php:118
+msgid "0 hides the image."
+msgstr ""
+
+#: templates/admin/invoices/design.php:119
+msgid "Corner radius (px)"
+msgstr ""
+
+#: templates/admin/invoices/design.php:120
+msgid "Border width (px)"
+msgstr ""
+
+#: templates/admin/invoices/design.php:123
+msgid "Page margins (mm)"
+msgstr ""
+
+#: templates/admin/invoices/design.php:126
+msgctxt "page margin"
+msgid "Top"
+msgstr ""
+
+#: templates/admin/invoices/design.php:127
+msgctxt "page margin"
+msgid "Bottom"
+msgstr ""
+
+#: templates/admin/invoices/design.php:128
+msgctxt "page margin"
+msgid "Sides"
 msgstr ""
 
 #: templates/admin/invoices/general.php:33
@@ -1435,143 +1382,136 @@ msgstr ""
 msgid "Raise"
 msgstr ""
 
-#: templates/admin/module-settings.php:36
-#: templates/admin/modules.php:23
-#: templates/admin/settings.php:35
-msgid "Save"
+#: templates/admin/invoices/preview.php:15
+msgid "Invoice preview"
 msgstr ""
 
-#: templates/admin/module-settings.php:76
-msgid "This module has no settings yet."
+#: templates/admin/invoices/preview.php:17
+msgid "Preview"
 msgstr ""
 
-#: templates/admin/modules.php:17
-#: templates/components/sidebar.php:22
-msgid "Modules"
+#: templates/admin/invoices/preview.php:20
+msgid "Order ID"
 msgstr ""
 
-#: templates/admin/modules.php:18
-msgid "Enable or disable modules as needed."
+#: templates/admin/invoices/preview.php:22
+msgid "Latest order"
 msgstr ""
 
-#: templates/admin/modules.php:33
-msgid "The modules are unavailable until the requirements are met."
+#: templates/admin/invoices/preview.php:25
+msgid "Zoom"
 msgstr ""
 
-#: templates/admin/modules.php:35
-msgid "See the requirements"
+#: templates/admin/invoices/preview.php:26
+msgid "Zoom out"
 msgstr ""
 
-#: templates/admin/modules.php:54
-msgid "Core module: always active."
+#: templates/admin/invoices/preview.php:29
+msgid "Fit to width"
 msgstr ""
 
-#: templates/admin/modules.php:67
-msgid "Core"
+#: templates/admin/invoices/preview.php:30
+msgid "Zoom in"
 msgstr ""
 
-#: templates/admin/settings.php:20
+#: templates/admin/invoices/preview.php:35
+msgid "Refresh"
+msgstr ""
+
+#: templates/admin/invoices/preview.php:43
+msgid "Sample: the next invoice number, nothing is saved or numbered."
+msgstr ""
+
+#: templates/admin/partials/plugin-settings.php:23
 msgid "WordPress"
 msgstr ""
 
-#: templates/admin/settings.php:21
+#: templates/admin/partials/plugin-settings.php:24
 msgid "PHP"
 msgstr ""
 
-#: templates/admin/settings.php:22
+#: templates/admin/partials/plugin-settings.php:25
 msgid "WooCommerce"
 msgstr ""
 
-#: templates/admin/settings.php:22
+#: templates/admin/partials/plugin-settings.php:25
 msgid "Not active"
 msgstr ""
 
-#: templates/admin/settings.php:23
+#: templates/admin/partials/plugin-settings.php:26
 msgid "PDF engine (Dompdf)"
 msgstr ""
 
-#: templates/admin/settings.php:23
+#: templates/admin/partials/plugin-settings.php:26
 msgid "Available"
 msgstr ""
 
-#: templates/admin/settings.php:23
+#: templates/admin/partials/plugin-settings.php:26
 msgid "Missing"
 msgstr ""
 
-#: templates/admin/settings.php:24
+#: templates/admin/partials/plugin-settings.php:27
 msgid "PHP memory"
 msgstr ""
 
-#: templates/admin/settings.php:31
-msgid "Global plugin configuration."
-msgstr ""
-
-#: templates/admin/settings.php:48
+#: templates/admin/partials/plugin-settings.php:32
 msgid "Updates"
 msgstr ""
 
-#: templates/admin/settings.php:49
+#: templates/admin/partials/plugin-settings.php:33
 msgid "Choose the plugin update channel."
 msgstr ""
 
-#: templates/admin/settings.php:54
+#: templates/admin/partials/plugin-settings.php:38
 msgid "Current version"
 msgstr ""
 
-#: templates/admin/settings.php:55
+#: templates/admin/partials/plugin-settings.php:39
 msgid "Plugin version installed on this site."
 msgstr ""
 
-#: templates/admin/settings.php:60
+#: templates/admin/partials/plugin-settings.php:44
 msgid "Check for updates"
 msgstr ""
 
-#: templates/admin/settings.php:67
+#: templates/admin/partials/plugin-settings.php:51
 msgid "Update channel"
 msgstr ""
 
-#: templates/admin/settings.php:68
+#: templates/admin/partials/plugin-settings.php:52
 msgid "Choose between stable versions and development pre-releases."
 msgstr ""
 
-#: templates/admin/settings.php:72
+#: templates/admin/partials/plugin-settings.php:56
 msgid "Stable (main)"
 msgstr ""
 
-#: templates/admin/settings.php:73
+#: templates/admin/partials/plugin-settings.php:57
 msgid "Dev (pre-release)"
 msgstr ""
 
-#: templates/admin/settings.php:80
+#: templates/admin/partials/plugin-settings.php:64
 msgid "Automatic updates"
 msgstr ""
 
-#: templates/admin/settings.php:85
+#: templates/admin/partials/plugin-settings.php:69
 msgid "Installs new versions of the chosen channel without intervention. Same setting as the \"Automatic updates\" column of the plugins list."
 msgstr ""
 
-#: templates/admin/settings.php:86
+#: templates/admin/partials/plugin-settings.php:70
 msgid "Automatic plugin updates are disabled on this site, or your account cannot manage them."
 msgstr ""
 
-#: templates/admin/settings.php:113
+#: templates/admin/partials/plugin-settings.php:91
 msgid "Environment"
 msgstr ""
 
-#: templates/admin/settings.php:114
+#: templates/admin/partials/plugin-settings.php:92
 msgid "Versions and components the plugin relies on."
 msgstr ""
 
-#: templates/components/sidebar.php:17
-msgid "Dashboard"
-msgstr ""
-
-#: templates/components/sidebar.php:32
-msgid "Global configuration"
-msgstr ""
-
-#: templates/components/sidebar.php:55
-msgid "Navigation"
+#: templates/admin/settings.php:33
+msgid "Invoices are paused until these requirements are met:"
 msgstr ""
 
 #: templates/pdf/invoice.php:41

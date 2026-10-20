@@ -67,15 +67,12 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Loads the media library on the Invoices tab only (logo picker).
+	 * Loads the media library on the plugin screen only (logo picker).
 	 *
 	 * @param string $hook Hook suffix of the admin page.
 	 */
 	public static function enqueue_media( $hook ): void {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
-
-		if ( 'module_invoices' === $tab && is_string( $hook ) && str_ends_with( $hook, '_page_lumia-factures' ) ) {
+		if ( is_string( $hook ) && str_ends_with( $hook, '_page_lumia-factures' ) ) {
 			wp_enqueue_media();
 		}
 	}
@@ -135,6 +132,11 @@ class Module extends AbstractModule {
 				],
 				'counters' => $counters,
 				'tags'     => NumberFormat::known_tags(),
+				// ES modules the preview loads with import() (not enqueued); the version busts the cache.
+				'pdfjs'    => [
+					'lib'    => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
+					'worker' => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.worker.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
+				],
 			],
 			'i18n'     => [
 				'logoFrameTitle'  => __( 'Choose a logo', 'lumia-factures' ),

@@ -4,9 +4,28 @@
  * .lumia-factures-admin; the components themselves stay in components.css.
  */
 
+/* ---------------- Split: fields on the left, preview pane on the right ---------------- */
+
+.lumia-factures-admin .lumia-factures-inv-split {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.lumia-factures-admin .lumia-factures-inv-split > .lumia-module-form__scroll {
+  flex: 1 1 auto;
+  min-width: 0;
+  /* The field grids follow the width of this column, not the screen's. */
+  container-type: inline-size;
+}
+
 .lumia-factures-admin .lumia-factures-inv-body {
-  padding: 24px 28px 40px;
-  max-width: 1100px;
+  padding: 4px 0 40px;
+  max-width: 960px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-body > .lumia-notice {
+  margin: 20px 28px 0;
 }
 
 .lumia-factures-admin .lumia-factures-inv-body .lumia-notice p {
@@ -18,10 +37,10 @@
 }
 
 .lumia-factures-admin .lumia-factures-inv-body .lumia-section {
-  margin-bottom: 28px;
+  margin-bottom: 8px;
 }
 
-/* Two-column grid of compact fields. */
+/* Grid of compact fields (Company, Content, Numbering tabs). */
 .lumia-factures-admin .lumia-factures-inv-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -30,6 +49,39 @@
 
 .lumia-factures-admin .lumia-factures-inv-grid > .lumia-form__group {
   margin-bottom: 0;
+}
+
+/* Fixed column grids (Design tab), one column in a narrow pane. */
+.lumia-factures-admin .lumia-factures-inv-cols {
+  display: grid;
+  gap: 0 20px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-cols--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.lumia-factures-admin .lumia-factures-inv-cols--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* The small inputs and selects of the design system cap their width: fill the column here. */
+.lumia-factures-admin .lumia-factures-inv-cols .lumia-input,
+#wpcontent .lumia-factures-admin .lumia-factures-inv-cols select.lumia-select {
+  width: 100%;
+  max-width: none;
+}
+
+@container (max-width: 480px) {
+  .lumia-factures-admin .lumia-factures-inv-cols--2,
+  .lumia-factures-admin .lumia-factures-inv-cols--3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.lumia-factures-admin .lumia-factures-inv-subhead {
+  margin: 4px 0 8px;
+  font-weight: 600;
 }
 
 /* Text field with its on/off switch above it. */
@@ -45,23 +97,188 @@
   margin-bottom: 0;
 }
 
-/* Color picker. */
-.lumia-factures-admin input[type="color"].lumia-factures-inv-color {
-  width: 56px;
-  min-height: 42px;
-  height: 42px;
-  padding: 4px;
-  cursor: pointer;
+/* ---------------- Themes ---------------- */
+
+.lumia-factures-admin .lumia-factures-inv-themes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 12px;
 }
 
-.lumia-factures-admin .lumia-factures-inv-color__hex {
-  font-size: 12px;
-  color: var(--lumia-text-muted);
+.lumia-factures-admin .lumia-factures-inv-theme {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+  background: var(--lumia-surface);
+  color: var(--lumia-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: var(--lumia-transition);
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme:hover {
+  border-color: var(--lumia-border-strong);
+  box-shadow: var(--lumia-shadow-md);
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme:focus-visible {
+  outline: 2px solid var(--lumia-accent);
+  outline-offset: 2px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme[aria-pressed="true"] {
+  border-color: var(--lumia-accent);
+  box-shadow: 0 0 0 1px var(--lumia-accent);
+}
+
+/* A miniature invoice: title band, a line of text, a block, a table header. */
+.lumia-factures-admin .lumia-factures-inv-theme__sample {
+  display: block;
+  height: 64px;
+  padding: 8px;
+  border: 1px solid;
+  border-radius: var(--lumia-radius-xs);
+  overflow: hidden;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__sample > span {
+  display: block;
+  border-radius: 2px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__band {
+  height: 10px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__line {
+  width: 45%;
+  height: 3px;
+  margin-top: 6px;
+  opacity: 0.6;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__block {
+  height: 10px;
+  margin-top: 6px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__head {
+  height: 6px;
+  margin-top: 6px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__name {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme__check {
+  color: var(--lumia-accent);
+  visibility: hidden;
+}
+
+.lumia-factures-admin .lumia-factures-inv-theme[aria-pressed="true"] .lumia-factures-inv-theme__check {
+  visibility: visible;
+}
+
+/* ---------------- Colors ---------------- */
+
+.lumia-factures-admin .lumia-factures-inv-colorfield {
+  margin-bottom: 0;
+}
+
+.lumia-factures-admin .lumia-factures-inv-colorfield__control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lumia-factures-admin input[type="color"].lumia-factures-inv-color {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border: 1px solid var(--lumia-border-strong);
+  border-radius: var(--lumia-radius-sm);
   background: none;
+  cursor: pointer;
+  overflow: hidden;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.lumia-factures-admin input[type="color"].lumia-factures-inv-color::-webkit-color-swatch-wrapper {
   padding: 0;
 }
 
-/* Logo picker. */
+.lumia-factures-admin input[type="color"].lumia-factures-inv-color::-webkit-color-swatch {
+  border: 0;
+  border-radius: 7px;
+}
+
+.lumia-factures-admin input[type="color"].lumia-factures-inv-color::-moz-color-swatch {
+  border: 0;
+  border-radius: 7px;
+}
+
+.lumia-factures-admin .lumia-input.lumia-factures-inv-color__hex {
+  width: 96px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+}
+
+.lumia-factures-admin .lumia-input.lumia-factures-inv-color__hex.is-invalid {
+  border-color: var(--lumia-danger);
+}
+
+.lumia-factures-admin .lumia-factures-inv-advanced {
+  margin-top: 16px;
+  border: 1px solid var(--lumia-border);
+  border-radius: var(--lumia-radius-sm);
+}
+
+.lumia-factures-admin .lumia-factures-inv-advanced__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--lumia-text);
+  list-style: none;
+  cursor: pointer;
+}
+
+.lumia-factures-admin .lumia-factures-inv-advanced__summary::-webkit-details-marker {
+  display: none;
+}
+
+.lumia-factures-admin .lumia-factures-inv-advanced__chevron {
+  color: var(--lumia-text-muted);
+  transition: transform 0.15s ease;
+}
+
+.lumia-factures-admin .lumia-factures-inv-advanced[open] .lumia-factures-inv-advanced__chevron {
+  transform: rotate(180deg);
+}
+
+.lumia-factures-admin .lumia-factures-inv-colors {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px 20px;
+  padding: 4px 14px 14px;
+}
+
+/* ---------------- Logo picker ---------------- */
+
 .lumia-factures-admin .lumia-factures-inv-logo {
   display: flex;
   flex-direction: column;
@@ -90,6 +307,13 @@
   max-height: 120px;
   height: auto;
 }
+
+/* .lumia-btn sets display and would win over the hidden attribute. */
+.lumia-factures-admin .lumia-factures-inv-logo [hidden] {
+  display: none;
+}
+
+/* ---------------- Numbering ---------------- */
 
 /* Live number sample. */
 .lumia-factures-admin .lumia-factures-inv-sample {
@@ -147,56 +371,183 @@
   display: none;
 }
 
-/* Design tab: fields on the left, preview pane on the right (below it on narrow screens). */
-.lumia-factures-admin .lumia-factures-inv-design {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 24px;
-}
+/* ---------------- Live preview ---------------- */
 
-/* .lumia-btn sets display and would win over the hidden attribute. */
-.lumia-factures-admin .lumia-factures-inv-logo [hidden] {
-  display: none;
-}
-
-/* Live preview. */
-@media (min-width: 1200px) {
-  .lumia-factures-admin .lumia-factures-inv-design {
-    grid-template-columns: minmax(0, 1fr) minmax(380px, 560px);
-    align-items: start;
-  }
-
-  .lumia-factures-admin .lumia-factures-inv-preview {
-    position: sticky;
-    top: 0;
-  }
-}
-
-.lumia-factures-admin .lumia-factures-inv-preview__bar {
+.lumia-factures-admin .lumia-factures-inv-preview {
+  flex: 0 0 clamp(400px, 44%, 680px);
   display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--lumia-border);
+  background: var(--lumia-n100);
 }
 
-.lumia-factures-admin .lumia-factures-inv-preview__bar .lumia-section__title {
-  margin-right: auto;
-}
-
-.lumia-factures-admin .lumia-factures-inv-preview__bar .lumia-input {
-  width: 130px;
-}
-
-.lumia-factures-admin .lumia-factures-inv-preview__frame {
-  display: block;
-  width: 100%;
-  height: 72vh;
-  min-height: 420px;
-  border: 1px solid var(--lumia-border);
-  border-radius: var(--lumia-radius-sm);
-  background: var(--lumia-white);
+.lumia-factures-admin .lumia-factures-inv-preview[hidden] {
+  display: none;
 }
 
 .lumia-factures-admin .lumia-factures-inv-preview [hidden] {
   display: none;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--lumia-surface);
+  border-bottom: 1px solid var(--lumia-border);
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__title {
+  margin-right: auto;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--lumia-text);
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__order {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--lumia-text-muted);
+  font-size: 13px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__order .lumia-input {
+  width: 150px;
+  max-width: none;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.lumia-factures-admin .lumia-btn.lumia-factures-inv-preview__icon-btn {
+  width: 34px;
+  padding: 0;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__zoom-value {
+  min-width: 52px;
+  padding: 4px;
+  border: 0;
+  border-radius: var(--lumia-radius-xs);
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--lumia-text-secondary);
+  cursor: pointer;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__zoom-value:hover {
+  background: var(--lumia-n100);
+  color: var(--lumia-text);
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__stage {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__stage > .lumia-notice {
+  margin-bottom: 16px;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  min-width: min-content;
+  transition: opacity 0.2s ease;
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview[aria-busy="true"] .lumia-factures-inv-preview__pages {
+  opacity: 0.55;
+}
+
+/* One A4 sheet (a canvas drawn by pdf.js, or the placeholder before the first render). */
+.lumia-factures-admin .lumia-factures-inv-preview__page {
+  display: block;
+  flex: none;
+  background: var(--lumia-white);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px oklch(0 0 0 / 0.08);
+}
+
+/* Placeholder sheet until the first render. */
+.lumia-factures-admin .lumia-factures-inv-preview__pages:empty::before {
+  content: "";
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  aspect-ratio: 210 / 297;
+  background: var(--lumia-white);
+  border-radius: 2px;
+  box-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 8px 24px oklch(0 0 0 / 0.08);
+  animation: lumia-factures-pulse 1.4s ease-in-out infinite;
+}
+
+/* No blank sheet under an error. */
+.lumia-factures-admin .lumia-factures-inv-preview__stage:has(> .lumia-notice:not([hidden])) .lumia-factures-inv-preview__pages:empty::before {
+  display: none;
+}
+
+@keyframes lumia-factures-pulse {
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* Fallback when pdf.js cannot load: the browser's own viewer. */
+.lumia-factures-admin .lumia-factures-inv-preview__frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 600px;
+  border: 0;
+  background: var(--lumia-white);
+}
+
+.lumia-factures-admin .lumia-factures-inv-preview__note {
+  margin: 12px 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--lumia-text-muted);
+}
+
+/* Narrow screens: the pane goes under the fields and the whole split scrolls. */
+@media (max-width: 1100px) {
+  .lumia-factures-admin .lumia-factures-inv-split {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .lumia-factures-admin .lumia-factures-inv-split > .lumia-module-form__scroll {
+    flex: none;
+    overflow: visible;
+  }
+
+  .lumia-factures-admin .lumia-factures-inv-preview {
+    flex: none;
+    height: 85vh;
+    border-left: 0;
+    border-top: 1px solid var(--lumia-border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lumia-factures-admin .lumia-factures-inv-preview__pages:empty::before {
+    animation: none;
+  }
 }

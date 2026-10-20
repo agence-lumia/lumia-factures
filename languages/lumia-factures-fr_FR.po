@@ -110,10 +110,6 @@ msgstr "Rester sur la page"
 msgid "You do not have the required permissions."
 msgstr "Vous n'avez pas les permissions nécessaires."
 
-#: includes/Admin/Admin.php:275
-msgid "Modules updated."
-msgstr "Modules mis à jour."
-
 #: includes/Admin/Admin.php:276
 msgid "Update check completed."
 msgstr "Vérification des mises à jour effectuée."
@@ -133,10 +129,6 @@ msgstr "Nonce invalide."
 msgid "Insufficient permissions."
 msgstr "Permissions insuffisantes."
 
-#: includes/Core/Modules.php:60
-msgid "Generate the invoices"
-msgstr "Générer les factures"
-
 #: includes/Core/Modules.php:66
 #: includes/Core/Modules.php:68
 msgid "Bricks"
@@ -145,10 +137,6 @@ msgstr "Bricks"
 #: includes/Core/Modules.php:67
 msgid "Dynamic tags to display invoice data in Bricks."
 msgstr "Balises dynamiques pour afficher les données des factures dans Bricks."
-
-#: includes/Core/Modules.php:69
-msgid "Bricks dynamic tags"
-msgstr "Balises dynamiques Bricks"
 
 #: includes/Core/Plugin.php:160
 msgid "Lümia Factures is not running:"
@@ -196,104 +184,11 @@ msgstr "L'ancien plugin « Facture PDF Lumia » est toujours actif : désactiv
 msgid "No release notes available."
 msgstr "Aucune note de version disponible."
 
-#: templates/admin/dashboard.php:22
-#: templates/components/sidebar.php:23
-msgid "Manage modules"
-msgstr "Gérer les modules"
-
-#: templates/admin/dashboard.php:36
-msgid "WooCommerce orders"
-msgstr "Commandes WooCommerce"
-
-#: templates/admin/dashboard.php:44
-#: templates/components/sidebar.php:16
-msgid "Overview"
-msgstr "Vue d'ensemble"
-
-#: templates/admin/dashboard.php:56
-msgid "Plugin version"
-msgstr "Version du plugin"
-
-#: templates/admin/dashboard.php:66
-msgid "OK"
-msgstr "OK"
-
-#: templates/admin/dashboard.php:67
-msgid "Requirements met"
-msgstr "Prérequis satisfaits"
-
-#: templates/admin/dashboard.php:75
-msgid "Requirements not met"
-msgstr "Prérequis non satisfaits"
-
-#: templates/admin/dashboard.php:86
-#: templates/admin/dashboard.php:107
-msgid "Active modules"
-msgstr "Modules actifs"
-
-#: templates/admin/dashboard.php:94
-msgid "Requirements"
-msgstr "Prérequis"
-
-#: templates/admin/dashboard.php:95
-msgid "The modules do not start until these problems are solved."
-msgstr "Les modules ne démarrent pas tant que ces problèmes ne sont pas résolus."
-
-#: templates/admin/dashboard.php:108
-msgid "These are the modules currently active on your site."
-msgstr "Voici les modules actuellement actifs sur votre site."
-
-#: templates/admin/dashboard.php:118
-msgid "Active"
-msgstr "Actif"
-
-#: templates/admin/dashboard.php:123
-#: templates/admin/modules.php:71
-msgid "Configure"
-msgstr "Configurer"
-
-#: templates/admin/dashboard.php:132
-msgid "No module is running."
-msgstr "Aucun module n'est en cours d'exécution."
-
-#: templates/admin/dashboard.php:142
-msgid "Shortcuts"
-msgstr "Raccourcis"
-
 #: templates/admin/module-settings.php:36
 #: templates/admin/modules.php:23
 #: templates/admin/settings.php:35
 msgid "Save"
 msgstr "Enregistrer"
-
-#: templates/admin/module-settings.php:75
-msgid "This module has no settings yet."
-msgstr "Ce module n'a pas encore de réglages."
-
-#: templates/admin/modules.php:17
-#: templates/components/sidebar.php:22
-msgid "Modules"
-msgstr "Modules"
-
-#: templates/admin/modules.php:18
-msgid "Enable or disable modules as needed."
-msgstr "Activez ou désactivez les modules selon vos besoins."
-
-#: templates/admin/modules.php:33
-msgid "The modules are unavailable until the requirements are met."
-msgstr "Les modules sont indisponibles tant que les prérequis ne sont pas satisfaits."
-
-#: templates/admin/modules.php:35
-msgid "See the requirements"
-msgstr "Voir les prérequis"
-
-#: templates/admin/modules.php:54
-msgid "Core module: always active."
-msgstr "Module du noyau : toujours actif."
-
-#: templates/admin/modules.php:67
-msgid "Core"
-msgstr "Noyau"
 
 #: templates/admin/settings.php:20
 msgid "WordPress"
@@ -326,10 +221,6 @@ msgstr "Manquant"
 #: templates/admin/settings.php:24
 msgid "PHP memory"
 msgstr "Mémoire PHP"
-
-#: templates/admin/settings.php:31
-msgid "Global plugin configuration."
-msgstr "Configuration globale du plugin."
 
 #: templates/admin/settings.php:48
 msgid "Updates"
@@ -386,18 +277,6 @@ msgstr "Environnement"
 #: templates/admin/settings.php:114
 msgid "Versions and components the plugin relies on."
 msgstr "Versions et composants dont dépend le plugin."
-
-#: templates/components/sidebar.php:17
-msgid "Dashboard"
-msgstr "Tableau de bord"
-
-#: templates/components/sidebar.php:32
-msgid "Global configuration"
-msgstr "Configuration globale"
-
-#: templates/components/sidebar.php:55
-msgid "Navigation"
-msgstr "Navigation"
 
 #: includes/Modules/Invoices/Numbering/NumberFormat.php:52
 msgid "The format cannot be empty."
@@ -936,9 +815,6 @@ msgstr "Texte légal"
 msgid "Primary"
 msgstr "Principale"
 
-msgid "Secondary"
-msgstr "Secondaire"
-
 msgid "Text"
 msgstr "Texte"
 
@@ -947,9 +823,6 @@ msgstr "Texte atténué"
 
 msgid "Table header background"
 msgstr "Fond de l'en-tête du tableau"
-
-msgid "Table header text"
-msgstr "Texte de l'en-tête du tableau"
 
 msgid "Alternate row"
 msgstr "Ligne alternée"
@@ -974,12 +847,6 @@ msgstr "Police des titres"
 
 msgid "Body font"
 msgstr "Police du texte"
-
-msgid "Body font size (pt)"
-msgstr "Taille du texte (pt)"
-
-msgid "Heading size (times the body size)"
-msgstr "Taille des titres (multiple de la taille du texte)"
 
 msgid "Line height"
 msgstr "Hauteur de ligne"
@@ -1013,15 +880,6 @@ msgstr "Largeur de l'image produit (px)"
 
 msgid "0 hides the image."
 msgstr "0 masque l'image."
-
-msgid "Top margin (mm)"
-msgstr "Marge haute (mm)"
-
-msgid "Bottom margin (mm)"
-msgstr "Marge basse (mm)"
-
-msgid "Side margins (mm)"
-msgstr "Marges latérales (mm)"
 
 msgid "Invoice preview"
 msgstr "Aperçu de la facture"
@@ -1249,9 +1107,6 @@ msgstr "Facture introuvable."
 msgid "Download my invoice"
 msgstr "Télécharger ma facture"
 
-msgid "A Bricks template uses the Facture PDF Lumia invoice tags: the Bricks module is turned on, it renders them as before."
-msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia : le module Bricks est activé, il les affiche comme avant."
-
 msgid "Lümia Factures: %d Facture PDF Lumia invoice was not imported (conflict)."
 msgid_plural "Lümia Factures: %d Facture PDF Lumia invoices were not imported (conflicts)."
 msgstr[0] "Lümia Factures : %d facture Facture PDF Lumia n'a pas été importée (conflit)."
@@ -1274,5 +1129,78 @@ msgstr "Masquer"
 msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
 msgstr "Aucune facture ne peut être émise pour cette commande : sa facture Facture PDF Lumia n'a pas pu être importée (conflit). Consultez le rapport de migration."
 
-msgid "A Bricks template uses the Facture PDF Lumia invoice tags, but the Bricks module could not be turned on: turn it on in the Modules tab of Lümia Factures, or the tags will not render."
-msgstr "Un modèle Bricks utilise les balises de facture de Facture PDF Lumia, mais le module Bricks n'a pas pu être activé : activez-le dans l'onglet Modules de Lümia Factures, sinon les balises ne s'afficheront pas."
+
+msgid "%s, hex code"
+msgstr "%s, code hexadécimal"
+
+msgid "Black"
+msgstr "Noir"
+
+msgid "Navy"
+msgstr "Marine"
+
+msgid "Forest"
+msgstr "Forêt"
+
+msgid "Terracotta"
+msgstr "Terracotta"
+
+msgid "Plum"
+msgstr "Prune"
+
+msgid "Header text"
+msgstr "Texte des en-têtes"
+
+msgid "Theme"
+msgstr "Thème"
+
+msgid "Start from a ready-made palette, then adjust any color."
+msgstr "Partez d'une palette prête à l'emploi, puis ajustez n'importe quelle couleur."
+
+msgid "The primary color fills the title band and the grand total, and colors the headings."
+msgstr "La couleur principale remplit le bandeau du titre et le total TTC, et colore les titres."
+
+msgid "Advanced colors"
+msgstr "Couleurs avancées"
+
+msgid "Body size (pt)"
+msgstr "Taille du texte (pt)"
+
+msgid "Heading scale"
+msgstr "Taille des titres"
+
+msgid "Times the body size."
+msgstr "Multiple de la taille du texte."
+
+msgid "Page margins (mm)"
+msgstr "Marges de la page (mm)"
+
+msgctxt "page margin"
+msgid "Top"
+msgstr "Haut"
+
+msgctxt "page margin"
+msgid "Bottom"
+msgstr "Bas"
+
+msgctxt "page margin"
+msgid "Sides"
+msgstr "Côtés"
+
+msgid "Zoom"
+msgstr "Zoom"
+
+msgid "Zoom out"
+msgstr "Dézoomer"
+
+msgid "Fit to width"
+msgstr "Ajuster à la largeur"
+
+msgid "Zoom in"
+msgstr "Zoomer"
+
+msgid "Sample: the next invoice number, nothing is saved or numbered."
+msgstr "Exemple : prochain numéro de facture, rien n'est enregistré ni numéroté."
+
+msgid "Invoices are paused until these requirements are met:"
+msgstr "La facturation est en pause tant que ces prérequis ne sont pas remplis :"

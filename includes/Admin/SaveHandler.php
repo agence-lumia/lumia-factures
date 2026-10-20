@@ -16,10 +16,10 @@ use Lumia\Factures\Core\Updater;
 /**
  * Handles the `lumia_factures_save_settings` admin-post action.
  *
- * One action for the three kinds of forms, told apart by `lumia_factures_tab`:
- *  - `settings`        → global settings;
- *  - `modules`         → activation of the optional modules (locked ones are skipped);
- *  - `module_{id}`     → settings of an active module, through its save_settings().
+ * One action for both forms of the screen:
+ *  - the global settings (`lumia_factures_global[...]`) are saved whenever they are posted: they
+ *    sit in the Settings tab of the invoices form, or alone in the fallback form;
+ *  - `lumia_factures_tab` = `module_{id}` also saves an active module, through its save_settings().
  */
 class SaveHandler {
 
@@ -86,25 +86,27 @@ class SaveHandler {
 			wp_die( esc_html__( 'Insufficient permissions.', 'lumia-factures' ), '', [ 'response' => 403 ] );
 		}
 
-		$tab    = isset( $_POST['lumia_factures_tab'] ) ? sanitize_key( wp_unslash( $_POST['lumia_factures_tab'] ) ) : 'settings';
-		$notice = 'settings_saved';
+		$tab = isset( $_POST['lumia_factures_tab'] ) ? sanitize_key( wp_unslash( $_POST['lumia_factures_tab'] ) ) : 'settings';
 
-		if ( 'settings' === $tab ) {
-			$this->save_global();
-		} elseif ( 'modules' === $tab ) {
-			$this->save_modules();
-			$notice = 'modules_updated';
-		} elseif ( 0 === strpos( $tab, 'module_' ) ) {
+		// The module first: a module that refuses the user dies before anything is written.
+		if ( 0 === strpos( $tab, 'module_' ) ) {
 			$this->save_module( substr( $tab, strlen( 'module_' ) ) );
-		} else {
-			$tab = 'settings';
 		}
+		$this->save_global();
 
+		$this->redirect( 'settings_saved' );
+	}
+
+	/**
+	 * Back to the screen with a toast. The open tab is restored by the browser (admin.js).
+	 *
+	 * @param string $notice Toast code.
+	 */
+	private function redirect( string $notice ): void {
 		wp_safe_redirect(
 			add_query_arg(
 				[
 					'page'                       => $this->slug,
-					'tab'                        => $tab,
 					'lumia_factures_notice'      => $notice,
 					'lumia_factures_notice_type' => 'success',
 				],
@@ -115,7 +117,7 @@ class SaveHandler {
 	}
 
 	/**
-	 * Global settings (whitelisted keys only).
+	 * Global settings (whitelisted keys only). Nothing posted, nothing written.
 	 */
 	private function save_global(): void {
 		$global = isset( $_POST['lumia_factures_global'] ) && is_array( $_POST['lumia_factures_global'] ) ? wp_unslash( $_POST['lumia_factures_global'] ) : []; // phpcs:ignore WordPress.Security.NonceVerification.Missing,WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce verified in handle(); each key is sanitized below.
@@ -180,42 +182,7 @@ class SaveHandler {
 		$this->updater->purge_caches();
 		wp_update_plugins();
 
-		wp_safe_redirect(
-			add_query_arg(
-				[
-					'page'                       => $this->slug,
-					'tab'                        => 'settings',
-					'lumia_factures_notice'      => 'updates_checked',
-					'lumia_factures_notice_type' => 'success',
-				],
-				admin_url( 'admin.php' )
-			)
-		);
-		exit;
-	}
-
-	/**
-	 * Activation state of the optional modules. A locked module is never
-	 * touched; an empty registry (requirements not met) makes this a no-op.
-	 */
-	private function save_modules(): void {
-		$enabled = [];
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in handle().
-		if ( isset( $_POST['lumia_factures_modules'] ) && is_array( $_POST['lumia_factures_modules'] ) ) {
-			$enabled = array_map( 'sanitize_key', wp_unslash( $_POST['lumia_factures_modules'] ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified in handle().
-		}
-
-		foreach ( array_keys( $this->modules->get_all() ) as $module_id ) {
-			if ( $this->modules->is_locked( $module_id ) ) {
-				continue;
-			}
-
-			if ( in_array( $module_id, $enabled, true ) ) {
-				$this->modules->activate( $module_id );
-			} else {
-				$this->modules->deactivate( $module_id );
-			}
-		}
+		$this->redirect( 'updates_checked' );
 	}
 
 	/**

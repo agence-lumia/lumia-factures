@@ -426,7 +426,35 @@ final class Context {
 			];
 		}
 
-		return $rows;
+		return self::informational_before_grand( $rows );
+	}
+
+	/**
+	 * Moves the informational rows printed after the grand total (incl. VAT mode: "Total excl. VAT",
+	 * the VAT rates) just above it: the grand total closes the table, as customers read it. Only the
+	 * order changes, never a value.
+	 *
+	 * @param array<int, array{key: string, label: string, value: string, grand: bool, informational: bool}> $rows Rows in statement order.
+	 * @return array<int, array{key: string, label: string, value: string, grand: bool, informational: bool}>
+	 */
+	private static function informational_before_grand( array $rows ): array {
+		$grand = null;
+		foreach ( $rows as $index => $row ) {
+			if ( $row['grand'] ) {
+				$grand = $index;
+				break;
+			}
+		}
+		if ( null === $grand ) {
+			return $rows;
+		}
+
+		$before = array_slice( $rows, 0, $grand );
+		$after  = array_slice( $rows, $grand + 1 );
+		$moved  = array_values( array_filter( $after, static fn( array $row ): bool => $row['informational'] ) );
+		$kept   = array_values( array_filter( $after, static fn( array $row ): bool => ! $row['informational'] ) );
+
+		return array_merge( $before, $moved, [ $rows[ $grand ] ], $kept );
 	}
 
 	/**

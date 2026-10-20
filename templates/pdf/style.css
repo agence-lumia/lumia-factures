@@ -86,25 +86,12 @@ p {
 	vertical-align: middle;
 }
 
-.lf-titlebar__label {
-	width: 55%;
-}
-
 .lf-titlebar__label h1 {
 	color: var(--lf-color-thead-text);
 	font-size: var(--lf-font-size-title);
 	letter-spacing: 0.06em;
 	text-transform: uppercase;
 	line-height: 1.1;
-}
-
-.lf-titlebar__number {
-	width: 45%;
-	text-align: right;
-	color: var(--lf-color-thead-text);
-	font-size: var(--lf-font-size-lg);
-	font-weight: bold;
-	letter-spacing: 0.04em;
 }
 
 /* Parties and details ------------------------------------------------ */
@@ -196,13 +183,16 @@ p {
 	text-align: left;
 	font-size: var(--lf-font-size-xs);
 	text-transform: uppercase;
-	letter-spacing: 0.06em;
-	padding: var(--lf-space-sm) var(--lf-cell-padding-x);
-	word-wrap: break-word;
+	/* No break inside a word ("REFE-RENCE"): a header wraps between words only. */
+	letter-spacing: 0.02em;
+	padding: var(--lf-space-sm) var(--lf-space-sm);
+	word-wrap: normal;
+	word-break: normal;
+	hyphens: none;
 }
 
 .lf-items tbody td {
-	padding: var(--lf-cell-padding-y) var(--lf-cell-padding-x);
+	padding: var(--lf-cell-padding-y) var(--lf-space-sm);
 	border-bottom: var(--lf-border-width) solid var(--lf-color-border);
 	vertical-align: top;
 	page-break-inside: avoid;
@@ -226,6 +216,23 @@ p {
 
 .lf-item__image img {
 	width: var(--lf-thumb-width);
+}
+
+/* Thumbnail and name side by side in the product cell. */
+.lf-item__product {
+	width: 100%;
+}
+
+.lf-items .lf-item__product td {
+	padding: 0;
+	border: 0;
+	vertical-align: top;
+	background: transparent;
+}
+
+.lf-item__thumb {
+	width: var(--lf-thumb-width);
+	padding-right: var(--lf-space-md) !important;
 }
 
 .lf-item__name {
@@ -347,28 +354,29 @@ p {
 	font-size: var(--lf-font-size-sm);
 }
 
-/* Footer ------------------------------------------------------------- */
+/* Footer -------------------------------------------------------------- */
+/* A left-aligned block: the free text, then the legal and contact lines. The page number is drawn
+   on the right by PdfEngine::draw_pagination(), so the block keeps room for it. */
 .lf-footer {
 	position: fixed;
 	left: 0;
 	right: 0;
 	bottom: var(--lf-footer-bottom);
 	padding-top: var(--lf-space-sm);
+	padding-right: 22mm;
 	border-top: var(--lf-border-width) solid var(--lf-color-border);
-	text-align: center;
+	text-align: left;
 	color: var(--lf-color-muted);
 	font-size: var(--lf-font-size-xs);
 	line-height: 1.5;
 }
 
 .lf-footer__text {
-	margin-bottom: var(--lf-space-xs);
 	color: var(--lf-color-text);
-	font-size: var(--lf-font-size-sm);
 }
 
 .lf-footer__line {
-	margin: 0 var(--lf-space-sm);
+	margin-right: var(--lf-space-md);
 }
 
 /* Preview watermark (never on an issued invoice) --------------------- */

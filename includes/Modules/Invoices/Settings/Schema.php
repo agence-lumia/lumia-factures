@@ -439,7 +439,6 @@ final class Schema {
 
 		$colors = [
 			'color_primary'    => '#111111',
-			'color_secondary'  => '#6b6b6b',
 			'color_text'       => '#1a1a1a',
 			'color_muted'      => '#6b6b6b',
 			'color_thead_bg'   => '#111111',

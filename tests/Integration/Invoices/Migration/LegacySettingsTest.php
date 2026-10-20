@@ -103,6 +103,17 @@ class LegacySettingsTest extends TestCase {
 		$this->assertCount( 5, $mapped['notes'] );
 	}
 
+	public function test_secondary_color_is_dropped_with_a_note_only_when_customized(): void {
+		$legacy                              = self::neonat();
+		$legacy['design']['color_secondary'] = '#6B6B6B';
+		$this->assertSame( [], LegacySettings::map( $legacy )['notes'], 'The default, whatever its case.' );
+
+		$legacy['design']['color_secondary'] = '#ff0000';
+		$mapped                              = LegacySettings::map( $legacy );
+		$this->assertArrayNotHasKey( 'color_secondary', $mapped['settings']['design'] );
+		$this->assertSame( [ 'design.color_secondary was set and is no longer supported: it was not imported.' ], $mapped['notes'] );
+	}
+
 	public function test_unknown_font_falls_back_with_note(): void {
 		$legacy                           = self::neonat();
 		$legacy['design']['font_heading'] = 'PlayfairDisplay';

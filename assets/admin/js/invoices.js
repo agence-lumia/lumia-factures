@@ -1,6 +1,7 @@
 /**
  * Lümia Factures - Invoices settings screen.
- * Logo picker (wp.media), live number sample, color read-out, live PDF preview, tab from the URL hash.
+ * Logo picker (wp.media), live number sample, color fields and themes, live PDF preview (pdf.js),
+ * tab from the URL hash.
  * Data comes from PHP: lumiaFacturesAdmin.invoices (see Modules\Invoices\Module::get_admin_js_data()).
  */
 (function () {
@@ -153,14 +154,101 @@
 
   /* ---------------- Colors ---------------- */
 
+  /** Sets a form field and tells the listeners (unsaved changes, preview, themes). */
+  function setValue(input, value) {
+    if (input.value === value) return;
+    input.value = value;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+
+  /** "#abc", "abc" or "#aabbcc" to "#aabbcc"; "" when it is not a color. */
+  function normalizeHex(text) {
+    var value = String(text || "").trim().toLowerCase();
+    if (value && value.charAt(0) !== "#") value = "#" + value;
+    if (/^#[0-9a-f]{3}$/.test(value)) {
+      value = "#" + value.charAt(1) + value.charAt(1) + value.charAt(2) + value.charAt(2) + value.charAt(3) + value.charAt(3);
+    }
+    return /^#[0-9a-f]{6}$/.test(value) ? value : "";
+  }
+
+  /**
+   * Each swatch (the posted value) has a hex text box without a name: typing a valid code sets the
+   * swatch, picking a color rewrites the code.
+   */
   function initColors() {
-    document.querySelectorAll('input[type="color"].lumia-factures-inv-color').forEach(function (input) {
-      var hex = document.querySelector('[data-lumia-factures-hex-for="' + input.id + '"]');
-      if (!hex) return;
+    document.querySelectorAll("[data-lumia-factures-hex-for]").forEach(function (hex) {
+      var input = document.getElementById(hex.getAttribute("data-lumia-factures-hex-for"));
+      if (!input) return;
+
       input.addEventListener("input", function () {
-        hex.textContent = input.value;
+        // Not while the code is being typed: "#abc" would be expanded under the cursor.
+        if (document.activeElement === hex) return;
+        hex.value = input.value;
+        hex.classList.remove("is-invalid");
+      });
+
+      hex.addEventListener("input", function () {
+        var value = normalizeHex(hex.value);
+        hex.classList.toggle("is-invalid", value === "");
+        if (value) setValue(input, value);
+      });
+
+      hex.addEventListener("blur", function () {
+        hex.value = input.value;
+        hex.classList.remove("is-invalid");
+      });
+
+      // Enter would submit (save) the whole form.
+      hex.addEventListener("keydown", function (event) {
+        if (event.key === "Enter") event.preventDefault();
       });
     });
+  }
+
+  /**
+   * Theme buttons fill the color fields; the button whose colors all match the form is pressed.
+   * The palettes come from Admin\Themes (data attribute), keyed like the design settings.
+   */
+  function initThemes() {
+    var box = document.querySelector("[data-lumia-factures-themes]");
+    if (!box) return;
+    var buttons = Array.prototype.slice.call(box.querySelectorAll("[data-lumia-factures-theme]"));
+
+    function palette(button) {
+      try {
+        return JSON.parse(button.getAttribute("data-lumia-factures-theme")) || {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function sync() {
+      buttons.forEach(function (button) {
+        var colors = palette(button);
+        var same = Object.keys(colors).every(function (key) {
+          var input = field("design." + key);
+          return !input || input.value.toLowerCase() === String(colors[key]).toLowerCase();
+        });
+        button.setAttribute("aria-pressed", same ? "true" : "false");
+      });
+    }
+
+    buttons.forEach(function (button) {
+      button.addEventListener("click", function () {
+        var colors = palette(button);
+        Object.keys(colors).forEach(function (key) {
+          var input = field("design." + key);
+          if (input) setValue(input, String(colors[key]));
+        });
+        sync();
+      });
+    });
+
+    document.addEventListener("input", function (event) {
+      if (event.target && event.target.type === "color") sync();
+    });
+    sync();
   }
 
   /* ---------------- Counters ---------------- */
@@ -209,6 +297,11 @@
    * Renders the unsaved form against a real order (Admin\Preview, nothing is saved or numbered).
    * The whole module form is posted as FormData, like a save. Requests are debounced, and only the
    * latest response is shown.
+   *
+   * The pages are drawn by pdf.js (assets/vendor/pdfjs, loaded on first use) as white sheets fitted
+   * to the pane width, times the zoom. If pdf.js cannot load or read the file, the browser's own
+   * PDF viewer shows it instead. The pane only shows next to the tabs of
+   * `data-lumia-factures-preview-tabs`; a change made elsewhere is rendered when it shows again.
    */
   function initPreview() {
     var root = document.querySelector("[data-lumia-factures-preview]");
@@ -216,15 +309,31 @@
     var admin = window.lumiaFacturesAdmin || {};
     if (!root || !form || !admin.ajaxUrl) return;
 
-    var frame = root.querySelector("[data-lumia-factures-preview-frame]");
+    var stage = root.querySelector("[data-lumia-factures-preview-stage]");
+    var pagesBox = root.querySelector("[data-lumia-factures-preview-pages]");
     var errorBox = root.querySelector("[data-lumia-factures-preview-error]");
     var orderInput = root.querySelector("[data-lumia-factures-preview-order]");
     var refresh = root.querySelector("[data-lumia-factures-preview-refresh]");
-    var panel = document.querySelector('[data-lumia-tab-panel="design"]');
-    var counter = 0;
+    var zoomValue = root.querySelector('[data-lumia-factures-preview-zoom="0"]');
+    var tabs = (root.getAttribute("data-lumia-factures-preview-tabs") || "").split(" ");
+
+    var ZOOM_STEP = 1.25;
+    var ZOOM_MIN = 0.5;
+    var ZOOM_MAX = 3;
+    // pdf.js scale 1 draws one CSS pixel per PDF point: 100 % is the printed size at 96 dpi.
+    var CSS_PER_POINT = 96 / 72;
+
+    var counter = 0; // Latest request.
+    var drawing = 0; // Latest drawing.
     var timer = null;
+    var resizeTimer = null;
+    var stale = true; // The form changed since the last render (or nothing rendered yet).
+    var zoom = 1; // Times the fitted width.
+    var pdfDoc = null;
+    var pdfTask = null; // Loading task of pdfDoc.
+    var pdfjs = null;
     var blobUrl = "";
-    var loaded = false;
+    var needsDraw = false; // A drawing was skipped while the pane had no width (hidden).
 
     function showError(message) {
       errorBox.textContent = message;
@@ -236,15 +345,141 @@
       root.setAttribute("aria-busy", busy ? "true" : "false");
     }
 
-    function show(base64) {
+    function visible() {
+      var active = document.querySelector('[data-lumia-tabs="invoices"] [data-lumia-tab].is-active');
+      return !!active && tabs.indexOf(active.getAttribute("data-lumia-tab")) !== -1;
+    }
+
+    function loadPdfjs() {
+      if (!pdfjs) {
+        var urls = data.pdfjs || {};
+        pdfjs = urls.lib
+          ? import(urls.lib).then(function (lib) {
+              lib.GlobalWorkerOptions.workerSrc = urls.worker;
+              return lib;
+            })
+          : Promise.reject(new Error("pdf.js is not configured"));
+        // A failed load (network hiccup) is tried again on the next render.
+        pdfjs.catch(function () {
+          pdfjs = null;
+        });
+      }
+      return pdfjs;
+    }
+
+    function revokeBlob() {
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      blobUrl = "";
+    }
+
+    /** Forgets the pdf.js document, so a zoom or a resize never redraws an older PDF. */
+    function dropDocument() {
+      if (pdfTask) pdfTask.destroy();
+      pdfTask = null;
+      pdfDoc = null;
+    }
+
+    /** Fallback: the browser's own PDF viewer in a frame. */
+    function showFrame(bytes) {
+      dropDocument();
+      var previous = blobUrl;
+      blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
+      var frame = document.createElement("iframe");
+      frame.className = "lumia-factures-inv-preview__frame";
+      frame.title = root.getAttribute("aria-label") || "";
+      frame.src = blobUrl;
+      pagesBox.replaceChildren(frame);
+      zoomValue.parentNode.hidden = true;
+      if (previous) URL.revokeObjectURL(previous);
+    }
+
+    /** Draws every page off screen, then swaps them in at once (no flicker while typing). */
+    function draw() {
+      if (!pdfDoc) return Promise.resolve();
+      // Hidden pane (another tab): no width to fit. Drawn when it shows again.
+      if (stage.clientWidth === 0) {
+        needsDraw = true;
+        return Promise.resolve();
+      }
+      needsDraw = false;
+      var current = ++drawing;
+      var doc = pdfDoc;
+      var ratio = window.devicePixelRatio || 1;
+      var canvases = [];
+
+      return doc.getPage(1).then(function (first) {
+        var style = window.getComputedStyle(stage);
+        var room = stage.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        var scale = Math.max(0.1, room / first.getViewport({ scale: 1 }).width) * zoom;
+        zoomValue.textContent = Math.round((scale / CSS_PER_POINT) * 100) + " %";
+
+        var chain = Promise.resolve();
+        for (var number = 1; number <= doc.numPages; number++) {
+          chain = chain.then(drawPage.bind(null, doc, number, scale, ratio, canvases, current));
+        }
+        return chain;
+      }).then(function () {
+        if (current !== drawing) return;
+        pagesBox.replaceChildren.apply(pagesBox, canvases);
+        revokeBlob(); // The fallback frame, if any, is gone.
+      });
+    }
+
+    /** Redraw from a zoom or a resize: a document destroyed meanwhile is not an error. */
+    function redraw() {
+      draw().catch(function () {});
+    }
+
+    function drawPage(doc, number, scale, ratio, canvases, current) {
+      if (current !== drawing) return null;
+      return doc.getPage(number).then(function (page) {
+        var viewport = page.getViewport({ scale: scale * ratio });
+        var canvas = document.createElement("canvas");
+        canvas.className = "lumia-factures-inv-preview__page";
+        canvas.width = Math.floor(viewport.width);
+        canvas.height = Math.floor(viewport.height);
+        canvas.style.width = Math.floor(viewport.width / ratio) + "px";
+        canvas.style.height = Math.floor(viewport.height / ratio) + "px";
+        canvases.push(canvas);
+        return page.render({ canvas: canvas, viewport: viewport }).promise;
+      });
+    }
+
+    function show(base64, current) {
       var binary = window.atob(base64);
       var bytes = new Uint8Array(binary.length);
       for (var i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-      var previous = blobUrl;
-      blobUrl = URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
-      frame.src = blobUrl;
-      if (previous) URL.revokeObjectURL(previous);
+      var task = null;
+
+      return loadPdfjs()
+        .then(function (lib) {
+          // pdf.js takes the buffer over: keep a copy for the fallback.
+          task = lib.getDocument({ data: bytes.slice(), enableXfa: false });
+          return task.promise;
+        })
+        .then(function (doc) {
+          // The loading task owns the document and its worker resources: it is what gets destroyed.
+          if (current !== counter) {
+            task.destroy();
+            return null;
+          }
+          var previous = pdfTask;
+          pdfTask = task;
+          pdfDoc = doc;
+          if (previous) previous.destroy();
+          zoomValue.parentNode.hidden = false;
+          return draw();
+        })
+        .catch(function (error) {
+          if (current !== counter) {
+            if (task && task !== pdfTask) task.destroy();
+            return;
+          }
+          if (window.console) window.console.warn("Lumia Factures preview: pdf.js failed, the browser viewer is used.", error);
+          if (task && task !== pdfTask) task.destroy();
+          showFrame(bytes);
+        });
     }
 
     function request() {
@@ -256,7 +491,7 @@
       body.set("nonce", admin.nonce || "");
       body.set("order_id", orderInput.value || "0");
 
-      loaded = true;
+      stale = false;
       setBusy(true);
 
       window
@@ -265,16 +500,19 @@
           return response.json();
         })
         .then(function (json) {
-          if (current !== counter) return; // A newer request is on its way.
+          if (current !== counter) return null; // A newer request is on its way.
           if (json && json.success && json.data && json.data.pdf) {
             showError("");
-            show(json.data.pdf);
-          } else {
-            showError((json && json.data && json.data.message) || t("previewFailed"));
+            return show(json.data.pdf, current);
           }
+          showError((json && json.data && json.data.message) || t("previewFailed"));
+          stale = true; // Tried again when the pane shows again.
+          return null;
         })
         .catch(function () {
-          if (current === counter) showError(t("previewFailed"));
+          if (current !== counter) return;
+          showError(t("previewFailed"));
+          stale = true;
         })
         .then(function () {
           if (current === counter) setBusy(false);
@@ -286,31 +524,64 @@
       timer = window.setTimeout(request, 600);
     }
 
-    ["design", "content"].forEach(function (name) {
-      var target = document.querySelector('[data-lumia-tab-panel="' + name + '"]');
-      if (!target) return;
-      ["input", "change"].forEach(function (type) {
-        target.addEventListener(type, function (event) {
-          // The preview's own order field sits in the design panel.
-          if (!root.contains(event.target)) schedule();
-        });
+    /** Shows the pane next to its tabs, and renders what changed while it was hidden. */
+    function sync() {
+      var on = visible();
+      root.hidden = !on;
+      if (!on) return;
+      if (stale) request();
+      else if (needsDraw) redraw();
+    }
+
+    ["input", "change"].forEach(function (type) {
+      form.addEventListener(type, function (event) {
+        // The preview's own fields are not settings.
+        if (root.contains(event.target)) return;
+        stale = true;
+        if (!root.hidden) schedule();
       });
     });
 
     refresh.addEventListener("click", request);
-    orderInput.addEventListener("change", request);
+    // One request per order value: Enter, then the change fired on blur, ask only once.
+    var requestedOrder = orderInput.value;
+    function requestOrder() {
+      if (orderInput.value === requestedOrder) return;
+      requestedOrder = orderInput.value;
+      request();
+    }
+    orderInput.addEventListener("change", requestOrder);
+    orderInput.addEventListener("keydown", function (event) {
+      // Enter would submit (save) the whole form.
+      if (event.key !== "Enter") return;
+      event.preventDefault();
+      requestOrder();
+    });
 
-    // Nothing is rendered until the Design tab is first shown.
-    var tab = document.querySelector('[data-lumia-tabs="invoices"] [data-lumia-tab="design"]');
-    function first() {
-      if (!loaded && panel && !panel.hidden) request();
-    }
-    if (tab) {
-      tab.addEventListener("click", function () {
-        window.setTimeout(first, 0);
+    root.querySelectorAll("[data-lumia-factures-preview-zoom]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        var step = parseInt(button.getAttribute("data-lumia-factures-preview-zoom"), 10);
+        zoom = step === 0 ? 1 : Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, step > 0 ? zoom * ZOOM_STEP : zoom / ZOOM_STEP));
+        redraw();
       });
+    });
+
+    if (window.ResizeObserver) {
+      var lastWidth = 0;
+      new window.ResizeObserver(function () {
+        var width = stage.clientWidth;
+        if (width === lastWidth) return;
+        lastWidth = width; // 0 while hidden: showing again counts as a change.
+        if (!pdfDoc || width === 0) return;
+        window.clearTimeout(resizeTimer);
+        resizeTimer = window.setTimeout(redraw, 150);
+      }).observe(stage);
     }
-    window.setTimeout(first, 0);
+
+    document.addEventListener("lumia-factures:tab", function (event) {
+      if (event.detail && event.detail.group === "invoices") sync();
+    });
+    sync();
   }
 
   /* ---------------- Tab from the URL hash ---------------- */
@@ -326,6 +597,7 @@
     initSample();
     initLogo();
     initColors();
+    initThemes();
     initCounters();
     initHash();
     initPreview();

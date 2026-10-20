@@ -1,10 +1,13 @@
 <?php
 /**
- * Settings form of the Invoices module.
+ * Settings form of the Invoices module: the whole plugin screen.
  *
- * Included by templates/admin/module-settings.php: $this is the Admin instance. The header
- * "Save" button submits this form (id lumia-factures-module-form). The "Raise counter" forms are
- * standalone forms printed after it: HTML forms cannot nest.
+ * Included by templates/admin/invoices.php: $this is the Admin instance. The header "Save" button
+ * submits this form (id lumia-factures-module-form), the Settings tab included (global settings,
+ * `lumia_factures_global[...]`). The "Raise counter" and "Check for updates" forms are standalone
+ * forms printed after it: HTML forms cannot nest.
+ *
+ * The preview pane sits next to the fields of the tabs that change the PDF (`data-lumia-factures-preview-tabs`).
  *
  * @package Lumia\Factures
  */
@@ -31,12 +34,13 @@ $invoices_tabs = [
 	'numbering' => __( 'Numbering', 'lumia-factures' ),
 	'content'   => __( 'Content', 'lumia-factures' ),
 	'design'    => __( 'Design', 'lumia-factures' ),
+	'settings'  => __( 'Settings', 'lumia-factures' ),
 ];
 ?>
 <form id="lumia-factures-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="lumia-form lumia-module-form">
 	<?php wp_nonce_field( 'lumia_factures_save_settings', 'lumia_factures_nonce' ); ?>
 	<input type="hidden" name="action" value="lumia_factures_save_settings">
-	<input type="hidden" name="lumia_factures_tab" value="<?php echo esc_attr( $tab ); ?>">
+	<input type="hidden" name="lumia_factures_tab" value="module_invoices">
 
 	<div class="lumia-tabs" role="tablist" data-lumia-tabs="invoices">
 		<?php foreach ( $invoices_tabs as $invoices_tab => $invoices_tab_label ) : ?>
@@ -44,22 +48,32 @@ $invoices_tabs = [
 		<?php endforeach; ?>
 	</div>
 
-	<div class="lumia-module-form__scroll">
-		<div class="lumia-factures-inv-body">
-			<?php if ( [] !== $invoices_errors ) : ?>
-				<div class="lumia-notice lumia-notice--error" role="alert">
-					<?php foreach ( $invoices_errors as $invoices_error ) : ?>
-						<p><?php echo esc_html( $invoices_error ); ?></p>
-					<?php endforeach; ?>
-				</div>
-			<?php endif; ?>
+	<div class="lumia-factures-inv-split" data-lumia-factures-split>
+		<div class="lumia-module-form__scroll">
+			<div class="lumia-factures-inv-body">
+				<?php if ( [] !== $invoices_errors ) : ?>
+					<div class="lumia-notice lumia-notice--error" role="alert">
+						<?php foreach ( $invoices_errors as $invoices_error ) : ?>
+							<p><?php echo esc_html( $invoices_error ); ?></p>
+						<?php endforeach; ?>
+					</div>
+				<?php endif; ?>
 
-			<?php foreach ( $invoices_tabs as $invoices_tab => $invoices_tab_label ) : ?>
-				<div class="lumia-tabs__panel" role="tabpanel" data-lumia-tabs-group="invoices" data-lumia-tab-panel="<?php echo esc_attr( $invoices_tab ); ?>"<?php echo 'general' === $invoices_tab ? '' : ' hidden'; ?>>
-					<?php include LUMIA_FACTURES_TEMPLATES_DIR . 'admin/invoices/' . $invoices_tab . '.php'; ?>
-				</div>
-			<?php endforeach; ?>
+				<?php foreach ( $invoices_tabs as $invoices_tab => $invoices_tab_label ) : ?>
+					<div class="lumia-tabs__panel" role="tabpanel" data-lumia-tabs-group="invoices" data-lumia-tab-panel="<?php echo esc_attr( $invoices_tab ); ?>"<?php echo 'general' === $invoices_tab ? '' : ' hidden'; ?>>
+						<?php
+						if ( 'settings' === $invoices_tab ) {
+							include LUMIA_FACTURES_TEMPLATES_DIR . 'admin/partials/plugin-settings.php';
+						} else {
+							include LUMIA_FACTURES_TEMPLATES_DIR . 'admin/invoices/' . $invoices_tab . '.php';
+						}
+						?>
+					</div>
+				<?php endforeach; ?>
+			</div>
 		</div>
+
+		<?php require LUMIA_FACTURES_TEMPLATES_DIR . 'admin/invoices/preview.php'; ?>
 	</div>
 </form>
 
@@ -70,3 +84,5 @@ $invoices_tabs = [
 		<input type="hidden" name="sequence_key" value="<?php echo esc_attr( $invoices_sequence['key'] ); ?>">
 	</form>
 <?php endforeach; ?>
+
+<?php require LUMIA_FACTURES_TEMPLATES_DIR . 'admin/partials/check-updates-form.php'; ?>

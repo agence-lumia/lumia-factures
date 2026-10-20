@@ -83,7 +83,6 @@ final class Counters {
 			add_query_arg(
 				[
 					'page'                       => 'lumia-factures',
-					'tab'                        => 'module_invoices',
 					'lumia_factures_notice'      => $code,
 					'lumia_factures_notice_type' => 'counter_raised' === $code ? 'success' : 'error',
 				],
