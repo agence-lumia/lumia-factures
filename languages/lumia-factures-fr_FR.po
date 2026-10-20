@@ -1329,6 +1329,10 @@ msgid "Nothing was refunded: no credit note."
 msgstr "Rien n'a été remboursé : pas d'avoir."
 
 #: includes/Modules/Invoices/Admin/OrderTools.php:623
+msgid "This refund was just created: its credit note can be issued in a few minutes."
+msgstr "Ce remboursement vient d'être créé : son avoir pourra être émis dans quelques minutes."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:623
 msgid "The refunded order no longer exists."
 msgstr "La commande remboursée n'existe plus."
 

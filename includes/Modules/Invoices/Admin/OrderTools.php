@@ -288,7 +288,7 @@ final class OrderTools {
 			return 'credit_note_not_issued';
 		}
 
-		$doc = CreditNoteIssuer::issue( $refund );
+		$doc = CreditNoteIssuer::issue_deferred( $refund );
 
 		return null !== $doc && 'issued' === $doc->status ? 'credit_note_issued' : 'credit_note_not_issued';
 	}
@@ -620,6 +620,7 @@ final class OrderTools {
 	private static function reason_label( string $reason ): string {
 		return match ( $reason ) {
 			'zero_amount' => __( 'Nothing was refunded: no credit note.', 'lumia-factures' ),
+			'in_flight'   => __( 'This refund was just created: its credit note can be issued in a few minutes.', 'lumia-factures' ),
 			'no_order'    => __( 'The refunded order no longer exists.', 'lumia-factures' ),
 			'import'      => __( 'Waiting for the Facture PDF Lumia import.', 'lumia-factures' ),
 			'conflict'    => __( 'The Facture PDF Lumia invoice of this order could not be imported (conflict).', 'lumia-factures' ),

@@ -12,6 +12,9 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Core\Deactivator;
+use Lumia\Factures\Modules\Invoices\Admin\CreditNoteNotice;
+use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
+use Lumia\Factures\Modules\Invoices\Cli\Command;
 use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
@@ -487,6 +490,133 @@ class CreditNoteIssuerTest extends TestCase {
 		$this->assertSame( $before, Sequences::current( $this->key() ) );
 	}
 
+	public function test_gateway_refund_failure_leaves_no_credit_note_when_another_request_runs_during_the_gateway_call(): void {
+		update_option( CreditNoteIssuer::SINCE_OPTION, time() - HOUR_IN_SECONDS );
+		delete_option( CreditNoteIssuer::SWEEP_CURSOR_OPTION );
+
+		$order = $this->invoiced_order();
+		$seen  = [];
+
+		// While the gateway is being asked, the refund is saved: every other path runs then, as
+		// another request would (cron sweep, invoice action, order screen, notice, WP-CLI).
+		$during = function () use ( $order, &$seen ): void {
+			$ids = $this->refund_ids( $order );
+			$this->assertCount( 1, $ids );
+			$refund = $this->refund_of( wc_get_order( $ids[0] ) );
+
+			$seen['in_flight'] = CreditNoteIssuer::in_flight( $refund );
+			$seen['refusal']   = CreditNoteIssuer::refusal( $refund );
+			$seen['deferred']  = CreditNoteIssuer::issue_deferred( $refund );
+			$seen['pending']   = CreditNoteIssuer::issue_pending( wc_get_order( $order->get_id() ) );
+			$seen['sweep_ids'] = CreditNoteIssuer::sweep_ids( 50 );
+			CreditNoteIssuer::sweep();
+			$seen['tools']  = OrderTools::issue_credit_note_for( $order->get_id(), $ids[0] );
+			$seen['notice'] = CreditNoteNotice::issue_pending();
+			$seen['cli']    = Command::credit_notes_data( (string) $order->get_id(), '', false, false );
+			$seen['meta']   = (string) $this->refund_of( $refund )->get_meta( CreditNoteIssuer::PENDING_META );
+			$seen['id']     = $ids[0];
+		};
+
+		$gateway = new class( $during ) extends WC_Payment_Gateway {
+			/**
+			 * Runs while the gateway is asked.
+			 *
+			 * @var callable
+			 */
+			private $during;
+
+			/**
+			 * A gateway that supports refunds, runs the callback, then refuses.
+			 *
+			 * @param callable $during Callback.
+			 */
+			public function __construct( callable $during ) {
+				$this->id       = 'lf_slow_failing';
+				$this->enabled  = 'yes';
+				$this->supports = [ 'products', 'refunds' ];
+				$this->during   = $during;
+			}
+
+			/**
+			 * Runs the callback, then refuses the refund.
+			 *
+			 * @param int        $order_id Order id.
+			 * @param float|null $amount   Amount.
+			 * @param string     $reason   Reason.
+			 * @return WP_Error
+			 */
+			public function process_refund( $order_id, $amount = null, $reason = '' ) {
+				( $this->during )();
+				return new WP_Error( 'lf_declined', 'Declined by the test gateway.' );
+			}
+		};
+		WC()->payment_gateways()->payment_gateways['lf_slow_failing'] = $gateway;
+
+		$order->set_payment_method( 'lf_slow_failing' );
+		$order->save();
+		$before = Sequences::current( $this->key() );
+
+		$result = wc_create_refund(
+			[
+				'order_id'       => $order->get_id(),
+				'amount'         => 4.0,
+				'reason'         => 'Gateway refuses after a while',
+				'refund_payment' => true,
+			]
+		);
+
+		unset( WC()->payment_gateways()->payment_gateways['lf_slow_failing'] );
+
+		$this->assertWPError( $result );
+		$this->assertArrayHasKey( 'id', $seen );
+		$this->assertTrue( $seen['in_flight'] );
+		$this->assertSame( 'in_flight', $seen['refusal'] );
+		$this->assertNull( $seen['deferred'] );
+		$this->assertSame( [ $seen['id'] => null ], $seen['pending'] );
+		$this->assertNotContains( $seen['id'], $seen['sweep_ids'] );
+		$this->assertSame( 'credit_note_not_issued', $seen['tools'] );
+		$this->assertSame( 0, $seen['notice']['issued'] );
+		$this->assertSame( 'in_flight', $seen['cli']['rows'][0]['status'] );
+		$this->assertSame( '', $seen['meta'] );
+
+		// The refused refund is gone and no credit note was numbered for it.
+		$this->assertSame( [], $this->refund_ids( $order ) );
+		$this->assertSame( [], Register::for_parent( 'credit_note', $order->get_id() ) );
+		$this->assertSame( $before, Sequences::current( $this->key() ) );
+	}
+
+	public function test_refund_created_moments_ago_waits_for_deferred_paths_but_not_for_its_hook(): void {
+		$order  = $this->invoiced_order();
+		$refund = $this->refund_without_hook( $order, 2.0, false );
+
+		// Created just now, no number, no flag: WooCommerce may still be asking the gateway.
+		$this->assertTrue( CreditNoteIssuer::in_flight( $this->refund_of( $refund ) ) );
+		$this->assertSame( 'in_flight', CreditNoteIssuer::refusal( $this->refund_of( $refund ) ) );
+		$this->assertNull( CreditNoteIssuer::issue_deferred( $this->refund_of( $refund ) ) );
+		$this->assertSame( '', $this->refund_of( $refund )->get_meta( CreditNoteIssuer::PENDING_META ) );
+		$this->assertNull( Register::find( 'credit_note', $refund->get_id() ) );
+
+		// Its own hook does not wait.
+		CreditNoteIssuer::on_refunded( $order->get_id(), $refund->get_id() );
+		$doc = Register::find( 'credit_note', $refund->get_id() );
+		$this->assertNotNull( $doc );
+		$this->track( $doc );
+		$this->assertSame( 'issued', $doc->status );
+		$this->assertFalse( CreditNoteIssuer::in_flight( $this->refund_of( $refund ) ) );
+		$this->assertSame( $doc->id, CreditNoteIssuer::issue_deferred( $this->refund_of( $refund ) )->id );
+
+		// Past Issuer::STALE_AFTER, a refund the hook missed is taken by the deferred paths.
+		$late = $this->refund_without_hook( $order, 1.0, false );
+		$aged = $this->refund_of( $late );
+		$aged->set_date_created( time() - Issuer::STALE_AFTER - 1 );
+		$aged->save();
+		$this->assertFalse( CreditNoteIssuer::in_flight( $this->refund_of( $late ) ) );
+		$issued = CreditNoteIssuer::issue_deferred( $this->refund_of( $late ) );
+		$this->assertNotNull( $issued );
+		$this->track( $issued );
+		$this->assertSame( 'issued', $issued->status );
+	}
+
 	public function test_zero_amount_refund_issues_nothing_and_is_not_pending(): void {
 		$order  = $this->invoiced_order();
 		$before = Sequences::current( $this->key() );
@@ -634,6 +764,45 @@ class CreditNoteIssuerTest extends TestCase {
 		$this->assertSame( 'reused_id', $this->refund_of( $refund )->get_meta( CreditNoteIssuer::PENDING_META ) );
 		$this->assertSame( $before, Sequences::current( $this->key() ) );
 		$this->assertSame( $doc->number, Register::find( 'credit_note', $refund->get_id() )->number );
+	}
+
+	public function test_credit_note_issued_before_the_refund_was_created_is_not_its_own(): void {
+		$order  = $this->invoiced_order();
+		$refund = $this->amount_refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$this->assertNotNull( $doc );
+		$this->track( $doc );
+
+		// The order and the refund were deleted for good (no DELETED_META survives), then MySQL
+		// gave both ids again: the new refund carries no number and was created after the credit
+		// note of the old one.
+		$reused = $this->refund_of( $refund );
+		$reused->delete_meta_data( CreditNoteIssuer::NUMBER_META );
+		$reused->delete_meta_data( CreditNoteIssuer::DATE_META );
+		$reused->set_date_created( $doc->issued_at + HOUR_IN_SECONDS );
+		$reused->save();
+		$this->assertSame( '', wc_get_order( $order->get_id() )->get_meta( CreditNoteIssuer::DELETED_META ) );
+
+		$before = Sequences::current( $this->key() );
+		$this->assertNull( CreditNoteIssuer::find_for( $this->refund_of( $refund ) ) );
+		$this->assertNull( CreditNoteIssuer::issue( $this->refund_of( $refund ) ) );
+		$this->assertSame( 'reused_id', $this->refund_of( $refund )->get_meta( CreditNoteIssuer::PENDING_META ) );
+		$this->assertSame( 'reused_id', CreditNoteIssuer::refusal( $this->refund_of( $refund ) ) );
+		$this->assertSame( '', $this->refund_of( $refund )->get_meta( CreditNoteIssuer::NUMBER_META ) );
+		$this->assertSame( $before, Sequences::current( $this->key() ) );
+
+		// The old row is untouched.
+		$row = Register::find( 'credit_note', $refund->get_id() );
+		$this->assertSame( $doc->id, $row->id );
+		$this->assertSame( $doc->number, $row->number );
+		$this->assertSame( $doc->issued_at, $row->issued_at );
+
+		// Within the clock tolerance, the row is still the refund's own (its meta lost).
+		$own = $this->refund_of( $refund );
+		$own->delete_meta_data( CreditNoteIssuer::PENDING_META );
+		$own->set_date_created( $doc->issued_at + 30 );
+		$own->save();
+		$this->assertSame( $doc->id, CreditNoteIssuer::find_for( $this->refund_of( $refund ) )->id );
 	}
 
 	public function test_refund_deletion_blocked_while_credit_note_exists(): void {
@@ -964,11 +1133,13 @@ class CreditNoteIssuerTest extends TestCase {
 
 	/**
 	 * A refund of an amount created without the `woocommerce_order_refunded` listener: no credit note.
+	 * Created past Issuer::STALE_AFTER by default, so the deferred paths take it (not in flight).
 	 *
 	 * @param WC_Order $order  Order.
 	 * @param float    $amount Amount.
+	 * @param bool     $aged   False to keep its creation date (now).
 	 */
-	private function refund_without_hook( WC_Order $order, float $amount ): WC_Order_Refund {
+	private function refund_without_hook( WC_Order $order, float $amount, bool $aged = true ): WC_Order_Refund {
 		$refund = null;
 		$this->without_refund_hook(
 			function () use ( $order, $amount, &$refund ): void {
@@ -977,6 +1148,11 @@ class CreditNoteIssuerTest extends TestCase {
 		);
 		$this->assertInstanceOf( WC_Order_Refund::class, $refund );
 		$this->assertNull( Register::find( 'credit_note', $refund->get_id() ) );
+
+		if ( $aged ) {
+			$refund->set_date_created( time() - Issuer::STALE_AFTER - MINUTE_IN_SECONDS );
+			$refund->save();
+		}
 
 		return $refund;
 	}

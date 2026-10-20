@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use Automattic\WooCommerce\Utilities\OrderUtil;
 use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
@@ -134,6 +135,12 @@ final class StorageModeTest extends TestCase {
 		$missed = OrderFactory::refund( wc_get_order( $order->get_id() ), [], 1.5 );
 		$zero   = OrderFactory::refund( wc_get_order( $order->get_id() ), [], 0.0 );
 		add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
+
+		// Past Issuer::STALE_AFTER: no longer in flight, so the sweep takes it.
+		update_option( CreditNoteIssuer::SINCE_OPTION, time() - HOUR_IN_SECONDS );
+		delete_option( CreditNoteIssuer::SWEEP_CURSOR_OPTION );
+		$missed->set_date_created( time() - Issuer::STALE_AFTER - MINUTE_IN_SECONDS );
+		$missed->save();
 
 		update_option( Migration::OPTION, [ 'status' => 'pending' ] );
 		$pending = OrderFactory::refund( wc_get_order( $order->get_id() ), [], 3.0 );

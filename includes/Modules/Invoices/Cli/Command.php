@@ -178,8 +178,9 @@ final class Command {
 	 *
 	 * The refunds taken are those without a credit note number (all of them, or with `$pending`
 	 * those flagged pending), narrowed by order and by refund date. A real run goes through
-	 * CreditNoteIssuer::issue(), so the gate, the pending flag and the numbering are the usual
-	 * ones; a dry run only reads (CreditNoteIssuer::refusal()), it never reserves nor numbers.
+	 * CreditNoteIssuer::issue_deferred(), so the gate, the pending flag and the numbering are the
+	 * usual ones and a refund created moments ago is left alone (`in_flight`); a dry run only
+	 * reads (CreditNoteIssuer::refusal()), it never reserves nor numbers.
 	 *
 	 * Refused (`blocked`) while the module's tables are missing, and for a real run while any
 	 * requirement fails; a dry run only needs WooCommerce.
@@ -324,7 +325,7 @@ final class Command {
 	 */
 	private static function issue_credit_note( WC_Order_Refund $refund, string &$number ): string {
 		try {
-			$doc = CreditNoteIssuer::issue( $refund );
+			$doc = CreditNoteIssuer::issue_deferred( $refund );
 			if ( null !== $doc && 'issued' === $doc->status ) {
 				$number = (string) $doc->number;
 				return 'issued';

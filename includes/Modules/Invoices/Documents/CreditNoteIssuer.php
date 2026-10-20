@@ -24,9 +24,11 @@ use WC_Order_Refund;
  * One refund, one credit note with its own gapless number series and a write-once archived PDF.
  *
  * A credit note is a register row of type `credit_note` whose `order_id` is the refund id and
- * `parent_id` the refunded order. It is issued on `woocommerce_order_refunded` only: WooCommerce
- * deletes the refund when the gateway refuses it, after `woocommerce_create_refund` and before
- * that hook. Reserving, numbering and archiving go through the shared Pipeline; the gate, the
+ * `parent_id` the refunded order. It is issued on `woocommerce_order_refunded` (or by the
+ * refund e-mail sent just before it): WooCommerce saves the refund, asks the gateway, and
+ * deletes the refund when the gateway refuses it, before that hook. Every other path (sweep, invoice action, order screen, WP-CLI) goes
+ * through issue_deferred(), which leaves alone a refund that may still be waiting on the gateway
+ * (in_flight()). Reserving, numbering and archiving go through the shared Pipeline; the gate, the
  * refund meta, the notes and the hooks are the credit note's own. A credit note always cites the
  * invoice it credits: the order's invoice is issued first when the order may still get one,
  * otherwise the refund is flagged pending (PENDING_META) and issued once the invoice exists.
@@ -120,6 +122,12 @@ final class CreditNoteIssuer {
 	private static array $orders_deleting = [];
 
 	/**
+	 * Seconds a credit note's issue date may precede its refund's creation date and still be the
+	 * refund's own (clocks of several web servers). A later refund given the id again is newer.
+	 */
+	private const CLOCK_TOLERANCE = 60;
+
+	/**
 	 * Hook `woocommerce_order_refunded`: issues the refund's credit note.
 	 *
 	 * Never throws: a failure is logged and must not break the refund.
@@ -168,7 +176,10 @@ final class CreditNoteIssuer {
 	 * The register row is the refund's only when it belongs to the refund's order and, when the
 	 * refund carries a credit note number, that number is the row's. A refund without the number
 	 * whose id the order recorded as deleted (DELETED_META) is a new refund given a freed id again:
-	 * the row is not its own. Never writes.
+	 * the row is not its own. So is an issued row older than the refund without the number: a
+	 * refund's credit note is always issued after the refund is created, so it belongs to an
+	 * earlier refund that had this id (an order deleted for good leaves no DELETED_META behind).
+	 * Never writes.
 	 *
 	 * @param WC_Order_Refund $refund Refund.
 	 * @return IssuedDocument|null The row (reserved or issued), null when the refund has none.
@@ -189,11 +200,59 @@ final class CreditNoteIssuer {
 			return $recorded === (string) $doc->number ? $doc : null;
 		}
 
+		if ( 'issued' === $doc->status && $doc->issued_at > 0 ) {
+			$created = $refund->get_date_created();
+			if ( null !== $created && $doc->issued_at < $created->getTimestamp() - self::CLOCK_TOLERANCE ) {
+				return null;
+			}
+		}
+
 		return self::deleted_refund( $doc ) ? null : $doc;
 	}
 
 	/**
+	 * Whether WooCommerce may still be processing the refund: `wc_create_refund()` saves it, then
+	 * asks the gateway and deletes it when the gateway refuses. A refund created less than
+	 * Issuer::STALE_AFTER seconds ago that carries neither a credit note number nor a pending flag
+	 * (both written only once WooCommerce is done with it, or after that delay) is taken as such.
+	 *
+	 * @param WC_Order_Refund $refund Refund.
+	 */
+	public static function in_flight( WC_Order_Refund $refund ): bool {
+		if ( '' !== (string) $refund->get_meta( self::NUMBER_META ) || '' !== (string) $refund->get_meta( self::PENDING_META ) ) {
+			return false;
+		}
+
+		$created = $refund->get_date_created();
+
+		return null !== $created && $created->getTimestamp() > time() - Issuer::STALE_AFTER;
+	}
+
+	/**
+	 * Issues the refund's credit note from a request that is not the refund's own (sweep, invoice
+	 * action, order screen, WP-CLI): a refund that may still be waiting on the gateway is left
+	 * alone, nothing written (in_flight()). An issued credit note is returned as is.
+	 *
+	 * Issuing it there would make it permanent: block_deletion() would then keep a refund the
+	 * gateway refused, with a credit note for money never returned.
+	 *
+	 * @param WC_Order_Refund $refund Refund.
+	 * @return IssuedDocument|null As issue(); null too while the refund is in flight.
+	 */
+	public static function issue_deferred( WC_Order_Refund $refund ): ?IssuedDocument {
+		$existing = self::find_for( $refund );
+		if ( ( null === $existing || 'issued' !== $existing->status ) && self::in_flight( $refund ) ) {
+			return null;
+		}
+
+		return self::issue( $refund );
+	}
+
+	/**
 	 * Issues the refund's credit note. Idempotent: an issued credit note is returned as is.
+	 *
+	 * Called directly only once WooCommerce is done with the refund (`woocommerce_order_refunded`,
+	 * the refund e-mail); every other path goes through issue_deferred().
 	 *
 	 * @param WC_Order_Refund $refund Refund.
 	 * @return IssuedDocument|null The issued credit note, null when not issued (nothing refunded,
@@ -330,7 +389,9 @@ final class CreditNoteIssuer {
 	 *
 	 * @param WC_Order_Refund $refund Refund.
 	 * @return string '' when the credit note is issued or would be issued now; otherwise
-	 *                `zero_amount` (nothing refunded, never pending), `no_order` (no refunded order),
+	 *                `zero_amount` (nothing refunded, never pending), `in_flight` (created moments
+	 *                ago, WooCommerce may still be asking the gateway: see in_flight()),
+	 *                `no_order` (no refunded order),
 	 *                `import` (the Facture PDF Lumia import is not finished), `conflict` (the order
 	 *                has a legacy invoice that could not be imported), `reused_id` (the register
 	 *                holds the credit note of a deleted refund that had this id), `vetoed` (filter
@@ -345,6 +406,10 @@ final class CreditNoteIssuer {
 
 		if ( ! self::has_amount( $refund ) ) {
 			return 'zero_amount';
+		}
+
+		if ( self::in_flight( $refund ) ) {
+			return 'in_flight';
 		}
 
 		$parent = self::parent( $refund );
@@ -367,6 +432,7 @@ final class CreditNoteIssuer {
 
 	/**
 	 * Issues the credit notes of every refund of the order that has none, by increasing refund id.
+	 * A refund still in flight is left to its own `woocommerce_order_refunded` (issue_deferred()).
 	 *
 	 * @param WC_Order $order Order.
 	 * @return array<int, IssuedDocument|null> Credit note (or null when not issued) keyed by refund id.
@@ -398,7 +464,7 @@ final class CreditNoteIssuer {
 			try {
 				$refund = wc_get_order( $refund_id );
 				if ( $refund instanceof WC_Order_Refund ) {
-					$results[ $refund_id ] = self::issue( $refund );
+					$results[ $refund_id ] = self::issue_deferred( $refund );
 				}
 			} catch ( Throwable $e ) {
 				Pipeline::log( 'Credit note issuing failed for refund ' . $refund_id . ' of order ' . $order_id . ': ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
@@ -440,7 +506,8 @@ final class CreditNoteIssuer {
 	 * Refunds the sweep retries: first those created since SINCE_OPTION that carry neither a
 	 * credit note number nor a pending flag and refund something (missed by the hook), then the
 	 * pending ones whose reason can lift without any hook issuing their credit note
-	 * (SWEEP_RETRIED). A pending refund never takes the place of a refund the hook simply missed.
+	 * (SWEEP_RETRIED). A pending refund never takes the place of a refund the hook simply missed,
+	 * and a refund still in flight (in_flight()) waits for a later run.
 	 *
 	 * The storages share one meta clause only (see pending_refund_ids()): each part reads its
 	 * refunds by pages of SWEEP_PAGE_SIZE, SWEEP_PAGES at most per run, and leaves out in PHP what
@@ -464,7 +531,7 @@ final class CreditNoteIssuer {
 				'meta_compare' => 'NOT EXISTS',
 			],
 			self::since(),
-			static fn( WC_Order_Refund $refund ): bool => self::has_amount( $refund ) && '' === (string) $refund->get_meta( self::PENDING_META ),
+			static fn( WC_Order_Refund $refund ): bool => self::has_amount( $refund ) && '' === (string) $refund->get_meta( self::PENDING_META ) && ! self::in_flight( $refund ),
 			$limit
 		);
 
@@ -616,7 +683,7 @@ final class CreditNoteIssuer {
 			try {
 				$refund = wc_get_order( $refund_id );
 				if ( $refund instanceof WC_Order_Refund ) {
-					self::issue( $refund );
+					self::issue_deferred( $refund );
 				}
 			} catch ( Throwable $e ) {
 				Pipeline::log( 'The credit note sweep failed for refund ' . $refund_id . ': ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );

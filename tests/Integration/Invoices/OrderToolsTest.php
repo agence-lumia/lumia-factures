@@ -17,6 +17,7 @@ use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Module;
@@ -729,6 +730,7 @@ class OrderToolsTest extends TestCase {
 
 	/**
 	 * A refund of an amount created without the `woocommerce_order_refunded` listener: no credit note.
+	 * Created past Issuer::STALE_AFTER, so it is not in flight.
 	 *
 	 * @param WC_Order $order  Order.
 	 * @param float    $amount Amount.
@@ -741,6 +743,10 @@ class OrderToolsTest extends TestCase {
 			add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
 		}
 		$this->assertNull( Register::find( 'credit_note', $refund->get_id() ) );
+
+		// Past Issuer::STALE_AFTER: no longer in flight, the deferred paths take it.
+		$refund->set_date_created( time() - Issuer::STALE_AFTER - MINUTE_IN_SECONDS );
+		$refund->save();
 
 		return $refund;
 	}

@@ -75,7 +75,8 @@ final class CreditNoteNotice {
 		$ids = [];
 		foreach ( self::ids( $missed ) as $refund_id ) {
 			$refund = wc_get_order( $refund_id );
-			if ( ! $refund instanceof WC_Order_Refund || Money::to_minor( $refund->get_amount() ) <= 0 ) {
+			// A refund still in flight is not missed: its own request may yet issue its credit note.
+			if ( ! $refund instanceof WC_Order_Refund || Money::to_minor( $refund->get_amount() ) <= 0 || CreditNoteIssuer::in_flight( $refund ) ) {
 				continue;
 			}
 
@@ -103,7 +104,7 @@ final class CreditNoteNotice {
 		foreach ( $ids as $refund_id ) {
 			try {
 				$refund = wc_get_order( $refund_id );
-				$doc    = $refund instanceof WC_Order_Refund ? CreditNoteIssuer::issue( $refund ) : null;
+				$doc    = $refund instanceof WC_Order_Refund ? CreditNoteIssuer::issue_deferred( $refund ) : null;
 				if ( null !== $doc && 'issued' === $doc->status ) {
 					++$issued;
 				}
