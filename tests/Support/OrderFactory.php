@@ -17,6 +17,7 @@ use WC_Order;
 use WC_Order_Item_Fee;
 use WC_Order_Item_Product;
 use WC_Order_Item_Shipping;
+use WC_Order_Item_Tax;
 use WC_Order_Refund;
 use WC_Product;
 use WC_Product_Attribute;
@@ -214,6 +215,9 @@ final class OrderFactory {
 	/**
 	 * One refunded item as the order screen sends it: the item's share of its total and taxes.
 	 *
+	 * The screen has one tax input per rate of the order on every row and posts them all, 0 for a
+	 * rate the item does not carry (WooCommerce 11+ keeps that 0 and records a tax item at 0).
+	 *
 	 * @param WC_Order_Item_Product|WC_Order_Item_Shipping|WC_Order_Item_Fee $item     Order item.
 	 * @param int|null                                                      $quantity Quantity refunded (products), null for the whole item.
 	 * @return array{qty: int|float, refund_total: float, refund_tax: array<int, float>}
@@ -225,6 +229,14 @@ final class OrderFactory {
 		$taxes    = $item->get_taxes();
 
 		$refund_tax = [];
+		$order      = $item->get_order();
+		if ( $order instanceof WC_Order ) {
+			foreach ( $order->get_items( 'tax' ) as $tax_item ) {
+				if ( $tax_item instanceof WC_Order_Item_Tax ) {
+					$refund_tax[ (int) $tax_item->get_rate_id() ] = 0.0;
+				}
+			}
+		}
 		foreach ( (array) ( $taxes['total'] ?? [] ) as $rate_id => $tax ) {
 			$refund_tax[ (int) $rate_id ] = round( (float) $tax * $share, $decimals );
 		}

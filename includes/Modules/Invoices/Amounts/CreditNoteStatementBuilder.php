@@ -91,7 +91,7 @@ final class CreditNoteStatementBuilder {
 		}
 
 		$total  = Money::to_minor( $refund->get_amount() );
-		$groups = self::refunded_taxes( Lines::taxes( $refund ), $labels );
+		$groups = self::refunded_taxes( Lines::taxes( $refund ), $labels, $rates );
 
 		$gap = $total - $items_incl;
 		if ( abs( $gap ) > self::ROUNDING_TOLERANCE ) {
@@ -118,19 +118,29 @@ final class CreditNoteStatementBuilder {
 	 * VAT refunded, keyed by the label of the order's rate: the refund's own tax items (what
 	 * WooCommerce recorded), positive.
 	 *
-	 * @param WC_Order_Item_Tax[] $tax_items Refund tax items.
-	 * @param array<int, string>  $labels    Row label of each order rate, keyed by rate id.
+	 * The order screen posts a tax for every rate of the order on every refunded row, 0 for the rates
+	 * the row does not carry, and WooCommerce 11+ keeps that 0: a refund of a 20 % line on a two-rate
+	 * order gets a 5.5 % tax item at 0. A rate nothing was refunded at is no row, unless the order
+	 * rate is a real 0 % rate, which prints as it does on the invoice.
+	 *
+	 * @param WC_Order_Item_Tax[]    $tax_items Refund tax items.
+	 * @param array<int, string>     $labels    Row label of each order rate, keyed by rate id.
+	 * @param array<int, float|null> $rates     Percent of each order rate, keyed by rate id.
 	 * @return array<string, int>
 	 */
-	private static function refunded_taxes( array $tax_items, array $labels ): array {
+	private static function refunded_taxes( array $tax_items, array $labels, array $rates ): array {
 		$groups = [];
 		foreach ( $tax_items as $tax_item ) {
-			// A rate the order does not know (never seen in practice): the refund tax item's own label.
-			$label = $labels[ (int) $tax_item->get_rate_id() ] ?? (string) $tax_item->get_label();
+			$rate_id = (int) $tax_item->get_rate_id();
+			$amount  = Money::to_minor( $tax_item->get_tax_total() ) + Money::to_minor( $tax_item->get_shipping_tax_total() );
+			if ( 0 === $amount && 0.0 !== ( $rates[ $rate_id ] ?? null ) ) {
+				continue;
+			}
 
-			$groups[ $label ] = ( $groups[ $label ] ?? 0 )
-				- Money::to_minor( $tax_item->get_tax_total() )
-				- Money::to_minor( $tax_item->get_shipping_tax_total() );
+			// A rate the order does not know (never seen in practice): the refund tax item's own label.
+			$label = $labels[ $rate_id ] ?? (string) $tax_item->get_label();
+
+			$groups[ $label ] = ( $groups[ $label ] ?? 0 ) - $amount;
 		}
 
 		return $groups;

@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Modules\Invoices\Amounts\CreditNoteStatementBuilder;
 use Lumia\Factures\Modules\Invoices\Amounts\Money;
 use Lumia\Factures\Modules\Invoices\Amounts\Statement;
+use Lumia\Factures\Modules\Invoices\Amounts\StatementBuilder;
 use Lumia\Factures\Modules\Invoices\Amounts\TotalRow;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Tests\Support\OrderFactory;
@@ -101,6 +102,93 @@ class CreditNoteStatementTest extends TestCase {
 		$this->assertSame( 300, $this->row( $excl, 'fee' )->amount );
 		$this->assertSame( 4300, $this->row( $excl, 'total_excl' )->amount );
 		$this->assertSame( $this->taxes( $incl ), $this->taxes( $excl ) );
+	}
+
+	public function test_line_refund_on_two_rate_order_shows_only_the_refunded_rate(): void {
+		$ids      = OrderFactory::tax_rates(
+			[
+				''             => 20.0,
+				'reduced-rate' => 5.5,
+			]
+		);
+		$order    = OrderFactory::order(
+			[
+				[ OrderFactory::simple_product( 12.5, '', 'Pelle' ), 2 ],
+				[ OrderFactory::simple_product( 10.0, 'reduced-rate', 'Graines' ) ],
+			],
+			[ 'shipping' => 5 ]
+		);
+		$item     = $this->product_item( $order );
+		$shipping = $this->shipping_item( $order );
+
+		// The order screen posts every rate of the order on each row: 0 for 5.5 % on the 20 % rows.
+		$line = OrderFactory::refund_line( $item );
+		$this->assertSame(
+			[
+				$ids['']             => 5.0,
+				$ids['reduced-rate'] => 0.0,
+			],
+			$line['refund_tax']
+		);
+		$refund = OrderFactory::refund(
+			$order,
+			[
+				$item->get_id()     => $line,
+				$shipping->get_id() => OrderFactory::refund_line( $shipping ),
+			],
+			null
+		);
+
+		// WooCommerce keeps the 0 and records a 5.5 % tax item at 0 on the refund.
+		$recorded = [];
+		foreach ( $refund->get_items( 'tax' ) as $tax_item ) {
+			$this->assertInstanceOf( WC_Order_Item_Tax::class, $tax_item );
+			$recorded[ (int) $tax_item->get_rate_id() ] = Money::to_minor( $tax_item->get_tax_total() ) + Money::to_minor( $tax_item->get_shipping_tax_total() );
+		}
+		$this->assertSame( -600, $recorded[ $ids[''] ] ?? null );
+		$this->assertSame( 0, $recorded[ $ids['reduced-rate'] ] ?? null, 'No 5.5 % tax item at 0: the order screen path is no longer covered.' );
+
+		[ $incl, $excl ] = $this->assertAddsUp( $refund );
+
+		$this->assertSame( [ 'subtotal', 'shipping', 'total', 'total_excl', 'tax' ], $this->keys( $incl ) );
+		$this->assertSame( [ 'subtotal', 'shipping', 'total_excl', 'tax', 'total' ], $this->keys( $excl ) );
+		foreach ( [ $incl, $excl ] as $statement ) {
+			$this->assertSame( [ "VAT 20\u{00A0}%" => 600 ], $this->taxes( $statement ) );
+			$this->assertSame( 3600, $this->row( $statement, 'total' )->amount );
+		}
+	}
+
+	public function test_real_zero_rate_keeps_its_row_as_on_the_invoice(): void {
+		OrderFactory::tax_rates(
+			[
+				''          => 20.0,
+				'zero-rate' => 0.0,
+			]
+		);
+		$order = OrderFactory::order(
+			[
+				[ OrderFactory::simple_product( 10.0 ) ],
+				[ OrderFactory::simple_product( 8.0, 'zero-rate', 'Livre' ) ],
+			]
+		);
+		$items = array_values( $order->get_items() );
+		$book  = $items[1] ?? null;
+		$this->assertInstanceOf( WC_Order_Item_Product::class, $book );
+
+		$this->assertSame(
+			[
+				"VAT 0\u{00A0}%"  => 0,
+				"VAT 20\u{00A0}%" => 200,
+			],
+			$this->taxes( StatementBuilder::build( $order, Module::settings() ) )
+		);
+
+		$refund = OrderFactory::refund( $order, [ $book->get_id() => OrderFactory::refund_line( $book ) ], null );
+
+		foreach ( $this->assertAddsUp( $refund ) as $statement ) {
+			$this->assertSame( [ "VAT 0\u{00A0}%" => 0 ], $this->taxes( $statement ) );
+			$this->assertSame( 800, $this->row( $statement, 'total' )->amount );
+		}
 	}
 
 	public function test_partial_quantity_refund(): void {
