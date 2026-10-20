@@ -24,6 +24,8 @@ use WC_Order_Refund;
 /**
  * Filter `woocommerce_email_attachments`: adds the archived invoice PDF to the configured emails,
  * and the archived credit note PDF of the refund to the refund email.
+ *
+ * Its guards (email list, preview, stored order and refund) are public: EmailLinks applies the same.
  */
 class Attachments {
 
@@ -159,7 +161,7 @@ class Attachments {
 	 * @param mixed  $enabled Stored list of email ids.
 	 * @param string $id      Canonical email id.
 	 */
-	private static function enabled( $enabled, string $id ): bool {
+	public static function enabled( $enabled, string $id ): bool {
 		if ( ! is_array( $enabled ) ) {
 			return false;
 		}
@@ -176,7 +178,7 @@ class Attachments {
 	/**
 	 * True while WooCommerce renders an email preview (WooCommerce 9.6+), built on a dummy order.
 	 */
-	private static function is_preview(): bool {
+	public static function is_preview(): bool {
 		return (bool) apply_filters( 'woocommerce_is_email_preview', false ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WooCommerce hook.
 	}
 
@@ -188,7 +190,7 @@ class Attachments {
 	 *
 	 * @param WC_Order $order Order given by the email.
 	 */
-	private static function persisted_order( WC_Order $order ): bool {
+	public static function persisted_order( WC_Order $order ): bool {
 		if ( $order->get_id() <= 0 || '' === $order->get_order_key() ) {
 			return false;
 		}
@@ -203,7 +205,7 @@ class Attachments {
 	 *
 	 * @param WC_Order_Refund $refund Refund given by the email.
 	 */
-	private static function persisted_refund( WC_Order_Refund $refund ): bool {
+	public static function persisted_refund( WC_Order_Refund $refund ): bool {
 		if ( $refund->get_id() <= 0 ) {
 			return false;
 		}

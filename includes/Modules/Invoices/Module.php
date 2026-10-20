@@ -21,6 +21,7 @@ use Lumia\Factures\Modules\Invoices\Database\Installer;
 use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Emails\EmailLinks;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
 use Lumia\Factures\Modules\Invoices\Front\Shortcode;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
@@ -51,6 +52,8 @@ class Module extends AbstractModule {
 
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
+		// Links to the invoice and credit notes in the customer e-mails (priority 20: after the order details).
+		add_action( 'woocommerce_email_order_meta', [ EmailLinks::class, 'render' ], 20, 4 );
 
 		// Credit notes: issued on `woocommerce_order_refunded` only, the last step of wc_create_refund()
 		// (a refund the gateway refuses is deleted before it), or once the order's invoice is issued
