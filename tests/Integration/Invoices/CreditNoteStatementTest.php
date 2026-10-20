@@ -16,6 +16,7 @@ use Lumia\Factures\Modules\Invoices\Amounts\Money;
 use Lumia\Factures\Modules\Invoices\Amounts\Statement;
 use Lumia\Factures\Modules\Invoices\Amounts\StatementBuilder;
 use Lumia\Factures\Modules\Invoices\Amounts\TotalRow;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
@@ -40,6 +41,10 @@ class CreditNoteStatementTest extends TestCase {
 		update_option( 'woocommerce_price_thousand_sep', ' ' );
 		update_option( 'woocommerce_price_num_decimals', '2' );
 		update_option( 'woocommerce_tax_round_at_subtotal', 'no' );
+
+		// Statements are read from the refunds alone: the issuing listener stays out (the hooks
+		// are restored after each test).
+		remove_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10 );
 	}
 
 	public function test_full_refund_by_lines(): void {

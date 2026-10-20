@@ -17,6 +17,7 @@ use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
@@ -50,6 +51,18 @@ class Module extends AbstractModule {
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
 
+		// Credit notes: issued on `woocommerce_order_refunded` only, the last step of wc_create_refund()
+		// (a refund the gateway refuses is deleted before it), or once the order's invoice is issued
+		// (priority 20: after the invoice's own listeners).
+		CreditNoteIssuer::ensure_since();
+		add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
+		add_action( 'lumia_factures_invoice_issued', [ CreditNoteIssuer::class, 'on_invoice_issued' ], 20, 2 );
+		add_filter( 'woocommerce_pre_delete_order_refund', [ CreditNoteIssuer::class, 'block_deletion' ], 10, 3 );
+		add_action( 'woocommerce_delete_order_refund', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 1 );
+		add_action( 'woocommerce_refund_deleted', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 2 );
+		add_action( CreditNoteIssuer::SWEEP_HOOK, [ CreditNoteIssuer::class, 'sweep' ] );
+		CreditNoteIssuer::schedule_sweep();
+
 		CustomerDownload::register();
 		Shortcode::register();
 
@@ -60,6 +73,7 @@ class Module extends AbstractModule {
 			Counters::register();
 			Preview::register();
 			MigrationNotice::register();
+			add_action( 'all_admin_notices', [ CreditNoteIssuer::class, 'render_deletion_notice' ] );
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
 
@@ -166,6 +180,7 @@ class Module extends AbstractModule {
 	 */
 	public function on_activate(): void {
 		Installer::install();
+		CreditNoteIssuer::ensure_since();
 		Migration::forget_no_data();
 
 		if ( [] !== Requirements::check() ) {
@@ -183,10 +198,21 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK ],
-			'meta'      => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date', Issuer::GATE_FLAG, Importer::NOTED_META ],
+			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK, CreditNoteIssuer::SINCE_OPTION ],
+			'meta'      => [
+				'_lumia_factures_invoice_number',
+				'_lumia_factures_invoice_date',
+				Issuer::GATE_FLAG,
+				Importer::NOTED_META,
+				CreditNoteIssuer::NUMBER_META,
+				CreditNoteIssuer::DATE_META,
+				CreditNoteIssuer::PENDING_META,
+				CreditNoteIssuer::DELETED_META,
+			],
 			'user_meta' => [ MigrationNotice::DISMISSED_META ],
 			'tables'    => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
+			// Also unscheduled on deactivation (Core\Deactivator).
+			'cron'      => [ CreditNoteIssuer::SWEEP_HOOK ],
 		];
 	}
 

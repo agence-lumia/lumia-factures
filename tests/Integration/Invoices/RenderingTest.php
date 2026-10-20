@@ -14,6 +14,7 @@ defined( 'ABSPATH' ) || exit;
 use InvalidArgumentException;
 use Lumia\Factures\Modules\Invoices\Amounts\CreditNoteStatementBuilder;
 use Lumia\Factures\Modules\Invoices\Amounts\StatementBuilder;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Rendering\Context;
@@ -54,6 +55,10 @@ class RenderingTest extends TestCase {
 		update_option( 'woocommerce_tax_round_at_subtotal', 'no' );
 		update_option( 'date_format', 'd/m/Y' );
 		Images::flush();
+
+		// These tests record their credit notes in the register themselves (credit_note_doc()): the
+		// issuing listener stays out (the hooks are restored after each test).
+		remove_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10 );
 
 		// Capture the plugin log lines instead of spilling them into the test output.
 		$this->log_file     = (string) tempnam( sys_get_temp_dir(), 'lf-log' );

@@ -56,6 +56,28 @@ final class Notes {
 	}
 
 	/**
+	 * The notes of a credit note, written on the refunded order.
+	 *
+	 * @param int $refund_id Refund the credit note is issued for (named when no number exists yet).
+	 */
+	public static function credit_note( int $refund_id ): self {
+		return new self(
+			/* translators: %d: refund id */
+			sprintf( __( 'Credit note for refund #%d could not be numbered.', 'lumia-factures' ), $refund_id ),
+			/* translators: %d: sequence value */
+			__( 'Credit note sequence value %d could not be turned into a number; this sequence value is skipped.', 'lumia-factures' ),
+			/* translators: 1: credit note number, 2: sequence value */
+			__( 'Credit note number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped.', 'lumia-factures' ),
+			/* translators: 1: credit note number, 2: sequence value */
+			__( 'Credit note number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the credit note is not numbered. Give each document type its own number prefix.', 'lumia-factures' ),
+			/* translators: %s: credit note number */
+			__( 'The PDF of credit note %s could not be stored; the PDF will be built on first download.', 'lumia-factures' ),
+			/* translators: %s: credit note number */
+			__( 'The PDF of credit note %s could not be generated; the PDF will be built on first download.', 'lumia-factures' )
+		);
+	}
+
+	/**
 	 * The note written when the PDF of a numbered document could not be archived.
 	 *
 	 * @param string $outcome `store_failed` or `render_failed` (Pipeline::archive()).

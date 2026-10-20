@@ -12,6 +12,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
@@ -232,6 +233,9 @@ class PreviewTest extends TestCase {
 	}
 
 	public function test_preview_refuses_unknown_order_and_refunds(): void {
+		// A refund of an order never invoiced: no credit note to issue (restored after the test).
+		remove_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10 );
+
 		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
 		$refund = wc_create_refund(
 			[
