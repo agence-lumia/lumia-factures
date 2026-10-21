@@ -4,7 +4,7 @@
  * Plugin URI:  https://github.com/agence-lumia/lumia-factures
  * Update URI:  https://github.com/agence-lumia/lumia-factures
  * Description: PDF invoices for WooCommerce orders.
- * Version:     2.0.1-dev.2
+ * Version:     2.0.2-dev.1
  * Author:      Agence Lümia
  * Author URI:  https://agence-lumia.com
  * License:     GPL-2.0+
@@ -23,7 +23,7 @@
 defined( 'ABSPATH' ) || exit;
 
 // Base constants.
-define( 'LUMIA_FACTURES_VERSION', '2.0.1-dev.2' );
+define( 'LUMIA_FACTURES_VERSION', '2.0.2-dev.1' );
 define( 'LUMIA_FACTURES_PLUGIN_FILE', __FILE__ );
 define( 'LUMIA_FACTURES_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'LUMIA_FACTURES_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
