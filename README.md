@@ -23,7 +23,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 - Customer access (2.1): the invoice and credit notes in My Account, on the thank-you page, as links in the customer e-mails, with the `[lumia_factures_documents]` shortcode and the Bricks tags. On a site updated from 2.0 the My Account and order page links start off (turn them on under General > Customer access).
 - A demo order built from the shop's products for the live preview while the shop has no order.
 
-Planned for 2.2: no-VAT mode, customer VAT number, the 2026 invoice mentions and Factur-X.
+Planned for 2.2 (issue #19): VAT franchise regime (art. 293 B), customer VAT number and SIREN, the 2026 invoice mentions, and a more compact company header and footer.
 
 Modules: **Invoices** (core) and **Bricks** (dynamic tags), both always active: the Bricks hooks only fire on a Bricks site.
 
