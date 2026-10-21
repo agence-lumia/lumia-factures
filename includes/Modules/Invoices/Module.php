@@ -12,20 +12,25 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\AbstractModule;
 use Lumia\Factures\Core\Requirements;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
+use Lumia\Factures\Modules\Invoices\Admin\CreditNoteNotice;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\MigrationNotice;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
 use Lumia\Factures\Modules\Invoices\Admin\Preview;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Emails\EmailLinks;
 use Lumia\Factures\Modules\Invoices\Front\CustomerDownload;
+use Lumia\Factures\Modules\Invoices\Front\CustomerLinks;
 use Lumia\Factures\Modules\Invoices\Front\Shortcode;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Settings\Schema;
+use Lumia\Factures\Modules\Invoices\Settings\Upgrader;
 
 /**
  * Core module: numbering, documents, rendering, storage and emails (lot 2).
@@ -39,7 +44,9 @@ class Module extends AbstractModule {
 	public function init(): void {
 		// Called directly: init() already runs inside the `init` hook at priority 10,
 		// a callback added to it now would never fire. Updating a plugin does not run
-		// the activation hook, so the tables are checked on every boot.
+		// the activation hook, so the tables are checked on every boot. The settings first: the
+		// installer records its schema version, one of the signs of an existing installation.
+		Upgrader::maybe_upgrade();
 		Installer::maybe_upgrade();
 
 		// The legacy import runs by itself, never during a front-end request (a visitor would wait
@@ -49,8 +56,26 @@ class Module extends AbstractModule {
 
 		add_action( 'woocommerce_order_status_changed', [ Issuer::class, 'on_status_changed' ], 10, 4 );
 		add_filter( 'woocommerce_email_attachments', [ Attachments::class, 'attach' ], 10, 4 );
+		// Links to the invoice and credit notes in the customer e-mails (priority 20: after the order details).
+		add_action( 'woocommerce_email_order_meta', [ EmailLinks::class, 'render' ], 20, 4 );
+
+		// Credit notes: issued on `woocommerce_order_refunded` only, the last step of wc_create_refund()
+		// (a refund the gateway refuses is deleted before it), or once the order's invoice is issued
+		// (priority 20: after the invoice's own listeners).
+		CreditNoteIssuer::ensure_since();
+		add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
+		add_action( 'lumia_factures_invoice_issued', [ CreditNoteIssuer::class, 'on_invoice_issued' ], 20, 2 );
+		add_filter( 'woocommerce_pre_delete_order_refund', [ CreditNoteIssuer::class, 'block_deletion' ], 10, 3 );
+		add_action( 'woocommerce_before_delete_order', [ CreditNoteIssuer::class, 'on_order_deleting' ], 10, 2 );
+		add_action( 'woocommerce_delete_order', [ CreditNoteIssuer::class, 'on_order_deleted' ], 10, 1 );
+		add_action( 'woocommerce_delete_order_refund', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 1 );
+		add_action( 'woocommerce_refund_deleted', [ CreditNoteIssuer::class, 'on_refund_deleted' ], 10, 2 );
+		add_action( CreditNoteIssuer::SWEEP_HOOK, [ CreditNoteIssuer::class, 'sweep' ] );
+		CreditNoteIssuer::schedule_sweep();
 
 		CustomerDownload::register();
+		// The documents on the My Account pages and the thank-you page (read only, nothing is issued).
+		CustomerLinks::register();
 		Shortcode::register();
 
 		// admin-post.php requests are is_admin() too.
@@ -60,6 +85,8 @@ class Module extends AbstractModule {
 			Counters::register();
 			Preview::register();
 			MigrationNotice::register();
+			CreditNoteNotice::register();
+			add_action( 'all_admin_notices', [ CreditNoteIssuer::class, 'render_deletion_notice' ] );
 			add_action( 'admin_enqueue_scripts', [ self::class, 'enqueue_media' ] );
 		}
 
@@ -107,9 +134,9 @@ class Module extends AbstractModule {
 	/**
 	 * Data of the settings screen, merged into `lumiaFacturesAdmin`.
 	 *
-	 * The live number sample is computed in JS from these values (it mirrors `NumberFormat::preview()`):
+	 * The live number samples are computed in JS from these values (they mirror `NumberFormat::preview()`):
 	 * today's date in the site timezone, the sample order 14243 and customer 27, the counters by key
-	 * and the tags a format may use.
+	 * and the tags a format may use. `documents` gives, per numbered type, the group of its fields.
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -119,10 +146,15 @@ class Module extends AbstractModule {
 			$counters[ $sequence['key'] ] = $sequence['value'];
 		}
 
+		$documents = [];
+		foreach ( Schema::NUMBERED as $type => $group ) {
+			$documents[ $type ] = [ 'group' => $group ];
+		}
+
 		return [
 			'invoices' => [
-				'type'     => 'invoice',
-				'sample'   => [
+				'documents' => $documents,
+				'sample'    => [
 					'year'        => (string) wp_date( 'Y' ),
 					'month'       => (string) wp_date( 'm' ),
 					'day'         => (string) wp_date( 'd' ),
@@ -130,10 +162,10 @@ class Module extends AbstractModule {
 					'orderId'     => '14243',
 					'customerId'  => '27',
 				],
-				'counters' => $counters,
-				'tags'     => NumberFormat::known_tags(),
+				'counters'  => $counters,
+				'tags'      => NumberFormat::known_tags(),
 				// ES modules the preview loads with import() (not enqueued); the version busts the cache.
-				'pdfjs'    => [
+				'pdfjs'     => [
 					'lib'    => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
 					'worker' => LUMIA_FACTURES_ASSETS_URL . 'vendor/pdfjs/pdf.worker.min.js?ver=' . rawurlencode( LUMIA_FACTURES_VERSION ),
 				],
@@ -160,7 +192,12 @@ class Module extends AbstractModule {
 	 * active) the import is planned by the first request that meets them.
 	 */
 	public function on_activate(): void {
+		// Before the installer, which records the schema version a fresh site would then seem to have.
+		Upgrader::maybe_upgrade();
 		Installer::install();
+		// No CreditNoteIssuer::ensure_since() here: activated next to Facture PDF Lumia 1.x, the
+		// module does not run yet and 1.x keeps handling the refunds. init() records it once the
+		// requirements are met.
 		Migration::forget_no_data();
 
 		if ( [] !== Requirements::check() ) {
@@ -178,10 +215,30 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options'   => [ 'lumia_factures_module_invoices', Installer::OPTION, Migration::OPTION, Migration::LOCK ],
-			'meta'      => [ '_lumia_factures_invoice_number', '_lumia_factures_invoice_date', Issuer::GATE_FLAG, Importer::NOTED_META ],
+			'options'   => [
+				'lumia_factures_module_invoices',
+				Installer::OPTION,
+				Migration::OPTION,
+				Migration::LOCK,
+				CreditNoteIssuer::SINCE_OPTION,
+				CreditNoteIssuer::DELETED_ORDERS_OPTION,
+				CreditNoteIssuer::SWEEP_CURSOR_OPTION,
+				Upgrader::OPTION,
+			],
+			'meta'      => [
+				'_lumia_factures_invoice_number',
+				'_lumia_factures_invoice_date',
+				Issuer::GATE_FLAG,
+				Importer::NOTED_META,
+				CreditNoteIssuer::NUMBER_META,
+				CreditNoteIssuer::DATE_META,
+				CreditNoteIssuer::PENDING_META,
+				CreditNoteIssuer::DELETED_META,
+			],
 			'user_meta' => [ MigrationNotice::DISMISSED_META ],
 			'tables'    => [ 'lumia_factures_sequences', 'lumia_factures_documents' ],
+			// Also unscheduled on deactivation (Core\Deactivator).
+			'cron'      => [ CreditNoteIssuer::SWEEP_HOOK ],
 		];
 	}
 
@@ -218,7 +275,9 @@ class Module extends AbstractModule {
 		$current = self::settings();
 		$result  = Schema::sanitize( $settings, $current );
 
-		self::carry_counter( $current['numbering'], $result['settings']['numbering'] );
+		foreach ( Schema::NUMBERED as $type => $group ) {
+			self::carry_counter( $type, $current[ $group ], $result['settings'][ $group ] );
+		}
 
 		if ( [] !== $result['errors'] ) {
 			set_transient( 'lumia_factures_invoices_errors', $result['errors'], MINUTE_IN_SECONDS );
@@ -230,17 +289,19 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Keeps the invoice series going when the numbering policy changes.
+	 * Keeps a document series going when its numbering policy changes.
 	 *
-	 * The reset policy chooses the counter key (`invoice`, `invoice_2026`, `invoice_2026_10`). A new
-	 * policy moves to another key that starts at the start number, behind the numbers already issued:
-	 * they would collide, or the series would restart within the period. The counter the new policy
-	 * uses for the current period is raised to the current value of the old one (never lowered).
+	 * The reset policy chooses the counter key (`invoice`, `invoice_2026`, `invoice_2026_10`; the
+	 * same with `credit_note`). A new policy moves to another key that starts at the start number,
+	 * behind the numbers already issued: they would collide, or the series would restart within the
+	 * period. The counter the new policy uses for the current period is raised to the current value
+	 * of the old one (never lowered). Each type has its own counters, so only its own move.
 	 *
-	 * @param array<string, mixed> $before Numbering settings before the save.
-	 * @param array<string, mixed> $after  Numbering settings about to be saved.
+	 * @param string               $type   Document type, a key of Schema::NUMBERED.
+	 * @param array<string, mixed> $before Numbering policy of the type before the save.
+	 * @param array<string, mixed> $after  Numbering policy of the type about to be saved.
 	 */
-	private static function carry_counter( array $before, array $after ): void {
+	private static function carry_counter( string $type, array $before, array $after ): void {
 		$changed = false;
 		foreach ( [ 'format', 'reset_enabled', 'reset_period' ] as $field ) {
 			if ( ( $before[ $field ] ?? null ) !== ( $after[ $field ] ?? null ) ) {
@@ -253,8 +314,8 @@ class Module extends AbstractModule {
 		}
 
 		$now     = time();
-		$old_key = Sequences::key( Issuer::TYPE, $now, $before );
-		$new_key = Sequences::key( Issuer::TYPE, $now, $after );
+		$old_key = Sequences::key( $type, $now, $before );
+		$new_key = Sequences::key( $type, $now, $after );
 		$value   = Sequences::current( $old_key );
 
 		if ( $old_key === $new_key || $value <= 0 ) {

@@ -102,12 +102,12 @@ class UpdaterTest extends TestCase {
 	}
 
 	public function test_injects_update_when_newer_release(): void {
-		$this->mock_http( 200, $this->release( '2.0.1' ) );
+		$this->mock_http( 200, $this->release( '99.0.0' ) );
 
 		$result = $this->run_check();
 
-		$this->assertSame( '2.0.1', $result->response[ self::BASENAME ]->new_version );
-		$this->assertStringEndsWith( 'lumia-factures-2.0.1.zip', $result->response[ self::BASENAME ]->package );
+		$this->assertSame( '99.0.0', $result->response[ self::BASENAME ]->new_version );
+		$this->assertStringEndsWith( 'lumia-factures-99.0.0.zip', $result->response[ self::BASENAME ]->package );
 		$this->assertSame( 'LumiaFactures', $this->last_args['headers']['User-Agent'] );
 	}
 
@@ -125,15 +125,15 @@ class UpdaterTest extends TestCase {
 		$this->mock_http(
 			200,
 			array(
-				$this->release( 'v2.0.0' ),
-				$this->release( 'v2.0.1-dev.2' ),
-				$this->release( 'v2.0.1-dev.1' ),
+				$this->release( 'v98.0.0' ),
+				$this->release( 'v99.0.0-dev.2' ),
+				$this->release( 'v99.0.0-dev.1' ),
 			)
 		);
 
 		$result = $this->run_check();
 
-		$this->assertSame( '2.0.1-dev.2', $result->response[ self::BASENAME ]->new_version );
+		$this->assertSame( '99.0.0-dev.2', $result->response[ self::BASENAME ]->new_version );
 		$this->assertNotFalse( get_transient( 'lumia_factures_github_update_dev' ) );
 	}
 

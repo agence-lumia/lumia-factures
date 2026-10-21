@@ -155,7 +155,8 @@ final class Importer {
 	 * Imports the legacy settings unless the user already saved settings.
 	 *
 	 * The activator stores the defaults before the migration runs, so an option still equal to
-	 * the defaults was never saved by the user and is replaced.
+	 * the defaults was never saved by the user and is replaced (Schema::left_at_defaults()). The
+	 * `customer` group is left out of that comparison and kept (keep_customer_group()).
 	 *
 	 * @param bool   $dry_run Dry run.
 	 * @param Report $report  Report.
@@ -168,20 +169,99 @@ final class Importer {
 		}
 
 		$stored = get_option( self::SETTINGS_OPTION, false );
-		if ( false !== $stored && Schema::defaults() != $stored ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseNotEqual -- Same values, key order and int/float equality do not matter.
+		if ( false !== $stored && ! Schema::left_at_defaults( $stored, [ 'customer' ] ) ) {
 			$report->settings = 'skipped_existing';
 			return;
 		}
 
 		$mapped    = LegacySettings::map( $legacy );
-		$sanitized = Schema::sanitize( $mapped['settings'], Schema::defaults() );
+		$sanitized = self::sanitize_settings( $mapped['settings'] );
+		$settings  = self::keep_customer_group( $sanitized['settings'], $stored );
 
 		$report->settings = 'imported';
-		$report->notes    = array_merge( $report->notes, $mapped['notes'], $sanitized['errors'] );
+		$report->notes    = array_merge( $report->notes, $mapped['notes'], $sanitized['errors'], $sanitized['notes'] );
 
 		if ( ! $dry_run ) {
-			update_option( self::SETTINGS_OPTION, $sanitized['settings'] );
+			update_option( self::SETTINGS_OPTION, $settings );
 		}
+	}
+
+	/**
+	 * Puts the stored `customer` group back over the imported settings.
+	 *
+	 * 1.x had no such group, and Settings\Upgrader writes it before the import runs (page links off
+	 * on a site with legacy data): it is not a user choice that blocks the import (left_at_defaults()
+	 * leaves it out), and the import never resets it either.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Imported settings.
+	 * @param mixed                               $stored   Stored option (false when missing).
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function keep_customer_group( array $settings, $stored ): array {
+		if ( ! is_array( $stored ) || ! isset( $stored['customer'] ) || ! is_array( $stored['customer'] ) ) {
+			return $settings;
+		}
+
+		foreach ( $stored['customer'] as $key => $value ) {
+			if ( array_key_exists( $key, $settings['customer'] ) ) {
+				$settings['customer'][ $key ] = $value;
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Sanitizes the mapped legacy settings, keeping the legacy invoice numbering policy.
+	 *
+	 * 1.x had no credit notes, so the credit note policy comes from the defaults. When the legacy
+	 * invoice format takes the default credit note prefix, Schema::sanitize() would revert the
+	 * invoice policy (a store numbered `A{year}{number:5}` would restart under `FA-`), so the first
+	 * format of Schema::CREDIT_NOTE_FALLBACKS that leaves the invoice policy alone is used, with a note. A
+	 * legacy invoice format refused on its own reverts whatever the credit note format: the default
+	 * is kept.
+	 *
+	 * @param array<string, array<string, mixed>> $mapped Mapped legacy settings.
+	 * @return array{settings: array<string, array<string, mixed>>, errors: string[], notes: string[]}
+	 */
+	private static function sanitize_settings( array $mapped ): array {
+		$default = (string) Schema::defaults()['credit_notes']['format'];
+		$chosen  = $default;
+		$best    = Schema::sanitize( $mapped, Schema::defaults() );
+
+		foreach ( Schema::CREDIT_NOTE_FALLBACKS as $format ) {
+			if ( [] === $best['errors'] ) {
+				break;
+			}
+
+			// The credit note format goes in as the current one, not as posted: it is never compared
+			// to the invoice format of the defaults, which no document was issued with.
+			$base                           = Schema::defaults();
+			$base['credit_notes']['format'] = $format;
+
+			$result = Schema::sanitize( $mapped, $base );
+			if ( count( $result['errors'] ) < count( $best['errors'] ) ) {
+				$best   = $result;
+				$chosen = $format;
+			}
+		}
+
+		$notes = [];
+		if ( $default !== $chosen ) {
+			$notes[] = sprintf(
+				/* translators: 1: imported invoice number format, 2: default credit note number format, 3: credit note number format used instead */
+				__( 'The invoice number format %1$s starts like the default credit note number format %2$s: credit notes will be numbered %3$s. Another format can be chosen in the Numbering tab.', 'lumia-factures' ),
+				(string) $best['settings']['numbering']['format'],
+				$default,
+				$chosen
+			);
+		}
+
+		return [
+			'settings' => $best['settings'],
+			'errors'   => $best['errors'],
+			'notes'    => $notes,
+		];
 	}
 
 	/**

@@ -16,6 +16,10 @@ defined( 'ABSPATH' ) || exit;
 use Lumia\Factures\Core\Plugin;
 use Lumia\Factures\Modules\Invoices\Admin\Counters;
 use Lumia\Factures\Modules\Invoices\Admin\Themes;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
+use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Emails\Attachments;
+use Lumia\Factures\Modules\Invoices\Emails\EmailIds;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
@@ -151,9 +155,15 @@ class SettingsScreenTest extends TestCase {
 					'font_size'     => '10.5',
 				],
 				'general'   => [ 'trigger_statuses' => [ 'completed' ] ],
+				'customer'  => [
+					'account_orders' => '0',
+					// In the order of the WooCommerce emails, the order the form posts.
+					'email_links'    => [ 'customer_refunded_order', 'customer_invoice' ],
+				],
 			]
 		);
 		$before = Module::settings();
+		$this->assertFalse( $before['customer']['account_orders'] );
 
 		$dom = new \DOMDocument();
 		libxml_use_internal_errors( true );
@@ -200,10 +210,176 @@ class SettingsScreenTest extends TestCase {
 	public function test_list_settings_post_an_empty_entry_first(): void {
 		$html = $this->render();
 
-		foreach ( [ 'trigger_statuses', 'email_attachments' ] as $key ) {
-			$hidden = '<input type="hidden" name="lumia_factures_module_settings[general][' . $key . '][]" value="">';
+		foreach ( [ 'general][trigger_statuses', 'general][email_attachments', 'credit_notes][email_attachments', 'customer][email_links' ] as $key ) {
+			$hidden = '<input type="hidden" name="lumia_factures_module_settings[' . $key . '][]" value="">';
 			$this->assertStringContainsString( $hidden, $html, $key );
 		}
+	}
+
+	public function test_refund_emails_hidden_from_invoice_email_list(): void {
+		$html = $this->render();
+
+		// The refund email is offered for the credit note, never for the invoice.
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[general][email_attachments][]" value="customer_refunded_order"', $html );
+		$this->assertStringContainsString( 'name="lumia_factures_module_settings[general][email_attachments][]" value="customer_invoice"', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[email_attachments\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[credit_notes][email_attachments][]" value="customer_invoice"', $html );
+
+		$this->assertNotContains( 'customer_refunded_order', Schema::email_options( 'invoice' ) );
+		$this->assertContains( 'customer_invoice', Schema::email_options( 'invoice' ) );
+		$this->assertSame( [ 'customer_refunded_order' ], Schema::email_options( 'refund' ) );
+		$this->assertContains( 'customer_refunded_order', Schema::email_options() );
+
+		// The sanitizer keeps each list to its own emails.
+		$result = Schema::sanitize(
+			[
+				'general'      => [ 'email_attachments' => [ 'customer_invoice', 'customer_refunded_order' ] ],
+				'credit_notes' => [ 'email_attachments' => [ 'customer_invoice', 'customer_refunded_order' ] ],
+			],
+			Schema::defaults()
+		);
+		$this->assertSame( [ 'customer_invoice' ], $result['settings']['general']['email_attachments'] );
+		$this->assertSame( [ 'customer_refunded_order' ], $result['settings']['credit_notes']['email_attachments'] );
+
+		// A refund email stored in the invoice list by an earlier version never gets the invoice.
+		$settings                                 = Schema::defaults();
+		$settings['general']['email_attachments'] = [ 'customer_refunded_order', 'customer_partially_refunded_order' ];
+		update_option( 'lumia_factures_module_invoices', $settings );
+		add_filter( 'lumia_factures_can_issue', '__return_true' );
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$this->assertTrue( Issuer::can_issue( $order ), 'The order could be invoiced.' );
+
+		foreach ( [ 'customer_refunded_order', 'customer_partially_refunded_order' ] as $email_id ) {
+			$this->assertSame( [ '/tmp/other.pdf' ], Attachments::attach( [ '/tmp/other.pdf' ], $email_id, $order ), $email_id );
+		}
+		$this->assertNull( Register::find( Issuer::TYPE, $order->get_id() ), 'Nothing was issued.' );
+	}
+
+	public function test_refund_email_keeps_its_id_after_a_partial_refund_email(): void {
+		// WooCommerce renames the refund email object while it sends a partial refund, and the object
+		// keeps that id for the rest of the request (or of this PHPUnit process).
+		$email = WC()->mailer()->get_emails()['WC_Email_Customer_Refunded_Order'] ?? null;
+		$this->assertIsObject( $email );
+		$this->assertSame( 'customer_refunded_order', EmailIds::normalize( 'customer_partially_refunded_order' ) );
+		$this->assertSame( 'customer_refunded_order', EmailIds::normalize( 'customer_refunded_order' ) );
+		$this->assertSame( 'customer_invoice', EmailIds::normalize( 'customer_invoice' ) );
+
+		$original  = $email->id;
+		$email->id = 'customer_partially_refunded_order';
+		try {
+			$this->assertSame( [ 'customer_refunded_order' ], Schema::email_options( 'refund' ) );
+			$this->assertNotContains( 'customer_partially_refunded_order', Schema::email_options() );
+			$this->assertNotContains( 'customer_refunded_order', Schema::email_options( 'invoice' ) );
+
+			// The stored id survives a save, and the form still offers it, checked.
+			$result = Schema::sanitize( [ 'credit_notes' => [ 'email_attachments' => [ 'customer_refunded_order' ] ] ], Schema::defaults() );
+			$this->assertSame( [ 'customer_refunded_order' ], $result['settings']['credit_notes']['email_attachments'] );
+
+			$html = $this->render();
+			$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[email_attachments\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+			$this->assertStringNotContainsString( 'value="customer_partially_refunded_order"', $html );
+		} finally {
+			$email->id = $original;
+		}
+	}
+
+	public function test_numbering_tab_renders_two_samples_and_document_column(): void {
+		$year = (string) wp_date( 'Y' );
+		Sequences::next( 'invoice_' . $year, 1 );
+		Sequences::next( 'credit_note_' . $year, 1 );
+
+		$html = $this->render();
+
+		// One live sample per numbered document type, each fed by its own group.
+		$this->assertSame( 2, substr_count( $html, 'data-lumia-factures-sample=' ) );
+		$this->assertStringContainsString( 'data-lumia-factures-sample="invoice"', $html );
+		$this->assertStringContainsString( 'data-lumia-factures-sample="credit_note"', $html );
+		foreach ( [ 'format', 'start_number', 'reset_enabled', 'reset_period' ] as $key ) {
+			$this->assertStringContainsString( 'name="lumia_factures_module_settings[credit_notes][' . $key . ']"', $html, $key );
+		}
+
+		// The counters table names the document type of each counter.
+		$this->assertMatchesRegularExpression( '#<th scope="col">Document</th>\s*<th scope="col">Counter</th>#', $html );
+		$this->assertMatchesRegularExpression( '#<td>Invoice</td>\s*<td><code>invoice_' . $year . '</code></td>#', $html );
+		$this->assertMatchesRegularExpression( '#<td>Credit note</td>\s*<td><code>credit_note_' . $year . '</code></td>#', $html );
+
+		$this->assertSame( 'invoice', Counters::document_type( 'invoice' ) );
+		$this->assertSame( 'invoice', Counters::document_type( 'invoice_2026_10' ) );
+		$this->assertSame( 'credit_note', Counters::document_type( 'credit_note_2026' ) );
+		$this->assertSame( '', Counters::document_type( 'invoices_2026' ) );
+
+		// The JS reads each type's fields from its group.
+		$data = Plugin::instance()->modules()->get_active_instances()['invoices']->get_admin_js_data();
+		$this->assertSame(
+			[
+				'invoice'     => [ 'group' => 'numbering' ],
+				'credit_note' => [ 'group' => 'credit_notes' ],
+			],
+			$data['invoices']['documents']
+		);
+		$this->assertSame( 1, $data['invoices']['counters'][ 'credit_note_' . $year ] );
+	}
+
+	public function test_general_tab_renders_the_customer_access_section(): void {
+		$settings                              = Schema::defaults();
+		$settings['customer']['order_details'] = false;
+		$settings['customer']['email_links']   = [ 'customer_invoice', 'customer_refunded_order' ];
+		update_option( 'lumia_factures_module_invoices', $settings );
+
+		$html = $this->render();
+
+		$this->assertStringContainsString( 'Customer access', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[account_orders\]"[^>]*checked/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[order_details\]" value="1"\s*>/', $html );
+		$this->assertStringContainsString( '<input type="hidden" name="lumia_factures_module_settings[customer][email_links][]" value="">', $html );
+
+		// The customer emails only, refund email included, each checked as stored.
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[email_links\]\[\]" value="customer_refunded_order"[^>]*checked/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[customer\]\[email_links\]\[\]" value="customer_processing_order"\s*>/', $html );
+		$this->assertStringNotContainsString( 'name="lumia_factures_module_settings[customer][email_links][]" value="new_order"', $html );
+
+		$bricks_help = 'Bricks is active:';
+		if ( defined( 'BRICKS_VERSION' ) ) {
+			$this->assertStringContainsString( $bricks_help, $html );
+		} else {
+			$this->assertStringNotContainsString( $bricks_help, $html );
+		}
+	}
+
+	public function test_customer_access_section_round_trips(): void {
+		$instance = Plugin::instance()->modules()->get_active_instances()['invoices'];
+		$instance->save_settings(
+			[
+				'customer' => [
+					'account_orders' => '0',
+					'order_details'  => '1',
+					'email_links'    => [ '', 'customer_completed_order', 'customer_refunded_order' ],
+				],
+			]
+		);
+
+		$this->assertSame(
+			[
+				'account_orders' => false,
+				'order_details'  => true,
+				'email_links'    => [ 'customer_completed_order', 'customer_refunded_order' ],
+			],
+			Module::settings()['customer']
+		);
+		$this->assertFalse( get_transient( 'lumia_factures_invoices_errors' ) );
+
+		// Every box off: an empty list, not the defaults.
+		$instance->save_settings( [ 'customer' => [ 'email_links' => [ '' ] ] ] );
+		$this->assertSame( [], Module::settings()['customer']['email_links'] );
+		$this->assertFalse( Module::settings()['customer']['account_orders'] );
+	}
+
+	public function test_content_tab_renders_the_credit_note_fields(): void {
+		$html = $this->render();
+
+		$this->assertMatchesRegularExpression( '/<input type="text"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[title\]"[^>]*placeholder="Credit note"/', $html );
+		$this->assertMatchesRegularExpression( '/<input type="checkbox"[^>]*name="lumia_factures_module_settings\[credit_notes\]\[reason_enabled\]"[^>]*checked/', $html );
 	}
 
 	public function test_unchecking_every_item_of_a_list_saves_an_empty_list(): void {

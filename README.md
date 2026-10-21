@@ -9,7 +9,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 - Issues PDF invoices for WooCommerce orders, rendered with Dompdf. An issued invoice is never modified: its number, date and archived PDF are fixed.
 - Continuous, unique numbering per document type, with a configurable format (`{year}`, `{month}`, `{number}`...) and yearly, monthly or no reset; counters can be raised, never lowered.
 - Amounts that always add up to the WooCommerce total (a rounding row absorbs any drift), in the order's currency, with the VAT rates read from the order.
-- Automatic issue on the order statuses you choose, manual issue and restore from the order screen, an invoice column in the order list, and the PDF attached to the WooCommerce e-mails you choose.
+- Automatic issue on the order statuses you choose, manual issue, rebuild and regeneration of the PDF (same number and date, the previous file kept) from the order screen, an invoice column in the order list, and the PDF attached to the WooCommerce e-mails you choose.
 - Write-once PDF archive in `wp-content/uploads/lumia-factures/`, protected from web access.
 - Settings screen (company, numbering, content, design) with a live PDF preview.
 - HPOS and legacy order storage.
@@ -19,8 +19,11 @@ The interface is in English and ships with a French translation (`fr_FR`).
 
 - Imports the invoices, numbers, counters, settings and PDFs of the former Facture PDF Lumia plugin (see [Migrating from Facture PDF Lumia](#migrating-from-facture-pdf-lumia)); the old customer download links and shortcode keep working.
 - Customer download of the invoice by link (order key for guests), by the `[lumia_factures_invoice]` shortcode, and by the Bricks dynamic tags.
+- Credit notes (2.1): one numbered, archived credit note per refund, in its own series (`AV-{year}-{number:5}` by default), attached to the refund e-mail; "Cancel invoice" credits the invoice of an unpaid order without moving money; `wp lumia-factures issue-credit-notes` can issue the credit notes of refunds made before 2.1 (never automatic).
+- Customer access (2.1): the invoice and credit notes in My Account, on the thank-you page, as links in the customer e-mails, with the `[lumia_factures_documents]` shortcode and the Bricks tags. On a site updated from 2.0 the My Account and order page links start off (turn them on under General > Customer access).
+- A demo order built from the shop's products for the live preview while the shop has no order.
 
-Planned, not delivered yet: customer access in My Account and credit notes, no-VAT mode, customer VAT number (lot 4).
+Planned for 2.2: no-VAT mode, customer VAT number, the 2026 invoice mentions and Factur-X.
 
 Modules: **Invoices** (core) and **Bricks** (dynamic tags), both always active: the Bricks hooks only fire on a Bricks site.
 
@@ -68,7 +71,7 @@ Before you start: if WordPress cron runs in a separate container or server (`wp 
 1. **Back up** the database and `wp-content/uploads/`.
 2. **Install** `lumia-factures` while the old plugin is still active. It shows the blocking notice "legacy plugin active" and starts nothing; nothing is imported yet.
 3. **Dry run, old plugin still active**: `wp lumia-factures migrate --dry-run` reports what the import will do (invoices, PDFs, counters, conflicts) without writing anything. `wp lumia-factures migration-status` works too; a real `migrate` is refused while the old plugin is active.
-4. **Deactivate every copy** of the old plugin at a quiet moment (few orders coming in), also on a multisite or a staging copy sharing the database. The next admin page opened by a shop manager or the next cron run runs the import; to start it immediately instead of waiting, run `wp lumia-factures migrate` right after deactivating. For the few minutes until it finishes, the old customer links answer "Invoice not found" and no new invoice is numbered: an order that changes status meanwhile gets an order note, and its e-mail goes out without an attachment.
+4. **Deactivate every copy** of the old plugin at a quiet moment (few orders coming in), also on a multisite or a staging copy sharing the database. The next admin page opened by a shop manager or the next cron run runs the import; to start it immediately instead of waiting, run `wp lumia-factures migrate` right after deactivating. For the few minutes until it finishes, the old customer links answer "Document not found" and no new invoice is numbered: an order that changes status meanwhile gets an order note, and its e-mail goes out without an attachment.
 5. **Check the import.** The notice at the top of the admin pages shows the status and the counts; `wp lumia-factures migration-status` shows them too, with each current counter next to the highest legacy sequence of the same key: the counter must be at least that value. Conflicts (a number already used) are listed in a warning that links each order; those orders get no invoice until you handle them by hand, then run `wp lumia-factures migrate --force`.
 6. **Check one old and one new invoice**: open an imported invoice from its order (number, date and amounts as before), then let a new order reach an invoicing status and check that its number continues the old series. An old invoice whose PDF was no longer on disk is rebuilt the first time it is needed, with its original number and date.
 7. **Deny web access to the archives** with the rule below, for `wp-content/uploads/lumia-factures/` and for the old `wp-content/uploads/facture-pdf-lumia/` folder, if your server ignores `.htaccess` (Nginx).

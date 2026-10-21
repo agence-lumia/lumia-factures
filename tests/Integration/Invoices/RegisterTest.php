@@ -11,6 +11,7 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Tests\Support\TestCase;
 
@@ -179,5 +180,115 @@ class RegisterTest extends TestCase {
 		$this->assertSame( 'reserved', Register::find( 'invoice', 523 )->status );
 
 		$this->assertNull( Register::import( 'invoice', 524, '', 'invoice_2026', 4, time() ) );
+	}
+
+	public function test_reserve_stores_parent_id(): void {
+		$id = Register::reserve( 'credit_note', 601, 600 );
+
+		$this->assertIsInt( $id );
+		$doc = Register::find( 'credit_note', 601 );
+		$this->assertSame( $id, $doc->id );
+		$this->assertSame( 601, $doc->order_id );
+		$this->assertSame( 600, $doc->parent_id );
+		$this->assertSame( 'reserved', $doc->status );
+
+		// Kept through assign() and attach_file().
+		Register::assign( (int) $id, 'AV-1', 'credit_note', 1, time() );
+		Register::attach_file( (int) $id, 'av-1.pdf', str_repeat( 'a', 64 ) );
+		$this->assertSame( 600, Register::find( 'credit_note', 601 )->parent_id );
+	}
+
+	public function test_reserve_without_parent_defaults_to_zero(): void {
+		Register::reserve( 'invoice', 602 );
+		Register::import( 'invoice', 603, 'FA-IMP-P', 'invoice_2026', 1, time() );
+
+		$this->assertSame( 0, Register::find( 'invoice', 602 )->parent_id );
+		$this->assertSame( 0, Register::find( 'invoice', 603 )->parent_id );
+
+		// The value object defaults to 0 too.
+		$doc = new IssuedDocument( 1, 'invoice', 1, 'issued', 'FA-1', 'invoice', 1, time(), null, null );
+		$this->assertSame( 0, $doc->parent_id );
+	}
+
+	public function test_for_parent_lists_rows_in_id_order(): void {
+		$second = (int) Register::reserve( 'credit_note', 612, 610 );
+		$first  = (int) Register::reserve( 'credit_note', 611, 610 );
+		$third  = (int) Register::reserve( 'credit_note', 613, 610 );
+		Register::assign( $second, 'AV-2', 'credit_note', 2, time() );
+
+		// Noise: another parent, the parent's own invoice, a row of another type with the same parent.
+		Register::reserve( 'credit_note', 621, 620 );
+		Register::reserve( 'invoice', 610 );
+		Register::reserve( 'other', 614, 610 );
+
+		$docs = Register::for_parent( 'credit_note', 610 );
+
+		$this->assertSame( [ 0, 1, 2 ], array_keys( $docs ) );
+		$this->assertSame( [ $second, $first, $third ], array_map( static fn ( IssuedDocument $doc ): int => $doc->id, $docs ) );
+		$this->assertSame( [ 612, 611, 613 ], array_map( static fn ( IssuedDocument $doc ): int => $doc->order_id, $docs ) );
+		$this->assertSame( [ 'issued', 'reserved', 'reserved' ], array_map( static fn ( IssuedDocument $doc ): string => $doc->status, $docs ) );
+		foreach ( $docs as $doc ) {
+			$this->assertSame( 610, $doc->parent_id );
+		}
+
+		$this->assertSame( [], Register::for_parent( 'credit_note', 630 ) );
+		// 0 means "no parent": never every invoice.
+		$this->assertSame( [], Register::for_parent( 'invoice', 0 ) );
+	}
+
+	public function test_one_credit_note_per_refund(): void {
+		$this->assertIsInt( Register::reserve( 'credit_note', 631, 630 ) );
+
+		// Same refund, same or other parent: refused at the unique key (type, order_id).
+		$this->assertNull( Register::reserve( 'credit_note', 631, 630 ) );
+		$this->assertNull( Register::reserve( 'credit_note', 631, 640 ) );
+
+		$this->assertSame( 630, Register::find( 'credit_note', 631 )->parent_id );
+		$this->assertCount( 1, Register::for_parent( 'credit_note', 630 ) );
+		$this->assertSame( [], Register::for_parent( 'credit_note', 640 ) );
+	}
+
+	public function test_number_exists_in_other_type(): void {
+		$invoice = (int) Register::reserve( 'invoice', 641 );
+		Register::assign( $invoice, 'DOC-1', 'invoice', 1, time() );
+		$credit_note = (int) Register::reserve( 'credit_note', 642, 641 );
+		Register::assign( $credit_note, 'AV-1', 'credit_note', 1, time() );
+		Register::reserve( 'credit_note', 643, 641 );
+
+		$this->assertTrue( Register::number_exists_in_other_type( 'credit_note', 'DOC-1' ) );
+		$this->assertFalse( Register::number_exists_in_other_type( 'invoice', 'DOC-1' ) );
+		$this->assertTrue( Register::number_exists_in_other_type( 'invoice', 'AV-1' ) );
+		$this->assertFalse( Register::number_exists_in_other_type( 'credit_note', 'AV-1' ) );
+		$this->assertFalse( Register::number_exists_in_other_type( 'invoice', 'AV-2' ) );
+		$this->assertFalse( Register::number_exists_in_other_type( 'credit_note', 'FA-404' ) );
+
+		// The unique key (type, number) itself does not span types.
+		$other = (int) Register::reserve( 'credit_note', 644, 641 );
+		$this->assertTrue( Register::assign( $other, 'DOC-1', 'credit_note', 2, time() ) );
+	}
+
+	public function test_number_starts_with(): void {
+		$invoice = (int) Register::reserve( 'invoice', 651 );
+		Register::assign( $invoice, 'FA-2026-00001', 'invoice_2026', 1, time() );
+		$legacy = (int) Register::reserve( 'invoice', 652 );
+		Register::assign( $legacy, '202610000123', 'invoice_2026', 123, time() );
+		Register::reserve( 'credit_note', 653, 651 );
+
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'FA-' ) );
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'FA-2026-00001' ) );
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'fa-' ), 'The collation ignores letter case.' );
+		$this->assertTrue( Register::number_starts_with( 'invoice', '2' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'AV-' ) );
+		$this->assertFalse( Register::number_starts_with( 'credit_note', 'FA-' ), 'Only the given type; a reserved row has no number.' );
+		$this->assertFalse( Register::number_starts_with( 'invoice', '' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice' ) );
+
+		// Several texts: any of them.
+		$this->assertTrue( Register::number_starts_with( 'invoice', 'AV-', '1', '2' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'AV-', 'CN-', '' ) );
+
+		// LIKE wildcards in the text are literal.
+		$this->assertFalse( Register::number_starts_with( 'invoice', 'F_-' ) );
+		$this->assertFalse( Register::number_starts_with( 'invoice', '%' ) );
 	}
 }

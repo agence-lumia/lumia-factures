@@ -59,6 +59,19 @@ $content_columns = [
 
 <div class="lumia-section">
 	<div class="lumia-section__header">
+		<h2 class="lumia-section__title"><?php echo esc_html__( 'Credit note', 'lumia-factures' ); ?></h2>
+		<p class="lumia-section__desc"><?php echo esc_html__( 'A credit note uses the layout of the invoice and always names the number and date of the invoice it credits.', 'lumia-factures' ); ?></p>
+	</div>
+	<div class="lumia-section__content">
+		<?php
+		$fields->text( 'credit_notes', 'title', __( 'Document title', 'lumia-factures' ), '', __( 'Credit note', 'lumia-factures' ) );
+		$fields->toggle( 'credit_notes', 'reason_enabled', __( 'Show the refund reason', 'lumia-factures' ), __( 'The reason entered with the refund, when there is one.', 'lumia-factures' ) );
+		?>
+	</div>
+</div>
+
+<div class="lumia-section">
+	<div class="lumia-section__header">
 		<h2 class="lumia-section__title"><?php echo esc_html__( 'Addresses', 'lumia-factures' ); ?></h2>
 	</div>
 	<div class="lumia-section__content">

@@ -140,7 +140,8 @@
 
   /* ================================================================
    * [data-modal-confirm] TRIGGERS
-   * Buttons that open the modal before submitting a form.
+   * Buttons that open the modal before submitting a form, or links that
+   * open it before following their href.
    * ================================================================ */
 
   function initModalTriggers() {
@@ -159,6 +160,7 @@
         danger:       btn.hasAttribute("data-modal-danger") || btn.classList.contains("lumia-btn--danger"),
         onConfirm: function () {
           if (form) form.submit();
+          else if (btn.href) window.location.href = btn.href;
         },
       });
     });

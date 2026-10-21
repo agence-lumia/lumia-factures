@@ -476,6 +476,124 @@ class ImporterTest extends TestCase {
 		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
 	}
 
+	public function test_settings_left_at_defaults_of_an_older_version_are_replaced(): void {
+		// Activated in 2.0 (no credit_notes group yet) while the legacy plugin was still active, then
+		// updated before the import ran: the settings were still never saved by the user.
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$defaults_2_0 = Schema::defaults();
+		unset( $defaults_2_0['credit_notes'] );
+		update_option( 'lumia_factures_module_invoices', $defaults_2_0 );
+
+		$report = Importer::run( false )->to_array();
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+		$this->assertSame( Schema::defaults()['credit_notes'], get_option( 'lumia_factures_module_invoices' )['credit_notes'] );
+	}
+
+	public function test_settings_imported_despite_upgrader_customer_group(): void {
+		// 2.1 activated on a 1.x site: the activator stored the defaults, then Settings\Upgrader turned
+		// the page links off before the import ran. That is not a user choice.
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$stored                               = Schema::defaults();
+		$stored['customer']['account_orders'] = false;
+		$stored['customer']['order_details']  = false;
+		update_option( 'lumia_factures_module_invoices', $stored );
+
+		$report = Importer::run( false )->to_array();
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+
+		// Same with the partial group the upgrader writes over 2.0 settings.
+		update_option( 'lumia_factures_module_invoices', [ 'customer' => [ 'account_orders' => false ] ] );
+		$this->assertSame( 'imported', Importer::run( false )->to_array()['settings'] );
+
+		// Any other saved setting still blocks the import.
+		$stored['company']['phone'] = '0102';
+		update_option( 'lumia_factures_module_invoices', $stored );
+		$this->assertSame( 'skipped_existing', Importer::run( false )->to_array()['settings'] );
+		$this->assertSame( $stored, get_option( 'lumia_factures_module_invoices' ) );
+	}
+
+	public function test_import_keeps_stored_customer_group(): void {
+		update_option( 'fpl_settings', LegacySettingsTest::neonat() );
+		$stored                            = Schema::defaults();
+		$stored['customer']                = [
+			'account_orders' => false,
+			'order_details'  => false,
+		];
+		$stored['customer']['email_links'] = [ 'customer_invoice' ];
+		update_option( 'lumia_factures_module_invoices', $stored );
+
+		// A dry run writes nothing.
+		$this->assertSame( 'imported', Importer::run( true )->to_array()['settings'] );
+		$this->assertSame( $stored, get_option( 'lumia_factures_module_invoices' ) );
+
+		Importer::run( false );
+
+		$this->assertSame(
+			[
+				'account_orders' => false,
+				'order_details'  => false,
+				'email_links'    => [ 'customer_invoice' ],
+			],
+			get_option( 'lumia_factures_module_invoices' )['customer']
+		);
+		$this->assertSame( '{year}{month}{number:6}', Module::settings()['numbering']['format'] );
+
+		// Without a stored group, the imported settings carry the defaults.
+		delete_option( 'lumia_factures_module_invoices' );
+		Importer::run( false );
+		$this->assertSame( Schema::defaults()['customer'], get_option( 'lumia_factures_module_invoices' )['customer'] );
+	}
+
+	public function test_legacy_invoice_format_clashing_with_credit_note_prefix_is_kept(): void {
+		// A legacy invoice prefix that starts the default credit note prefix (A and AV-): the invoice
+		// numbering goes on as it was, the credit notes take another prefix.
+		$legacy              = LegacySettingsTest::neonat();
+		$legacy['numbering'] = [
+			'format'        => 'A{year}{month}{number:5}',
+			'start_number'  => 1,
+			'reset_enabled' => true,
+			'reset_period'  => 'monthly',
+		];
+		update_option( 'fpl_settings', $legacy );
+
+		$dry = Importer::run( true )->to_array();
+		$this->assertFalse( get_option( 'lumia_factures_module_invoices' ), 'A dry run writes nothing.' );
+
+		$report = Importer::run( false )->to_array();
+		$this->assertSame( $dry['notes'], $report['notes'], 'The dry run tells the same story.' );
+
+		$this->assertSame( 'imported', $report['settings'] );
+		$settings = Module::settings();
+		$this->assertSame( 'A{year}{month}{number:5}', $settings['numbering']['format'] );
+		$this->assertTrue( $settings['numbering']['reset_enabled'] );
+		$this->assertSame( 'monthly', $settings['numbering']['reset_period'] );
+		$this->assertSame( 'CN-{year}-{number:5}', $settings['credit_notes']['format'] );
+
+		// No refusal in the report, one note naming the credit note format the import chose.
+		$this->assertEmpty( preg_grep( '/must start with a prefix|cannot take a prefix/', $report['notes'] ) );
+		$this->assertCount( 1, preg_grep( '/A\{year\}\{month\}\{number:5\}.*AV-\{year\}-\{number:5\}.*CN-\{year\}-\{number:5\}/', $report['notes'] ) );
+
+		// The stored settings pass their own rules: the next save keeps both formats.
+		delete_transient( 'lumia_factures_invoices_errors' );
+		( new Module( 'invoices' ) )->save_settings( [ 'company' => [ 'phone' => '0102' ] ] );
+		$this->assertFalse( get_transient( 'lumia_factures_invoices_errors' ) );
+		$this->assertSame( 'A{year}{month}{number:5}', Module::settings()['numbering']['format'] );
+		$this->assertSame( 'CN-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
+
+		// A legacy invoice format free of the default credit note prefix keeps the default.
+		delete_option( 'lumia_factures_module_invoices' );
+		$legacy['numbering']['format'] = 'C{year}{month}{number:5}';
+		update_option( 'fpl_settings', $legacy );
+		$report = Importer::run( false )->to_array();
+		$this->assertSame( 'C{year}{month}{number:5}', Module::settings()['numbering']['format'] );
+		$this->assertSame( 'AV-{year}-{number:5}', Module::settings()['credit_notes']['format'] );
+		$this->assertEmpty( preg_grep( '/CN-\{year\}/', $report['notes'] ) );
+	}
+
 	public function test_no_legacy_settings(): void {
 		$this->assertFalse( LegacySource::has_data() );
 		$report = Importer::run( false )->to_array();

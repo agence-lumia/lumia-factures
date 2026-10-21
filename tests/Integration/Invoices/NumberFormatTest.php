@@ -76,4 +76,32 @@ class NumberFormatTest extends TestCase {
 	public function test_preview_uses_sample_values(): void {
 		$this->assertSame( '14243-27-0003', NumberFormat::preview( '{order_number}-{customer_id}-{number:4}', 3 ) );
 	}
+
+	public function test_prefix_is_the_text_before_the_first_tag(): void {
+		$this->assertSame( 'FA-', NumberFormat::prefix( 'FA-{year}-{number:5}' ) );
+		$this->assertSame( 'AV-', NumberFormat::prefix( '  AV-{number}' ) );
+		$this->assertSame( '', NumberFormat::prefix( '{year}{month}{number:6}' ) );
+		$this->assertSame( 'F{x', NumberFormat::prefix( 'F{x{number}' ) );
+	}
+
+	public function test_prefixes_differ(): void {
+		$this->assertTrue( NumberFormat::prefixes_differ( 'FA-{year}-{number:5}', 'AV-{year}-{number:5}' ) );
+		$this->assertTrue( NumberFormat::prefixes_differ( 'FA-{number}', 'FAV-{number}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( 'FA-{number}', 'FA-{year}{number}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( 'FA-{number}', 'FA-AV-{number}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( 'FA-AV-{number}', 'FA-{number}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( 'FA-{number}', 'fa-{number}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( "\u{00C9}-{number}", 'e-{number}' ), 'Accents are folded like the register collation.' );
+		$this->assertFalse( NumberFormat::prefixes_differ( 'FA-{number}', '{year}-{number}' ) );
+
+		// Invoice format starting with a tag: the other prefix must not start with a digit.
+		$this->assertTrue( NumberFormat::prefixes_differ( '{year}{month}{number:6}', 'AV-{year}-{number:5}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( '{year}-{number:5}', '2026-{number:5}' ) );
+		$this->assertFalse( NumberFormat::prefixes_differ( '{year}{number}', '' ) );
+	}
+
+	public function test_number_starts(): void {
+		$this->assertSame( [ 'FA-' ], NumberFormat::number_starts( 'FA-{year}-{number:5}' ) );
+		$this->assertSame( [ '0', '1', '2', '3', '4', '5', '6', '7', '8', '9' ], NumberFormat::number_starts( '{year}{month}{number:6}' ) );
+	}
 }

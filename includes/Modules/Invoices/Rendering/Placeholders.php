@@ -10,6 +10,7 @@ namespace Lumia\Factures\Modules\Invoices\Rendering;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Amounts\Money;
+use Lumia\Factures\Modules\Invoices\Amounts\Statement;
 use Lumia\Factures\Modules\Invoices\Module;
 use WC_Order;
 
@@ -18,7 +19,11 @@ use WC_Order;
  *
  * The result is plain text: it is NOT escaped here, the templates escape every value. An unknown
  * tag is kept as typed. A company field switched off in the settings resolves to an empty string,
- * exactly as it is absent from the rest of the document.
+ * exactly as it is absent from the rest of the document; so does the refund reason when it is not
+ * shown.
+ *
+ * On a credit note, `{invoice_number}` and `{invoice_date}` name the invoice it credits and the
+ * order tags the refunded order. The credit note tags are empty on an invoice.
  */
 final class Placeholders {
 
@@ -36,6 +41,10 @@ final class Placeholders {
 		'order_items_count',
 		'invoice_number',
 		'invoice_date',
+		'credit_note_number',
+		'credit_note_date',
+		'refund_amount',
+		'refund_reason',
 		'customer_first_name',
 		'customer_last_name',
 		'customer_full_name',
@@ -59,18 +68,20 @@ final class Placeholders {
 	/**
 	 * Resolves the tags of a text.
 	 *
-	 * @param string                    $text     Text with `{tag}` markers.
-	 * @param WC_Order                  $order    Order.
-	 * @param DocumentData              $doc      Document.
-	 * @param array<string, mixed>|null $settings Invoice settings, `Module::settings()` when null.
+	 * @param string                    $text      Text with `{tag}` markers.
+	 * @param WC_Order                  $order     Order (the refunded order for a credit note).
+	 * @param DocumentData              $doc       Document.
+	 * @param array<string, mixed>|null $settings  Invoice settings, `Module::settings()` when null.
+	 * @param Statement|null            $statement Amounts of the document: `{refund_amount}` is its
+	 *                                             grand total, '' without it.
 	 * @return string Plain text.
 	 */
-	public static function resolve( string $text, WC_Order $order, DocumentData $doc, ?array $settings = null ): string {
+	public static function resolve( string $text, WC_Order $order, DocumentData $doc, ?array $settings = null, ?Statement $statement = null ): string {
 		if ( ! str_contains( $text, '{' ) ) {
 			return $text;
 		}
 
-		$values = self::values( $order, $doc, $settings ?? Module::settings() );
+		$values = self::values( $order, $doc, $settings ?? Module::settings(), $statement );
 
 		return (string) preg_replace_callback(
 			'/\{([a-z0-9_]+)\}/i',
@@ -105,14 +116,37 @@ final class Placeholders {
 	}
 
 	/**
+	 * The grand total of a statement as text, '' without one.
+	 *
+	 * @param Statement|null $statement Statement.
+	 */
+	private static function grand_total( ?Statement $statement ): string {
+		if ( null === $statement ) {
+			return '';
+		}
+
+		foreach ( $statement->rows as $row ) {
+			if ( $row->grand && null !== $row->amount ) {
+				return Money::format( $row->amount, $statement->currency );
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Tag values.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings.
+	 * @param WC_Order             $order     Order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings.
+	 * @param Statement|null       $statement Amounts of the document.
 	 * @return array<string, string>
 	 */
-	private static function values( WC_Order $order, DocumentData $doc, array $settings ): array {
+	private static function values( WC_Order $order, DocumentData $doc, array $settings, ?Statement $statement ): array {
+		$credit  = $doc->is_credit_note();
+		$group   = isset( $settings['credit_notes'] ) && is_array( $settings['credit_notes'] ) ? $settings['credit_notes'] : [];
+		$reason  = $credit && ! empty( $group['reason_enabled'] ) ? trim( $doc->reason ) : '';
 		$created = $order->get_date_created();
 		$items   = 0;
 		foreach ( $order->get_items() as $item ) {
@@ -135,8 +169,12 @@ final class Placeholders {
 			'payment_method'      => (string) $order->get_payment_method_title(),
 			'shipping_method'     => $shipping_method,
 			'order_items_count'   => (string) $items,
-			'invoice_number'      => $doc->number,
-			'invoice_date'        => self::format_date( $doc->date ),
+			'invoice_number'      => $credit ? $doc->reference_number : $doc->number,
+			'invoice_date'        => self::format_date( $credit ? $doc->reference_date : $doc->date ),
+			'credit_note_number'  => $credit ? $doc->number : '',
+			'credit_note_date'    => $credit ? self::format_date( $doc->date ) : '',
+			'refund_amount'       => $credit ? self::grand_total( $statement ) : '',
+			'refund_reason'       => $reason,
 			'due_date'            => '',
 			'customer_first_name' => $first,
 			'customer_last_name'  => $last,

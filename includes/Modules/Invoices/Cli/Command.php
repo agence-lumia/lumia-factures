@@ -9,19 +9,26 @@ namespace Lumia\Factures\Modules\Invoices\Cli;
 
 defined( 'ABSPATH' ) || exit;
 
+use DateTimeImmutable;
 use Lumia\Factures\Core\Requirements;
 use Lumia\Factures\Modules\Invoices\Database\Installer;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
+use Lumia\Factures\Modules\Invoices\Documents\Pipeline;
 use Lumia\Factures\Modules\Invoices\Migration\Importer;
 use Lumia\Factures\Modules\Invoices\Migration\LegacySource;
 use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
+use Throwable;
+use WC_Order;
+use WC_Order_Refund;
 use WP_CLI;
 
 /**
- * Imports the Facture PDF Lumia (1.x) data and shows the import status.
+ * Imports the Facture PDF Lumia (1.x) data, shows the import status and issues the credit notes
+ * of refunds that have none.
  *
- * The logic lives in static methods returning data (`migrate_data()`, `status_rows()`), so the
- * tests call them without WP-CLI; the subcommands only print.
+ * The logic lives in static methods returning data (`migrate_data()`, `status_rows()`,
+ * `credit_notes_data()`), so the tests call them without WP-CLI; the subcommands only print.
  *
  * Registered by Core\Plugin whatever the requirements: `migrate --dry-run` and `migration-status`
  * only read, and must work while the legacy plugin is still active (the rollout dry run). A real
@@ -94,6 +101,244 @@ final class Command {
 			WP_CLI::log( 'Conflicts:' );
 			WP_CLI\Utils\format_items( 'table', $conflicts, [ 'order_id', 'number', 'reason' ] );
 		}
+	}
+
+	/**
+	 * Issues the credit notes of refunds that have none (refunds made before 2.1, pending ones).
+	 *
+	 * Each credit note is dated the day it is issued; its PDF prints the refund date. Refunds are
+	 * taken by increasing id.
+	 *
+	 * ## OPTIONS
+	 *
+	 * [--order=<id>]
+	 * : Only the refunds of this order.
+	 *
+	 * [--since=<date>]
+	 * : Only the refunds made on or after this date (Y-m-d, site time).
+	 *
+	 * [--pending]
+	 * : Only the refunds flagged pending (their credit note was refused, see the reason).
+	 *
+	 * [--dry-run]
+	 * : List the refunds and what would happen, without reserving or numbering anything.
+	 *
+	 * ## EXAMPLES
+	 *
+	 *     wp lumia-factures issue-credit-notes --dry-run
+	 *     wp lumia-factures issue-credit-notes --order=1234
+	 *     wp lumia-factures issue-credit-notes --since=2026-01-01 --pending
+	 *
+	 * @subcommand issue-credit-notes
+	 *
+	 * @param string[]             $args       Positional arguments (none).
+	 * @param array<string, mixed> $assoc_args Flags.
+	 */
+	public function issue_credit_notes( array $args, array $assoc_args ): void { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter.FoundBeforeLastUsed -- WP-CLI signature.
+		$dry_run = ! empty( $assoc_args['dry-run'] );
+		$result  = self::credit_notes_data(
+			isset( $assoc_args['order'] ) ? (string) $assoc_args['order'] : '',
+			isset( $assoc_args['since'] ) ? (string) $assoc_args['since'] : '',
+			! empty( $assoc_args['pending'] ),
+			$dry_run
+		);
+
+		switch ( $result['outcome'] ) {
+			case 'blocked':
+				WP_CLI::error( 'Credit notes cannot be issued: ' . $result['error'] );
+				// WP_CLI::error() exits.
+			case 'invalid':
+				WP_CLI::error( $result['error'] );
+				// WP_CLI::error() exits.
+			case 'nothing':
+				WP_CLI::success( 'No refund without a credit note matches.' );
+				return;
+		}
+
+		WP_CLI\Utils\format_items( 'table', $result['rows'], [ 'refund_id', 'order_id', 'refunded_on', 'amount', 'number', 'status' ] );
+
+		$counts = array_count_values( array_column( $result['rows'], 'status' ) );
+		if ( $dry_run ) {
+			WP_CLI::success( sprintf( 'Dry run: nothing was written. %d credit note(s) would be issued.', $counts['would_issue'] ?? 0 ) );
+			return;
+		}
+
+		$refused = count( $result['rows'] ) - ( $counts['issued'] ?? 0 ) - ( $counts['already_issued'] ?? 0 );
+		$message = sprintf( '%d credit note(s) issued.', $counts['issued'] ?? 0 );
+		if ( $refused > 0 ) {
+			WP_CLI::warning( $message . ' ' . $refused . ' refund(s) got none (see their status).' );
+			return;
+		}
+
+		WP_CLI::success( $message );
+	}
+
+	/**
+	 * Issues the credit notes of the matching refunds, or lists what a run would do.
+	 *
+	 * The refunds taken are those without a credit note number (all of them, or with `$pending`
+	 * those flagged pending), narrowed by order and by refund date. A real run goes through
+	 * CreditNoteIssuer::issue_deferred(), so the gate, the pending flag and the numbering are the
+	 * usual ones and a refund created moments ago is left alone (`in_flight`); a dry run only
+	 * reads (CreditNoteIssuer::refusal()), it never reserves nor numbers.
+	 *
+	 * Refused (`blocked`) while the module's tables are missing, and for a real run while any
+	 * requirement fails; a dry run only needs WooCommerce.
+	 *
+	 * @param string $order   Order id, '' for every order.
+	 * @param string $since   Earliest refund date (Y-m-d, site time), '' for none.
+	 * @param bool   $pending True for the pending refunds only.
+	 * @param bool   $dry_run True to report without writing.
+	 * @return array{outcome: string, rows: list<array{refund_id: int, order_id: int, refunded_on: string, amount: string, number: string, status: string}>, error: string}
+	 *         `outcome`: `dry_run`, `done`, `nothing`, `blocked` or `invalid`. Row `status`:
+	 *         `issued`, `already_issued`, `would_issue` (dry run), `failed`, or the refusal reason
+	 *         (see CreditNoteIssuer::refusal()).
+	 */
+	public static function credit_notes_data( string $order, string $since, bool $pending, bool $dry_run ): array {
+		$result = [
+			'outcome' => '',
+			'rows'    => [],
+			'error'   => '',
+		];
+
+		$errors = Requirements::check();
+		if ( $dry_run ) {
+			$errors = array_intersect_key( $errors, [ 'woocommerce' => true ] );
+		}
+		if ( [] === $errors && ! Installer::tables_exist() ) {
+			$errors['tables'] = 'The plugin tables do not exist yet: load the WordPress admin once so the plugin installs them.';
+		}
+
+		if ( [] !== $errors ) {
+			$result['outcome'] = 'blocked';
+			$result['error']   = implode( ' ', $errors );
+			return $result;
+		}
+
+		$query = [
+			'type'    => 'shop_order_refund',
+			'limit'   => -1,
+			'orderby' => 'ID',
+			'order'   => 'ASC',
+			'return'  => 'ids',
+		];
+
+		if ( '' !== $order ) {
+			$order_id = ctype_digit( $order ) ? (int) $order : 0;
+			if ( $order_id <= 0 || ! wc_get_order( $order_id ) instanceof WC_Order ) {
+				$result['outcome'] = 'invalid';
+				$result['error']   = 'Order ' . $order . ' not found.';
+				return $result;
+			}
+			$query['parent'] = $order_id;
+		}
+
+		if ( '' !== $since ) {
+			$date = DateTimeImmutable::createFromFormat( '!Y-m-d', $since, wp_timezone() );
+			if ( false === $date || $date->format( 'Y-m-d' ) !== $since ) {
+				$result['outcome'] = 'invalid';
+				$result['error']   = 'Invalid --since date "' . $since . '": expected Y-m-d.';
+				return $result;
+			}
+			$query['date_created'] = '>=' . $date->getTimestamp();
+		}
+
+		// One meta clause through `meta_key` / `meta_compare`: the legacy order storage ignores
+		// `meta_query` (see CreditNoteIssuer::pending_refund_ids()).
+		$query['meta_key']     = $pending ? CreditNoteIssuer::PENDING_META : CreditNoteIssuer::NUMBER_META; // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- WP-CLI command run by hand.
+		$query['meta_compare'] = $pending ? 'EXISTS' : 'NOT EXISTS';
+
+		$refunds = [];
+		foreach ( self::ids( wc_get_orders( $query ) ) as $refund_id ) {
+			$refund = wc_get_order( $refund_id );
+			if ( $refund instanceof WC_Order_Refund ) {
+				$refunds[ $refund_id ] = $refund;
+			}
+		}
+
+		if ( [] === $refunds ) {
+			$result['outcome'] = 'nothing';
+			return $result;
+		}
+
+		// Read before any issuing: issuing an order's invoice issues its other refunds' credit notes
+		// too (CreditNoteIssuer::on_invoice_issued()), which this run did, not an earlier one.
+		$before = [];
+		foreach ( $refunds as $refund_id => $refund ) {
+			$existing = CreditNoteIssuer::find_for( $refund );
+			if ( null !== $existing && 'issued' === $existing->status ) {
+				$before[ $refund_id ] = (string) $existing->number;
+			}
+		}
+
+		foreach ( $refunds as $refund_id => $refund ) {
+			$number = $before[ $refund_id ] ?? '';
+
+			if ( '' !== $number ) {
+				// Issued without its refund meta (an interrupted call): issue() writes it back, never renumbers.
+				if ( ! $dry_run ) {
+					self::issue_credit_note( $refund, $number );
+				}
+				$status = 'already_issued';
+			} elseif ( $dry_run ) {
+				$reason = CreditNoteIssuer::refusal( $refund );
+				$status = '' === $reason ? 'would_issue' : $reason;
+			} else {
+				$status = self::issue_credit_note( $refund, $number );
+			}
+
+			$created          = $refund->get_date_created();
+			$result['rows'][] = [
+				'refund_id'   => $refund_id,
+				'order_id'    => $refund->get_parent_id(),
+				'refunded_on' => null !== $created ? (string) wp_date( 'Y-m-d', $created->getTimestamp() ) : '-',
+				'amount'      => wc_format_decimal( $refund->get_amount(), wc_get_price_decimals() ),
+				'number'      => '' !== $number ? $number : '-',
+				'status'      => $status,
+			];
+		}
+
+		$result['outcome'] = $dry_run ? 'dry_run' : 'done';
+
+		return $result;
+	}
+
+	/**
+	 * Distinct positive integer ids out of a `wc_get_orders()` result, sorted.
+	 *
+	 * @param mixed $result Result of `wc_get_orders()` with `return => ids`.
+	 * @return int[]
+	 */
+	private static function ids( $result ): array {
+		$ids = array_filter( array_unique( array_map( 'intval', is_array( $result ) ? $result : [] ) ), static fn( int $id ): bool => $id > 0 );
+		sort( $ids );
+
+		return $ids;
+	}
+
+	/**
+	 * Issues one refund's credit note.
+	 *
+	 * @param WC_Order_Refund $refund Refund.
+	 * @param string          $number Receives the credit note number when issued.
+	 * @return string `issued`, the refusal reason, or `failed`.
+	 */
+	private static function issue_credit_note( WC_Order_Refund $refund, string &$number ): string {
+		try {
+			$doc = CreditNoteIssuer::issue_deferred( $refund );
+			if ( null !== $doc && 'issued' === $doc->status ) {
+				$number = (string) $doc->number;
+				return 'issued';
+			}
+
+			$fresh  = wc_get_order( $refund->get_id() );
+			$reason = CreditNoteIssuer::refusal( $fresh instanceof WC_Order_Refund ? $fresh : $refund );
+		} catch ( Throwable $e ) {
+			Pipeline::log( 'Credit note issuing failed for refund ' . $refund->get_id() . ' (WP-CLI): ' . $e->getMessage() . ' (' . $e->getFile() . ':' . $e->getLine() . ')' );
+			$reason = '';
+		}
+
+		return '' !== $reason ? $reason : 'failed';
 	}
 
 	/**
