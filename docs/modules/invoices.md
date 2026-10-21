@@ -1,6 +1,6 @@
 # Invoices module
 
-Core module (`includes/Modules/Invoices/`, locked: always active, cannot be deactivated). It numbers, renders, archives and e-mails PDF invoices for WooCommerce orders (lot 2), imports the 1.x data and serves the customer downloads (lot 3), and since 2.1 issues a credit note for every refund and gives the customers their documents in My Account, on the thank-you page and in the e-mails (lot 4a). VAT (no-VAT mode, customer VAT number, Factur-X) comes in 2.2.
+Core module (`includes/Modules/Invoices/`, locked: always active, cannot be deactivated). It numbers, renders, archives and e-mails PDF invoices for WooCommerce orders (lot 2), imports the 1.x data and serves the customer downloads (lot 3), and since 2.1 issues a credit note for every refund and gives the customers their documents in My Account, on the thank-you page and in the e-mails (lot 4a). 2.2 (issue #19) adds the VAT franchise regime, the customer VAT number and SIREN, the 2026 mentions and a compact header and footer.
 
 Credit notes and customer access live in this module, not in the `CreditNotes` and `CustomerAccess` modules the v2 spec planned: they share the register, the pipeline, the settings form and the locked state, and a credit note module that could be deactivated would leave refunds of invoiced orders without their credit note.
 
