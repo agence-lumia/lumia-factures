@@ -1204,3 +1204,403 @@ msgstr "Exemple : prochain numéro de facture, rien n'est enregistré ni numéro
 
 msgid "Invoices are paused until these requirements are met:"
 msgstr "La facturation est en pause tant que ces prérequis ne sont pas remplis :"
+
+#: includes/Modules/Bricks/Tags.php:72
+msgid "Latest credit note URL"
+msgstr "URL du dernier avoir"
+
+#: includes/Modules/Bricks/Tags.php:73
+msgid "Latest credit note number"
+msgstr "Numéro du dernier avoir"
+
+#: includes/Modules/Bricks/Tags.php:74
+msgid "Latest credit note status"
+msgstr "Statut du dernier avoir"
+
+#: includes/Modules/Bricks/Tags.php:75
+msgid "Order documents (HTML list)"
+msgstr "Documents de la commande (liste HTML)"
+
+#: includes/Modules/Invoices/Admin/Counters.php:80
+#: includes/Modules/Invoices/Front/DocumentList.php:62
+#: includes/Modules/Invoices/Rendering/Context.php:218
+#: templates/admin/invoices/content.php:62
+#: templates/admin/invoices/content.php:67
+msgid "Credit note"
+msgstr "Avoir"
+
+#. translators: %d: number of refunds
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:144
+#, php-format
+msgid "Lümia Factures: %d refund has no credit note yet."
+msgid_plural "Lümia Factures: %d refunds have no credit note yet."
+msgstr[0] "Lümia Factures : %d remboursement n'a pas encore d'avoir."
+msgstr[1] "Lümia Factures : %d remboursements n'ont pas encore d'avoir."
+
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:148
+msgid "The reason is shown in the Invoice box of each order. Refunds made before credit notes existed are not counted: issue theirs from the order or with \"wp lumia-factures issue-credit-notes\"."
+msgstr "La raison est indiquée dans le bloc Facture de chaque commande. Les remboursements antérieurs aux avoirs ne sont pas comptés : émettez leur avoir depuis la commande ou avec « wp lumia-factures issue-credit-notes »."
+
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:160
+msgid "Issue the pending credit notes"
+msgstr "Émettre les avoirs en attente"
+
+#. translators: %d: number of credit notes
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:220
+#, php-format
+msgid "%d credit note issued."
+msgid_plural "%d credit notes issued."
+msgstr[0] "%d avoir émis."
+msgstr[1] "%d avoirs émis."
+
+#. translators: %d: number of refunds
+#: includes/Modules/Invoices/Admin/CreditNoteNotice.php:226
+#, php-format
+msgid "%d refund still has no credit note."
+msgid_plural "%d refunds still have no credit note."
+msgstr[0] "%d remboursement n'a toujours pas d'avoir."
+msgstr[1] "%d remboursements n'ont toujours pas d'avoir."
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:231
+msgid "Sample customer"
+msgstr "Client exemple"
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:232
+msgid "Sample recipient"
+msgstr "Destinataire exemple"
+
+#: includes/Modules/Invoices/Admin/DemoOrder.php:307
+msgid "Sample product"
+msgstr "Produit exemple"
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:327
+msgid "Invoice cancelled"
+msgstr "Facture annulée"
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Admin/OrderTools.php:448
+#, php-format
+msgid "Cancel invoice %s?"
+msgstr "Annuler la facture %s ?"
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Admin/OrderTools.php:450
+#, php-format
+msgid "No money is moved: this records a full refund and issues a credit note that cancels invoice %s."
+msgstr "Aucun argent n'est déplacé : cela enregistre un remboursement total et émet un avoir qui annule la facture %s."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:451
+msgid "Cancel invoice"
+msgstr "Annuler la facture"
+
+#. translators: %d: refund id
+#: includes/Modules/Invoices/Admin/OrderTools.php:533
+#, php-format
+msgid "Refund #%d deleted"
+msgstr "Remboursement n° %d supprimé"
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:543
+#: templates/admin/invoices/general.php:62
+msgid "Credit notes"
+msgstr "Avoirs"
+
+#. translators: 1: refund id, 2: refunded amount
+#: includes/Modules/Invoices/Admin/OrderTools.php:563
+#, php-format
+msgid "Refund #%1$d (%2$s)"
+msgstr "Remboursement n° %1$d (%2$s)"
+
+#. translators: %s: why the credit note was not issued
+#: includes/Modules/Invoices/Admin/OrderTools.php:598
+#, php-format
+msgid "No credit note yet (was: %s)"
+msgstr "Pas encore d'avoir (motif : %s)"
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:601
+msgid "No credit note yet."
+msgstr "Pas encore d'avoir."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:606
+msgid "Issue credit note"
+msgstr "Émettre l'avoir"
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:622
+msgid "Nothing was refunded: no credit note."
+msgstr "Rien n'a été remboursé : pas d'avoir."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:623
+msgid "This refund was just created: its credit note can be issued in a few minutes."
+msgstr "Ce remboursement vient d'être créé : son avoir pourra être émis dans quelques minutes."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:623
+msgid "The refunded order no longer exists."
+msgstr "La commande remboursée n'existe plus."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:624
+msgid "Waiting for the Facture PDF Lumia import."
+msgstr "En attente de l'import de Facture PDF Lumia."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:625
+msgid "The Facture PDF Lumia invoice of this order could not be imported (conflict)."
+msgstr "La facture Facture PDF Lumia de cette commande n'a pas pu être importée (conflit)."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:626
+msgid "This refund reuses the id of a deleted refund that carries a credit note: no credit note can be issued for it."
+msgstr "Ce remboursement réutilise l'identifiant d'un remboursement supprimé qui porte un avoir : aucun avoir ne peut être émis pour lui."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:627
+msgid "Refused by the lumia_factures_can_issue_credit_note filter."
+msgstr "Refusé par le filtre lumia_factures_can_issue_credit_note."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:628
+msgid "The order has no invoice: issue the invoice first."
+msgstr "La commande n'a pas de facture : émettez d'abord la facture."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:693
+msgid "The credit note has been issued."
+msgstr "L'avoir a été émis."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:694
+msgid "The credit note could not be issued. The reason is shown in the Invoice box."
+msgstr "L'avoir n'a pas pu être émis. La raison est indiquée dans le bloc Facture."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:695
+msgid "The credit note PDF has been rebuilt."
+msgstr "Le PDF de l'avoir a été reconstruit."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:696
+msgid "The credit note PDF could not be rebuilt."
+msgstr "Le PDF de l'avoir n'a pas pu être reconstruit."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:697
+msgid "The invoice has been cancelled by a credit note."
+msgstr "La facture a été annulée par un avoir."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:698
+msgid "The full refund has been recorded, but its credit note is not issued yet. The reason is shown in the Invoice box."
+msgstr "Le remboursement total a été enregistré, mais son avoir n'est pas encore émis. La raison est indiquée dans le bloc Facture."
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:699
+msgid "The invoice could not be cancelled."
+msgstr "La facture n'a pas pu être annulée."
+
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:109
+msgid "Other refunded amount"
+msgstr "Autre montant remboursé"
+
+#: includes/Modules/Invoices/Amounts/CreditNoteStatementBuilder.php:112
+msgid "Total refunded"
+msgstr "Total remboursé"
+
+#. translators: 1: credit note number, 2: refund id, 3: invoice number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:280
+#, php-format
+msgid "Credit note %1$s issued for refund #%2$d (invoice %3$s)."
+msgstr "Avoir %1$s émis pour le remboursement n° %2$d (facture %3$s)."
+
+#. translators: 1: refund id, 2: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:802
+#, php-format
+msgid "Refund #%1$d was deleted; credit note %2$s stays issued and the order no longer matches it."
+msgstr "Le remboursement n° %1$d a été supprimé ; l'avoir %2$s reste émis et la commande ne lui correspond plus."
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:839
+#, php-format
+msgid "This refund carries credit note %s and cannot be deleted."
+msgstr "Ce remboursement porte l'avoir %s et ne peut pas être supprimé."
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:903
+#, php-format
+msgid "Credit note PDF %s was missing or damaged and has been rebuilt from the current order data."
+msgstr "Le PDF de l'avoir %s était manquant ou endommagé : il a été reconstruit à partir des données actuelles de la commande."
+
+#. translators: 1: invoice number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:50
+#, php-format
+msgid "Invoice number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the invoice is not numbered. Give each document type its own number prefix."
+msgstr "Le numéro de facture %1$s (séquence %2$d) est déjà utilisé par un autre type de document ; cette valeur de séquence est sautée et la facture n'est pas numérotée. Donnez à chaque type de document son propre préfixe de numéro."
+
+#. translators: %d: refund id
+#: includes/Modules/Invoices/Documents/Notes.php:66
+#, php-format
+msgid "Credit note for refund #%d could not be numbered."
+msgstr "L'avoir du remboursement n° %d n'a pas pu être numéroté."
+
+#. translators: %d: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:68
+#, php-format
+msgid "Credit note sequence value %d could not be turned into a number; this sequence value is skipped."
+msgstr "La valeur de séquence %d n'a pas pu être transformée en numéro d'avoir ; cette valeur de séquence est sautée."
+
+#. translators: 1: credit note number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:70
+#, php-format
+msgid "Credit note number %1$s (sequence %2$d) could not be recorded; this sequence value is skipped."
+msgstr "Le numéro d'avoir %1$s (séquence %2$d) n'a pas pu être enregistré ; cette valeur de séquence est sautée."
+
+#. translators: 1: credit note number, 2: sequence value
+#: includes/Modules/Invoices/Documents/Notes.php:72
+#, php-format
+msgid "Credit note number %1$s (sequence %2$d) is already used by another document type; this sequence value is skipped and the credit note is not numbered. Give each document type its own number prefix."
+msgstr "Le numéro d'avoir %1$s (séquence %2$d) est déjà utilisé par un autre type de document ; cette valeur de séquence est sautée et l'avoir n'est pas numéroté. Donnez à chaque type de document son propre préfixe de numéro."
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/Notes.php:74
+#, php-format
+msgid "The PDF of credit note %s could not be stored; the PDF will be built on first download."
+msgstr "Le PDF de l'avoir %s n'a pas pu être enregistré ; le PDF sera créé au premier téléchargement."
+
+#. translators: %s: credit note number
+#: includes/Modules/Invoices/Documents/Notes.php:76
+#, php-format
+msgid "The PDF of credit note %s could not be generated; the PDF will be built on first download."
+msgstr "Le PDF de l'avoir %s n'a pas pu être généré ; le PDF sera créé au premier téléchargement."
+
+#: includes/Modules/Invoices/Front/CustomerDownload.php:355
+msgid "Document not found."
+msgstr "Document introuvable."
+
+#. translators: %s: invoice number.
+#: includes/Modules/Invoices/Front/CustomerLinks.php:83
+#, php-format
+msgid "Download invoice %s"
+msgstr "Télécharger la facture %s"
+
+#. translators: 1: imported invoice number format, 2: default credit note number format, 3: credit note number format used instead
+#: includes/Modules/Invoices/Migration/Importer.php:260
+#, php-format
+msgid "The invoice number format %1$s starts like the default credit note number format %2$s: credit notes will be numbered %3$s. Another format can be chosen in the Numbering tab."
+msgstr "Le format de numéro de facture %1$s commence comme le format de numéro d'avoir par défaut %2$s : les avoirs seront numérotés %3$s. Un autre format peut être choisi dans l'onglet Numérotation."
+
+#. translators: %s: invoice number
+#: includes/Modules/Invoices/Rendering/Context.php:244
+#, php-format
+msgid "Credit note for invoice %s"
+msgstr "Avoir sur la facture n° %s"
+
+#. translators: 1: invoice number, 2: invoice date
+#: includes/Modules/Invoices/Rendering/Context.php:248
+#, php-format
+msgid "Credit note for invoice %1$s of %2$s"
+msgstr "Avoir sur la facture n° %1$s du %2$s"
+
+#: includes/Modules/Invoices/Rendering/Context.php:350
+msgid "Credit note no."
+msgstr "N° d'avoir"
+
+#: includes/Modules/Invoices/Rendering/Context.php:351
+msgid "Credit note date"
+msgstr "Date de l'avoir"
+
+#: includes/Modules/Invoices/Rendering/Context.php:352
+msgid "Refund date"
+msgstr "Date du remboursement"
+
+#: includes/Modules/Invoices/Rendering/Context.php:561
+msgid "Refund reason"
+msgstr "Motif du remboursement"
+
+#. translators: %s: why the credit note number format is refused.
+#: includes/Modules/Invoices/Settings/Schema.php:111
+#, php-format
+msgid "Credit note number: %s"
+msgstr "Numéro d'avoir : %s"
+
+#: includes/Modules/Invoices/Settings/Schema.php:147
+msgid "The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-."
+msgstr "Le format de numéro d'avoir doit commencer par un préfixe différent de celui du format de numéro de facture, par exemple AV- et FA-."
+
+#: includes/Modules/Invoices/Settings/Schema.php:149
+msgid "A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number."
+msgstr "Un format de numéro ne peut pas prendre un préfixe que l'autre type de document utilise ou a déjà imprimé (en échangeant FA- et AV-, par exemple) : une facture et un avoir partageraient un numéro."
+
+#: templates/admin/invoices/content.php:63
+msgid "A credit note uses the layout of the invoice and always names the number and date of the invoice it credits."
+msgstr "Un avoir reprend la mise en page de la facture et indique toujours le numéro et la date de la facture à laquelle il se rapporte."
+
+#: templates/admin/invoices/content.php:68
+msgid "Show the refund reason"
+msgstr "Afficher le motif du remboursement"
+
+#: templates/admin/invoices/content.php:68
+msgid "The reason entered with the refund, when there is one."
+msgstr "Le motif saisi avec le remboursement, s'il y en a un."
+
+#: templates/admin/invoices/general.php:63
+msgid "Each refund of an invoiced order issues a credit note. An issued credit note never changes, and the refund email never carries the invoice."
+msgstr "Chaque remboursement d'une commande facturée émet un avoir. Un avoir émis ne change jamais, et l'e-mail de remboursement ne porte jamais la facture."
+
+#: templates/admin/invoices/general.php:66
+msgid "Attach the credit note to"
+msgstr "Joindre l'avoir à"
+
+#: templates/admin/invoices/general.php:72
+msgid "Customer access"
+msgstr "Accès client"
+
+#: templates/admin/invoices/general.php:73
+msgid "Where customers find the links to their invoice and credit notes. A link appears once the document is issued."
+msgstr "Où les clients trouvent les liens vers leur facture et leurs avoirs. Un lien apparaît dès que le document est émis."
+
+#: templates/admin/invoices/general.php:77
+msgid "Invoice button in the My Account orders list"
+msgstr "Bouton Facture dans la liste des commandes de Mon compte"
+
+#: templates/admin/invoices/general.php:78
+msgid "Documents on the order page"
+msgstr "Documents sur la page de la commande"
+
+#: templates/admin/invoices/general.php:78
+msgid "The order view of My Account and the thank-you page."
+msgstr "La vue de la commande dans Mon compte et la page de remerciement."
+
+#: templates/admin/invoices/general.php:79
+msgid "Add the document links to"
+msgstr "Ajouter les liens des documents à"
+
+#: templates/admin/invoices/general.php:82
+msgid "Bricks is active: if your templates already show the documents with the Lümia Factures dynamic tags, turn off the matching options to avoid showing them twice."
+msgstr "Bricks est actif : si vos modèles affichent déjà les documents avec les balises dynamiques Lümia Factures, désactivez les options correspondantes pour ne pas les afficher deux fois."
+
+#: templates/admin/invoices/numbering.php:67
+msgid "Credit note number"
+msgstr "Numéro d'avoir"
+
+#: templates/admin/invoices/numbering.php:68
+msgid "Credit notes have their own continuous series. Their format must start with a prefix that differs from the invoice one, e.g. AV- and FA-, so that a credit note never shares an invoice number."
+msgstr "Les avoirs ont leur propre série continue. Leur format doit commencer par un préfixe différent de celui des factures, par exemple AV- et FA-, pour qu'un avoir ne partage jamais un numéro de facture."
+
+#: templates/admin/invoices/numbering.php:71
+msgid "Same tags as the invoice number; the order tags refer to the refunded order."
+msgstr "Mêmes balises que pour le numéro de facture ; les balises de commande désignent la commande remboursée."
+
+#: templates/admin/invoices/numbering.php:74
+msgid "Next credit note number"
+msgstr "Prochain numéro d'avoir"
+
+#: templates/admin/invoices/numbering.php:88
+msgid "A counter can only be raised, never lowered: a number that was issued is never issued again. Raise it to continue after invoices or credit notes created elsewhere."
+msgstr "Un compteur ne peut qu'être augmenté, jamais diminué : un numéro déjà émis n'est jamais réémis. Augmentez-le pour poursuivre après des factures ou des avoirs créés ailleurs."
+
+#: templates/admin/invoices/numbering.php:92
+msgid "No counter yet. The first one is created with the first invoice or credit note."
+msgstr "Aucun compteur pour l'instant. Le premier est créé avec la première facture ou le premier avoir."
+
+#: templates/admin/invoices/preview.php:44
+msgid "No order yet: demo order built from your products and shop address, without order number. Nothing is saved."
+msgstr "Aucune commande pour l'instant : commande de démonstration construite à partir de vos produits et de l'adresse de la boutique, sans numéro de commande. Rien n'est enregistré."
+
+#: templates/front/emails/order-documents.php:19
+#: templates/front/emails/plain/order-documents.php:20
+msgid "Your documents"
+msgstr "Vos documents"
+
+#: templates/front/order-documents.php:20
+msgid "Documents"
+msgstr "Documents"
+
+#: templates/front/order-documents.php:25
+msgid "Date"
+msgstr "Date"

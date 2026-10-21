@@ -1,6 +1,6 @@
 <?php
 /**
- * Rendering context of an invoice.
+ * Rendering context of an invoice or a credit note.
  *
  * @package Lumia\Factures
  */
@@ -9,6 +9,7 @@ namespace Lumia\Factures\Modules\Invoices\Rendering;
 
 defined( 'ABSPATH' ) || exit;
 
+use InvalidArgumentException;
 use Lumia\Factures\Modules\Invoices\Amounts\Line;
 use Lumia\Factures\Modules\Invoices\Amounts\Money;
 use Lumia\Factures\Modules\Invoices\Amounts\Statement;
@@ -21,11 +22,15 @@ use WC_Order;
  * Nothing is computed here: lines and totals come from the `Statement`, formatted as text. A
  * field switched off in the settings is absent from the context, so a template never tests a
  * toggle. Every string is plain text, the templates escape it.
+ *
+ * A credit note is rendered with the refunded order (parties, payment method, footer) and the
+ * statement of its refund. It always names the invoice it credits, and prints neither the
+ * customer note nor the invoice title.
  */
 final class Context {
 
 	/**
-	 * Order.
+	 * Order (the refunded order for a credit note).
 	 *
 	 * @var WC_Order
 	 */
@@ -46,34 +51,57 @@ final class Context {
 	private array $settings;
 
 	/**
+	 * Amounts of the document.
+	 *
+	 * @var Statement
+	 */
+	private Statement $statement;
+
+	/**
 	 * Constructor.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings.
+	 * @param WC_Order             $order     Order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings.
+	 * @param Statement            $statement Amounts of the document.
 	 */
-	private function __construct( WC_Order $order, DocumentData $doc, array $settings ) {
-		$this->order    = $order;
-		$this->doc      = $doc;
-		$this->settings = $settings;
+	private function __construct( WC_Order $order, DocumentData $doc, array $settings, Statement $statement ) {
+		$this->order     = $order;
+		$this->doc       = $doc;
+		$this->settings  = $settings;
+		$this->statement = $statement;
 	}
 
 	/**
 	 * Builds the context.
 	 *
-	 * @param WC_Order             $order    Order.
-	 * @param DocumentData         $doc      Document.
-	 * @param array<string, mixed> $settings Invoice settings (`Module::settings()`).
+	 * @param WC_Order             $order     Order; for a credit note, the refunded order.
+	 * @param DocumentData         $doc       Document.
+	 * @param array<string, mixed> $settings  Invoice settings (`Module::settings()`).
+	 * @param Statement|null       $statement Amounts; null for an invoice builds the order's own
+	 *                                        (`StatementBuilder`). Required for a credit note
+	 *                                        (`CreditNoteStatementBuilder`).
 	 * @return array<string, mixed>
+	 * @throws InvalidArgumentException For a credit note without its statement or without the invoice it credits.
 	 */
-	public static function build( WC_Order $order, DocumentData $doc, array $settings ): array {
-		$builder   = new self( $order, $doc, $settings );
-		$statement = StatementBuilder::build( $order, $settings );
-		$items     = $builder->items( $statement );
+	public static function build( WC_Order $order, DocumentData $doc, array $settings, ?Statement $statement = null ): array {
+		if ( $doc->is_credit_note() ) {
+			// The order's own amounts would be printed, or the mandatory reference left out.
+			if ( null === $statement ) {
+				throw new InvalidArgumentException( 'A credit note is rendered from the statement of its refund.' );
+			}
+			if ( '' === $doc->reference_number ) {
+				throw new InvalidArgumentException( 'A credit note must name the invoice it credits.' );
+			}
+		}
+
+		$builder = new self( $order, $doc, $settings, $statement ?? StatementBuilder::build( $order, $settings ) );
+		$items   = $builder->items();
 
 		$context = [
+			'type'       => $doc->type,
 			'preview'    => $doc->preview,
-			'incl_tax'   => $statement->incl_tax,
+			'incl_tax'   => $builder->statement->incl_tax,
 			'header'     => $builder->header(),
 			'shop'       => $builder->shop(),
 			'customer'   => $builder->customer(),
@@ -82,22 +110,37 @@ final class Context {
 			'message'    => $builder->message(),
 			'columns'    => $builder->columns( $items ),
 			'items'      => $items,
-			'totals'     => $builder->totals( $statement ),
+			'totals'     => $builder->totals(),
 			'notes'      => $builder->notes(),
 			'footer'     => $builder->footer(),
 			'legal_text' => $builder->text( 'legal_text' ),
 		];
 
 		/**
-		 * Filters the rendering context.
+		 * Filters the rendering context, of an invoice or of a credit note.
 		 *
 		 * @param array<string, mixed> $context Context.
-		 * @param WC_Order             $order   Order.
+		 * @param WC_Order             $order   Order (the refunded order for a credit note).
 		 * @param DocumentData         $doc     Document.
+		 * @param string               $type    Document type, `invoice` or `credit_note` (`$doc->type`).
 		 */
-		$filtered = apply_filters( 'lumia_factures_invoice_context', $context, $order, $doc );
+		$filtered = apply_filters( 'lumia_factures_invoice_context', $context, $order, $doc, $doc->type );
 
 		return is_array( $filtered ) ? $filtered : $context;
+	}
+
+	/**
+	 * A setting of a group.
+	 *
+	 * @param string $group    Settings group.
+	 * @param string $key      Key in the group.
+	 * @param mixed  $fallback Value when unset.
+	 * @return mixed
+	 */
+	private function setting( string $group, string $key, $fallback = '' ) {
+		$values = isset( $this->settings[ $group ] ) && is_array( $this->settings[ $group ] ) ? $this->settings[ $group ] : [];
+
+		return array_key_exists( $key, $values ) ? $values[ $key ] : $fallback;
 	}
 
 	/**
@@ -108,9 +151,7 @@ final class Context {
 	 * @return mixed
 	 */
 	private function content( string $key, $fallback = '' ) {
-		$content = isset( $this->settings['content'] ) && is_array( $this->settings['content'] ) ? $this->settings['content'] : [];
-
-		return array_key_exists( $key, $content ) ? $content[ $key ] : $fallback;
+		return $this->setting( 'content', $key, $fallback );
 	}
 
 	/**
@@ -125,11 +166,12 @@ final class Context {
 	/**
 	 * A label setting: the stored text, or the translated default when empty.
 	 *
-	 * @param string $key     Key of the `content` group.
+	 * @param string $key      Key of the group.
 	 * @param string $fallback Translated default.
+	 * @param string $group    Settings group.
 	 */
-	private function label( string $key, string $fallback ): string {
-		$value = $this->content( $key );
+	private function label( string $key, string $fallback, string $group = 'content' ): string {
+		$value = $this->setting( $group, $key );
 		$value = is_scalar( $value ) ? trim( (string) $value ) : '';
 
 		return '' !== $value ? $value : $fallback;
@@ -144,13 +186,13 @@ final class Context {
 		$value = $this->content( $key );
 		$value = is_scalar( $value ) ? trim( (string) $value ) : '';
 
-		return '' === $value ? '' : Placeholders::resolve( $value, $this->order, $this->doc, $this->settings );
+		return '' === $value ? '' : Placeholders::resolve( $value, $this->order, $this->doc, $this->settings, $this->statement );
 	}
 
 	/**
-	 * Logo and document title.
+	 * Logo, document title and, for a credit note, the invoice it credits.
 	 *
-	 * @return array{logo: array{src: string, width: int}|null, title: string, number: string}
+	 * @return array{logo: array{src: string, width: int}|null, title: string, number: string, reference: string}
 	 */
 	private function header(): array {
 		$company = isset( $this->settings['company'] ) && is_array( $this->settings['company'] ) ? $this->settings['company'] : [];
@@ -172,14 +214,38 @@ final class Context {
 		// The document's own title (decided by the caller) wins, then the setting, then the default.
 		$title = $this->doc->title;
 		if ( '' === $title ) {
-			$title = $this->label( 'invoice_title', __( 'Invoice', 'lumia-factures' ) );
+			$title = $this->doc->is_credit_note()
+				? $this->label( 'title', __( 'Credit note', 'lumia-factures' ), 'credit_notes' )
+				: $this->label( 'invoice_title', __( 'Invoice', 'lumia-factures' ) );
 		}
 
 		return [
-			'logo'   => $logo,
-			'title'  => $title,
-			'number' => $this->doc->number,
+			'logo'      => $logo,
+			'title'     => $title,
+			'number'    => $this->doc->number,
+			'reference' => $this->reference(),
 		];
+	}
+
+	/**
+	 * The invoice a credit note credits, '' for an invoice.
+	 *
+	 * A mandatory mention: printed whatever the settings, with the invoice number and date the
+	 * register holds.
+	 */
+	private function reference(): string {
+		if ( ! $this->doc->is_credit_note() ) {
+			return '';
+		}
+
+		$date = Placeholders::format_date( $this->doc->reference_date );
+		if ( '' === $date ) {
+			/* translators: %s: invoice number */
+			return sprintf( __( 'Credit note for invoice %s', 'lumia-factures' ), $this->doc->reference_number );
+		}
+
+		/* translators: 1: invoice number, 2: invoice date */
+		return sprintf( __( 'Credit note for invoice %1$s of %2$s', 'lumia-factures' ), $this->doc->reference_number, $date );
 	}
 
 	/**
@@ -270,22 +336,38 @@ final class Context {
 	/**
 	 * Numbers and dates of the document and of the order.
 	 *
+	 * A credit note's own number and date and the refund date have no toggle: they always print
+	 * (the invoice toggles name the invoice). The order rows follow their toggles on both documents.
+	 *
 	 * @return array<int, array{key: string, label: string, value: string}>
 	 */
 	private function meta(): array {
 		$created = $this->order->get_date_created();
 
-		$candidates = [
-			[ 'invoice_number', __( 'Invoice no.', 'lumia-factures' ), $this->doc->number ],
-			[ 'invoice_date', __( 'Invoice date', 'lumia-factures' ), Placeholders::format_date( $this->doc->date ) ],
-			[ 'order_number', __( 'Order no.', 'lumia-factures' ), $this->order->get_id() > 0 ? (string) $this->order->get_order_number() : '' ],
-			[ 'order_date', __( 'Order date', 'lumia-factures' ), $created ? Placeholders::format_date( $created->getTimestamp() ) : '' ],
-			[ 'payment_method', __( 'Payment method', 'lumia-factures' ), (string) $this->order->get_payment_method_title() ],
-		];
+		// Candidate: key, label, value, toggle key of the `content` group ('' for none).
+		$document = $this->doc->is_credit_note()
+			? [
+				[ 'credit_note_number', __( 'Credit note no.', 'lumia-factures' ), $this->doc->number, '' ],
+				[ 'credit_note_date', __( 'Credit note date', 'lumia-factures' ), Placeholders::format_date( $this->doc->date ), '' ],
+				[ 'refund_date', __( 'Refund date', 'lumia-factures' ), Placeholders::format_date( $this->doc->refund_date ), '' ],
+			]
+			: [
+				[ 'invoice_number', __( 'Invoice no.', 'lumia-factures' ), $this->doc->number, 'meta_invoice_number_enabled' ],
+				[ 'invoice_date', __( 'Invoice date', 'lumia-factures' ), Placeholders::format_date( $this->doc->date ), 'meta_invoice_date_enabled' ],
+			];
+
+		$candidates = array_merge(
+			$document,
+			[
+				[ 'order_number', __( 'Order no.', 'lumia-factures' ), $this->order->get_id() > 0 ? (string) $this->order->get_order_number() : '', 'meta_order_number_enabled' ],
+				[ 'order_date', __( 'Order date', 'lumia-factures' ), $created ? Placeholders::format_date( $created->getTimestamp() ) : '', 'meta_order_date_enabled' ],
+				[ 'payment_method', __( 'Payment method', 'lumia-factures' ), (string) $this->order->get_payment_method_title(), 'meta_payment_method_enabled' ],
+			]
+		);
 
 		$rows = [];
 		foreach ( $candidates as $candidate ) {
-			if ( $this->on( 'meta_' . $candidate[0] . '_enabled' ) && '' !== $candidate[2] ) {
+			if ( ( '' === $candidate[3] || $this->on( $candidate[3] ) ) && '' !== $candidate[2] ) {
 				$rows[] = [
 					'key'   => $candidate[0],
 					'label' => $candidate[1],
@@ -373,14 +455,18 @@ final class Context {
 	/**
 	 * Product lines, as text.
 	 *
-	 * @param Statement $statement Statement.
+	 * On a credit note, a line refunded without quantity (an amount or a tax only) leaves the
+	 * quantity cell empty; its unit price is the line total.
+	 *
 	 * @return array<int, array<string, mixed>>
 	 */
-	private function items( Statement $statement ): array {
+	private function items(): array {
+		$statement = $this->statement;
 		$design    = isset( $this->settings['design'] ) && is_array( $this->settings['design'] ) ? $this->settings['design'] : [];
 		$thumb     = isset( $design['thumb_width'] ) && is_numeric( $design['thumb_width'] ) ? (int) $design['thumb_width'] : 46;
 		$images    = $this->on( 'col_image_enabled' ) && $thumb > 0;
 		$describes = $this->on( 'col_description_enabled' );
+		$credit    = $this->doc->is_credit_note();
 
 		$items = [];
 		foreach ( $statement->lines as $line ) {
@@ -389,7 +475,7 @@ final class Context {
 				'attributes'  => $line->attributes,
 				'description' => $describes ? self::description( $line ) : '',
 				'sku'         => $line->sku,
-				'quantity'    => self::quantity( $line->quantity ),
+				'quantity'    => $credit && 0.0 === (float) $line->quantity ? '' : self::quantity( $line->quantity ),
 				'unit_price'  => Money::format( $line->unit, $statement->currency ),
 				'tax_rate'    => null === $line->tax_rate ? '' : StatementBuilder::format_rate( $line->tax_rate ),
 				'total'       => Money::format( $line->total, $statement->currency ),
@@ -404,13 +490,13 @@ final class Context {
 	 * Totals rows as text.
 	 *
 	 * The toggle hides only what is outside the sum: in incl. VAT mode, the informational "excl. VAT" and VAT rows. A summed row always prints, so the rows printed add up
-	 * to the total.
+	 * to the total (to the refunded amount on a credit note, whose statement labels it "Total refunded").
 	 *
-	 * @param Statement $statement Statement.
 	 * @return array<int, array{key: string, label: string, value: string, grand: bool, informational: bool}>
 	 */
-	private function totals( Statement $statement ): array {
-		$rows = [];
+	private function totals(): array {
+		$statement = $this->statement;
+		$rows      = [];
 
 		foreach ( $statement->rows as $row ) {
 			if ( $statement->incl_tax && $row->informational && in_array( $row->key, [ 'total_excl', 'tax' ], true ) && ! $this->on( 'total_tax_enabled' ) ) {
@@ -458,11 +544,26 @@ final class Context {
 	}
 
 	/**
-	 * Customer note.
+	 * Customer note on an invoice; on a credit note, the refund reason (never the customer note,
+	 * which was written for the order).
 	 *
 	 * @return array<int, array{title: string, body: string}>
 	 */
 	private function notes(): array {
+		if ( $this->doc->is_credit_note() ) {
+			$reason = trim( $this->doc->reason );
+			if ( '' === $reason || empty( $this->setting( 'credit_notes', 'reason_enabled', false ) ) ) {
+				return [];
+			}
+
+			return [
+				[
+					'title' => __( 'Refund reason', 'lumia-factures' ),
+					'body'  => $reason,
+				],
+			];
+		}
+
 		$note = trim( $this->order->get_customer_note() );
 
 		if ( ! $this->on( 'customer_note_enabled' ) || '' === $note ) {

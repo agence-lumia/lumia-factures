@@ -197,7 +197,7 @@ class AdminTest extends TestCase {
 		$stored = get_option( 'lumia_factures_module_invoices' );
 		$this->assertIsArray( $stored );
 		$this->assertArrayNotHasKey( 'sample', $stored );
-		$this->assertSame( array( 'general', 'company', 'numbering', 'content', 'design' ), array_keys( $stored ) );
+		$this->assertSame( array( 'general', 'company', 'numbering', 'credit_notes', 'customer', 'content', 'design' ), array_keys( $stored ) );
 	}
 
 	public function test_base_save_settings_keeps_known_keys_and_coerces_types(): void {

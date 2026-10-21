@@ -2,7 +2,9 @@
 /**
  * Billing, shipping and document details on one row.
  *
- * A hidden block gives its width to the others instead of leaving an empty column.
+ * A hidden block gives its width to the others instead of leaving an empty column. On a credit
+ * note the parties are those of the refunded order and the details start with the credit note
+ * number and date and the refund date (keys `credit_note_number`, `credit_note_date`, `refund_date`).
  *
  * @package Lumia\Factures
  *

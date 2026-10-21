@@ -3,7 +3,8 @@
  * Totals block, right aligned, then the legal text.
  *
  * Informational rows (excl. VAT total, VAT detail in incl. VAT mode, coupon codes) are muted: they
- * are not part of the sum.
+ * are not part of the sum. On a credit note the rows add up to the refunded amount and the grand
+ * total reads "Total refunded".
  *
  * @package Lumia\Factures
  *

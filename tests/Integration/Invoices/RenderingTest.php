@@ -11,6 +11,11 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use InvalidArgumentException;
+use Lumia\Factures\Modules\Invoices\Amounts\CreditNoteStatementBuilder;
+use Lumia\Factures\Modules\Invoices\Amounts\StatementBuilder;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
+use Lumia\Factures\Modules\Invoices\Documents\Register;
 use Lumia\Factures\Modules\Invoices\Module;
 use Lumia\Factures\Modules\Invoices\Rendering\Context;
 use Lumia\Factures\Modules\Invoices\Rendering\DocumentData;
@@ -21,6 +26,9 @@ use Lumia\Factures\Modules\Invoices\Rendering\Renderer;
 use Lumia\Factures\Modules\Invoices\Rendering\Styles;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
+use WC_Order;
+use WC_Order_Item_Product;
+use WC_Order_Refund;
 use WP_Error;
 
 /**
@@ -32,6 +40,11 @@ class RenderingTest extends TestCase {
 
 	private string $previous_log = '';
 
+	/**
+	 * Credit notes recorded by credit_note_doc() in the current test.
+	 */
+	private int $documents = 0;
+
 	public function set_up(): void {
 		parent::set_up();
 		update_option( 'woocommerce_currency', 'EUR' );
@@ -42,6 +55,10 @@ class RenderingTest extends TestCase {
 		update_option( 'woocommerce_tax_round_at_subtotal', 'no' );
 		update_option( 'date_format', 'd/m/Y' );
 		Images::flush();
+
+		// These tests record their credit notes in the register themselves (credit_note_doc()): the
+		// issuing listener stays out (the hooks are restored after each test).
+		remove_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10 );
 
 		// Capture the plugin log lines instead of spilling them into the test output.
 		$this->log_file     = (string) tempnam( sys_get_temp_dir(), 'lf-log' );
@@ -539,11 +556,421 @@ class RenderingTest extends TestCase {
 		$this->assertStringContainsString( 'CUSTOM FOOTER', $html );
 	}
 
+	public function test_credit_note_title_and_meta_labels(): void {
+		$order     = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund    = $this->refund( $order );
+		$doc       = $this->credit_note_doc( $order, $refund );
+		$parent    = $this->parent( $order );
+		$statement = CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() );
+
+		// The invoice title setting never names a credit note: its own setting, else the default.
+		$context = Context::build( $parent, $doc, $this->settings( [ 'content' => [ 'invoice_title' => 'Proforma' ] ] ), $statement );
+		$this->assertSame( 'credit_note', $context['type'] );
+		$this->assertSame( 'Credit note', $context['header']['title'] );
+		$this->assertSame( 'AV-2026-00001', $context['header']['number'] );
+
+		$named = $this->settings( [ 'credit_notes' => [ 'title' => 'Avoir commercial' ] ] );
+		$this->assertSame( 'Avoir commercial', Context::build( $parent, $doc, $named, $statement )['header']['title'] );
+
+		// The document's own title wins over the setting.
+		$titled = new DocumentData( 'Custom', $doc->number, $doc->date, false, $doc->type, $doc->reference_number, $doc->reference_date, $doc->refund_date, $doc->reason );
+		$this->assertSame( 'Custom', Context::build( $parent, $titled, $named, $statement )['header']['title'] );
+
+		$this->assertSame( [ 'credit_note_number', 'credit_note_date', 'refund_date', 'order_number', 'order_date' ], array_column( $context['meta'], 'key' ) );
+		$meta = array_column( $context['meta'], 'value', 'label' );
+		$this->assertSame( 'AV-2026-00001', $meta['Credit note no.'] );
+		$this->assertSame( '20/10/2026', $meta['Credit note date'] );
+		$this->assertSame( '18/10/2026', $meta['Refund date'] );
+
+		$html = Renderer::html( $parent, $doc, $this->settings(), $statement );
+		$this->assertStringContainsString( '<title>Credit note AV-2026-00001</title>', $html );
+		$this->assertStringContainsString( 'Total refunded', $html );
+		$this->assertStringNotContainsString( 'Invoice no.', $html );
+		$this->assertStringNotContainsString( 'Invoice date', $html );
+	}
+
+	public function test_credit_note_always_references_invoice_number_and_date(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order, 'Damaged parcel' );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		// Every toggle off: the reference and the credit note's own number and date still print.
+		$off = [];
+		foreach ( array_keys( Module::settings()['content'] ) as $key ) {
+			if ( str_ends_with( $key, '_enabled' ) ) {
+				$off[ $key ] = false;
+			}
+		}
+		$settings = $this->settings(
+			[
+				'content'      => $off,
+				'credit_notes' => [ 'reason_enabled' => false ],
+			]
+		);
+
+		$context = Context::build( $parent, $doc, $settings, CreditNoteStatementBuilder::build( $refund, $parent, $settings ) );
+		$this->assertSame( 'Credit note for invoice FA-2026-00042 of 15/03/2026', $context['header']['reference'] );
+		$this->assertSame( [ 'credit_note_number', 'credit_note_date', 'refund_date' ], array_column( $context['meta'], 'key' ) );
+
+		$html = Renderer::html( $parent, $doc, $settings, CreditNoteStatementBuilder::build( $refund, $parent, $settings ) );
+		$this->assertStringContainsString( 'Credit note for invoice FA-2026-00042 of 15/03/2026', $html );
+		$this->assertGreaterThan( strpos( $html, 'lf-titlebar' ), strpos( $html, 'Credit note for invoice' ), 'The reference sits under the title band.' );
+		$this->assertStringContainsString( 'AV-2026-00001', $html );
+	}
+
+	public function test_credit_note_references_imported_legacy_invoice_number_and_date(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$issued = (int) gmmktime( 10, 0, 0, 11, 5, 2024 );
+		$this->assertIsInt( Register::import( 'invoice', $order->get_id(), 'F2024-0157', '', 0, $issued ) );
+
+		$refund = $this->refund( $order );
+		$doc    = $this->credit_note_doc( $order, $refund );
+
+		// Read from the register: the imported invoice keeps its legacy number and date.
+		$this->assertSame( 'F2024-0157', $doc->reference_number );
+		$this->assertSame( $issued, $doc->reference_date );
+
+		$parent = $this->parent( $order );
+		$html   = Renderer::html( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+		$this->assertStringContainsString( 'Credit note for invoice F2024-0157 of 05/11/2024', $html );
+	}
+
+	public function test_credit_note_document_data_needs_an_issued_invoice_and_its_own_refund(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order );
+		$row    = (int) Register::reserve( 'credit_note', $refund->get_id(), $order->get_id() );
+
+		// Reserved only: no number yet.
+		$this->assertNull( DocumentData::credit_note( Register::find( 'credit_note', $refund->get_id() ), $refund ) );
+
+		Register::assign( $row, 'AV-2026-00001', 'credit_note', 1, (int) gmmktime( 12, 0, 0, 10, 20, 2026 ) );
+		$credit_note = Register::find( 'credit_note', $refund->get_id() );
+
+		// No issued invoice for the order: the mandatory reference cannot be printed.
+		$this->assertNull( DocumentData::credit_note( $credit_note, $refund ) );
+		$invoice = (int) Register::reserve( 'invoice', $order->get_id() );
+		$this->assertNull( DocumentData::credit_note( $credit_note, $refund ) );
+		Register::assign( $invoice, 'FA-2026-00042', 'invoice', 42, (int) gmmktime( 12, 0, 0, 3, 15, 2026 ) );
+		$this->assertNotNull( DocumentData::credit_note( $credit_note, $refund ) );
+
+		// A refund of another order, or another refund, is never paired with the row.
+		$other = $this->refund( OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] ) );
+		$this->assertNull( DocumentData::credit_note( $credit_note, $other ) );
+
+		// An invoice row is not a credit note.
+		$this->assertNull( DocumentData::credit_note( Register::find( 'invoice', $order->get_id() ), $refund ) );
+	}
+
+	public function test_credit_note_needs_its_statement_and_reference(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		// Without a reference: refused, never printed without its invoice.
+		$unreferenced = new DocumentData( '', $doc->number, $doc->date, false, 'credit_note' );
+		try {
+			Context::build( $parent, $unreferenced, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+			$this->fail( 'A credit note without the invoice it credits was rendered.' );
+		} catch ( InvalidArgumentException $e ) {
+			$this->assertStringContainsString( 'invoice', $e->getMessage() );
+		}
+
+		// Without its statement: the order's own amounts would be printed.
+		$this->expectException( InvalidArgumentException::class );
+		Context::build( $parent, $doc, $this->settings() );
+	}
+
+	public function test_refund_reason_follows_toggle(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order, 'Damaged parcel' );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+		$this->assertSame( 'Damaged parcel', $doc->reason );
+
+		$on = Renderer::html( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+		$this->assertStringContainsString( 'Refund reason', $on );
+		$this->assertStringContainsString( 'Damaged parcel', $on );
+
+		$settings = $this->settings( [ 'credit_notes' => [ 'reason_enabled' => false ] ] );
+		$off      = Renderer::html( $parent, $doc, $settings, CreditNoteStatementBuilder::build( $refund, $parent, $settings ) );
+		$this->assertStringNotContainsString( 'Refund reason', $off );
+		$this->assertStringNotContainsString( 'Damaged parcel', $off );
+
+		// No reason entered: no empty block.
+		$plain        = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$plain_refund = $this->refund( $plain );
+		$plain_parent = $this->parent( $plain );
+		$context      = Context::build( $plain_parent, $this->credit_note_doc( $plain, $plain_refund ), $this->settings(), CreditNoteStatementBuilder::build( $plain_refund, $plain_parent, $this->settings() ) );
+		$this->assertSame( [], $context['notes'] );
+	}
+
+	public function test_credit_note_parties_come_from_parent_order(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->set_billing_first_name( 'Marie' );
+		$order->set_billing_last_name( 'Curie' );
+		$order->set_billing_address_1( '12 rue des Lilas' );
+		$order->set_billing_postcode( '69001' );
+		$order->set_billing_city( 'Lyon' );
+		$order->set_billing_email( 'marie@example.com' );
+		$order->set_payment_method_title( 'Bank transfer' );
+		$order->save();
+
+		$refund   = $this->refund( $order );
+		$parent   = $this->parent( $order );
+		$settings = $this->settings( [ 'company' => [ 'siret' => '12345678900011' ] ] );
+		$context  = Context::build( $parent, $this->credit_note_doc( $order, $refund ), $settings, CreditNoteStatementBuilder::build( $refund, $parent, $settings ) );
+
+		$this->assertStringContainsString( 'Marie Curie', $context['customer']['address'] );
+		$this->assertStringContainsString( '12 rue des Lilas', $context['customer']['address'] );
+		$this->assertSame( 'marie@example.com', $context['customer']['email'] );
+
+		$meta = array_column( $context['meta'], 'value', 'key' );
+		$this->assertSame( (string) $parent->get_order_number(), $meta['order_number'] );
+		$this->assertSame( 'Bank transfer', $meta['payment_method'] );
+		$this->assertContains( 'SIRET: 12345678900011', $context['footer']['lines'] );
+	}
+
+	public function test_customer_note_not_printed_on_credit_note(): void {
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->set_customer_note( 'Leave it at the door' );
+		$order->save();
+
+		$refund = $this->refund( $order );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		$this->assertStringContainsString( 'Leave it at the door', Renderer::html( $parent, $this->doc(), $this->settings() ) );
+
+		$context = Context::build( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+		$this->assertSame( [], $context['notes'] );
+		$this->assertStringNotContainsString( 'Leave it at the door', Renderer::html( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) ) );
+	}
+
+	public function test_invoice_context_unchanged_with_default_document_data(): void {
+		$doc = $this->doc();
+		$this->assertSame( 'invoice', $doc->type );
+		$this->assertFalse( $doc->is_credit_note() );
+		$this->assertSame( [ '', 0, 0, '' ], [ $doc->reference_number, $doc->reference_date, $doc->refund_date, $doc->reason ] );
+
+		$order = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$order->set_customer_note( 'Leave it at the door' );
+		$order->save();
+
+		$context = Context::build( $order, $doc, $this->settings() );
+
+		// The statement defaults to the order's own: passing it changes nothing.
+		$this->assertSame( $context, Context::build( $order, $doc, $this->settings(), StatementBuilder::build( $order, $this->settings() ) ) );
+
+		$this->assertSame( 'invoice', $context['type'] );
+		$this->assertSame( 'Invoice', $context['header']['title'] );
+		$this->assertSame( '', $context['header']['reference'] );
+		$this->assertSame( [ 'invoice_number', 'invoice_date', 'order_number', 'order_date' ], array_column( $context['meta'], 'key' ) );
+		$this->assertSame( [ 'Invoice no.', 'Invoice date', 'Order no.', 'Order date' ], array_column( $context['meta'], 'label' ) );
+		$this->assertSame(
+			[
+				[
+					'title' => 'Customer note',
+					'body'  => 'Leave it at the door',
+				],
+			],
+			$context['notes']
+		);
+		$this->assertSame( 'Total', $context['totals'][ count( $context['totals'] ) - 1 ]['label'] );
+
+		// The meta toggles still hide the invoice number and date.
+		$hidden = Context::build(
+			$order,
+			$doc,
+			$this->settings(
+				[
+					'content' => [
+						'meta_invoice_number_enabled' => false,
+						'meta_invoice_date_enabled'   => false,
+					],
+				]
+			)
+		);
+		$this->assertSame( [ 'order_number', 'order_date' ], array_column( $hidden['meta'], 'key' ) );
+
+		$html = Renderer::html( $order, $doc, $this->settings() );
+		$body = substr( $html, (int) strpos( $html, '<body>' ) );
+		$this->assertStringNotContainsString( 'lf-reference', $body );
+		$this->assertStringNotContainsString( 'Credit note', $body );
+	}
+
+	public function test_invoice_filters_receive_credit_note_type(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		$seen = [];
+		add_filter(
+			'lumia_factures_invoice_context',
+			static function ( $context, $filtered_order, $filtered_doc, $type ) use ( &$seen ) {
+				$seen[] = [ 'context', $filtered_doc->type, $type, $filtered_order->get_id() ];
+				return $context;
+			},
+			10,
+			4
+		);
+		add_filter(
+			'lumia_factures_invoice_html',
+			static function ( $html, $filtered_order, $filtered_doc, $type ) use ( &$seen ) {
+				$seen[] = [ 'html', $filtered_doc->type, $type, $filtered_order->get_id() ];
+				return $html;
+			},
+			10,
+			4
+		);
+
+		Renderer::html( $parent, $this->doc(), $this->settings() );
+		Renderer::html( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+
+		$id = $order->get_id();
+		$this->assertSame(
+			[
+				[ 'context', 'invoice', 'invoice', $id ],
+				[ 'html', 'invoice', 'invoice', $id ],
+				[ 'context', 'credit_note', 'credit_note', $id ],
+				[ 'html', 'credit_note', 'credit_note', $id ],
+			],
+			$seen,
+			'The filters receive the parent order and the document type.'
+		);
+	}
+
+	public function test_credit_note_placeholders_resolve(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$refund = $this->refund( $order, 'Damaged parcel' );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+		$text   = '{credit_note_number}|{credit_note_date}|{refund_amount}|{refund_reason}|{invoice_number}|{invoice_date}';
+
+		$settings = $this->settings( [ 'content' => [ 'message_body' => $text ] ] );
+		$context  = Context::build( $parent, $doc, $settings, CreditNoteStatementBuilder::build( $refund, $parent, $settings ) );
+		$this->assertSame( "AV-2026-00001|20/10/2026|10,00\u{00A0}€|Damaged parcel|FA-2026-00042|15/03/2026", $context['message']['body'] );
+
+		// The reason follows its toggle, like a company field switched off.
+		$off     = $this->settings(
+			[
+				'content'      => [ 'message_body' => $text ],
+				'credit_notes' => [ 'reason_enabled' => false ],
+			]
+		);
+		$context = Context::build( $parent, $doc, $off, CreditNoteStatementBuilder::build( $refund, $parent, $off ) );
+		$this->assertSame( "AV-2026-00001|20/10/2026|10,00\u{00A0}€||FA-2026-00042|15/03/2026", $context['message']['body'] );
+
+		// On an invoice the credit note tags are empty.
+		$this->assertSame( '||||FA-2026-00042|15/03/2026', Placeholders::resolve( $text, $parent, $this->doc() ) );
+
+		foreach ( [ 'credit_note_number', 'credit_note_date', 'refund_amount', 'refund_reason' ] as $tag ) {
+			$this->assertContains( $tag, Placeholders::TAGS );
+		}
+	}
+
+	public function test_credit_note_zero_quantity_line_has_an_empty_quantity_cell(): void {
+		$ids    = OrderFactory::tax_rates( [ '' => 20.0 ] );
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0 ) ] ] );
+		$item   = current( $order->get_items() );
+		$refund = OrderFactory::refund(
+			$order,
+			[
+				$item->get_id() => [
+					'qty'          => 0,
+					'refund_total' => 0,
+					'refund_tax'   => [ $ids[''] => 2.0 ],
+				],
+			],
+			null
+		);
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		$context = Context::build( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+		$this->assertSame( '', $context['items'][0]['quantity'] );
+		$this->assertSame( '1', Context::build( $parent, $this->doc(), $this->settings() )['items'][0]['quantity'] );
+	}
+
+	public function test_credit_note_pdf_bytes(): void {
+		$order  = OrderFactory::order( [ [ OrderFactory::simple_product( 10.0, '', 'Croquettes' ) ] ] );
+		$refund = $this->refund( $order, 'Damaged parcel' );
+		$doc    = $this->credit_note_doc( $order, $refund );
+		$parent = $this->parent( $order );
+
+		$pdf = Renderer::pdf( $parent, $doc, $this->settings(), CreditNoteStatementBuilder::build( $refund, $parent, $this->settings() ) );
+
+		$this->assertStringStartsWith( '%PDF-', $pdf );
+	}
+
 	/**
 	 * Document identity used by the tests.
 	 */
 	private function doc(): DocumentData {
 		return new DocumentData( '', 'FA-2026-00042', (int) gmmktime( 12, 0, 0, 3, 15, 2026 ), false );
+	}
+
+	/**
+	 * A full refund of the order (no payment, no restock), dated 18/10/2026.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param string   $reason Refund reason.
+	 */
+	private function refund( WC_Order $order, string $reason = '' ): WC_Order_Refund {
+		$lines = [];
+		foreach ( $order->get_items() as $item ) {
+			if ( $item instanceof WC_Order_Item_Product ) {
+				$lines[ $item->get_id() ] = OrderFactory::refund_line( $item );
+			}
+		}
+
+		$refund = OrderFactory::refund( $order, $lines, null, $reason );
+		$refund->set_date_created( (int) gmmktime( 9, 0, 0, 10, 18, 2026 ) );
+		$refund->save();
+
+		$fresh = wc_get_order( $refund->get_id() );
+		$this->assertInstanceOf( WC_Order_Refund::class, $fresh );
+
+		return $fresh;
+	}
+
+	/**
+	 * The order as stored now (a full refund changed its status).
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	private function parent( WC_Order $order ): WC_Order {
+		$fresh = wc_get_order( $order->get_id() );
+		$this->assertInstanceOf( WC_Order::class, $fresh );
+
+		return $fresh;
+	}
+
+	/**
+	 * Records the order's invoice (FA-2026-00042 of 15/03/2026, unless one is already in the
+	 * register) and the refund's credit note (AV-2026-00001 of 20/10/2026), then reads the credit
+	 * note's identity back from the register. Later calls in a test take the next numbers.
+	 *
+	 * @param WC_Order        $order  Order.
+	 * @param WC_Order_Refund $refund Refund of the order.
+	 */
+	private function credit_note_doc( WC_Order $order, WC_Order_Refund $refund ): DocumentData {
+		$sequence = ++$this->documents;
+
+		if ( null === Register::find( 'invoice', $order->get_id() ) ) {
+			$invoice = (int) Register::reserve( 'invoice', $order->get_id() );
+			$this->assertTrue( Register::assign( $invoice, sprintf( 'FA-2026-%05d', 41 + $sequence ), 'invoice', 41 + $sequence, (int) gmmktime( 12, 0, 0, 3, 15, 2026 ) ) );
+		}
+
+		$row = (int) Register::reserve( 'credit_note', $refund->get_id(), $order->get_id() );
+		$this->assertTrue( Register::assign( $row, sprintf( 'AV-2026-%05d', $sequence ), 'credit_note', $sequence, (int) gmmktime( 12, 0, 0, 10, 20, 2026 ) ) );
+
+		$doc = DocumentData::credit_note( Register::find( 'credit_note', $refund->get_id() ), $refund );
+		$this->assertInstanceOf( DocumentData::class, $doc );
+
+		return $doc;
 	}
 
 	/**

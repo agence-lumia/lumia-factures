@@ -1,6 +1,7 @@
 <?php
 /**
- * Order screen tools: meta box, list column, admin download, issue and restore actions.
+ * Order screen tools: meta box, list column, admin download, issue and restore actions, credit
+ * notes and the pending credit notes notice.
  *
  * @package Lumia\Factures
  */
@@ -11,16 +12,21 @@ namespace Lumia\Factures\Tests\Integration\Invoices;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Admin\CreditNoteNotice;
 use Lumia\Factures\Modules\Invoices\Admin\Download;
 use Lumia\Factures\Modules\Invoices\Admin\OrderTools;
+use Lumia\Factures\Modules\Invoices\Documents\CreditNoteIssuer;
 use Lumia\Factures\Modules\Invoices\Documents\IssuedDocument;
+use Lumia\Factures\Modules\Invoices\Documents\Issuer;
 use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Migration\Migration;
 use Lumia\Factures\Modules\Invoices\Module;
 use RuntimeException;
 use Lumia\Factures\Modules\Invoices\Storage\Archive;
 use Lumia\Factures\Tests\Support\OrderFactory;
 use Lumia\Factures\Tests\Support\TestCase;
 use WC_Order;
+use WC_Order_Refund;
 use WPDieException;
 
 /**
@@ -35,20 +41,294 @@ class OrderToolsTest extends TestCase {
 	 */
 	private array $written = [];
 
+	private string $log_file = '';
+
+	private string $previous_log = '';
+
 	public function set_up(): void {
 		parent::set_up();
 		update_option( 'woocommerce_currency', 'EUR' );
 		delete_option( 'lumia_factures_module_invoices' );
+		delete_option( Migration::OPTION );
 		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+
+		// Capture the plugin log lines (credit note refusals) instead of spilling them into the test output.
+		$this->log_file     = (string) tempnam( sys_get_temp_dir(), 'lf-log' );
+		$this->previous_log = (string) ini_get( 'error_log' );
+		ini_set( 'error_log', $this->log_file ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
 	}
 
 	public function tear_down(): void {
-		foreach ( $this->written as $path ) {
+		foreach ( array_unique( $this->written ) as $path ) {
 			if ( is_file( $path ) ) {
 				wp_delete_file( $path );
 			}
 		}
+		unset( $_GET['order_id'], $_GET['refund_id'], $_GET['_wpnonce'], $_REQUEST['_wpnonce'], $_GET['lumia_factures_notice'], $_GET['lumia_factures_issued'], $_GET['lumia_factures_left'] );
+		ini_set( 'error_log', $this->previous_log ); // phpcs:ignore WordPress.PHP.IniSet.Risky -- Test isolation.
+		wp_delete_file( $this->log_file );
 		parent::tear_down();
+	}
+
+	public function test_meta_box_lists_refunds_with_and_without_credit_note_and_pending_reason(): void {
+		$order   = $this->issued_order();
+		$issued  = $this->refund( $order, 3.0 );
+		$missing = $this->refund_without_hook( $order, 2.0 );
+		$flagged = $this->refund_without_hook( $order, 1.0 );
+		$flagged->update_meta_data( CreditNoteIssuer::PENDING_META, 'vetoed' );
+		$flagged->save();
+		$doc = Register::find( 'credit_note', $issued->get_id() );
+
+		$html = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+
+		$this->assertStringContainsString( 'Credit notes', $html );
+		$this->assertStringContainsString( (string) $doc->number, $html );
+		$this->assertStringContainsString( 'Refund #' . $issued->get_id() . ' (', $html );
+		$this->assertStringContainsString( 'action=lumia_factures_invoices_download_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $issued->get_id(), $html );
+		$this->assertStringNotContainsString( 'lumia_factures_invoices_restore_credit_note', $html );
+
+		$this->assertStringContainsString( 'action=lumia_factures_invoices_issue_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $missing->get_id(), $html );
+		$this->assertStringContainsString( 'action=lumia_factures_invoices_issue_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $flagged->get_id(), $html );
+		$this->assertStringContainsString( 'No credit note yet (was: Refused by the lumia_factures_can_issue_credit_note filter.)', $html );
+		$this->assertSame( 2, substr_count( $html, 'Issue credit note' ) );
+
+		// While the reason holds, no button: the reason is shown instead.
+		add_filter( 'lumia_factures_can_issue_credit_note', '__return_false' );
+		$vetoed = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+		remove_filter( 'lumia_factures_can_issue_credit_note', '__return_false' );
+
+		$this->assertStringNotContainsString( 'lumia_factures_invoices_issue_credit_note', $vetoed );
+		$this->assertSame( 2, substr_count( $vetoed, 'Refused by the lumia_factures_can_issue_credit_note filter.' ) );
+		$this->assertStringContainsString( (string) $doc->number, $vetoed );
+
+		// The missing file of a credit note offers the rebuild.
+		wp_delete_file( (string) Archive::path( $doc ) );
+		$this->assertStringContainsString( 'lumia_factures_invoices_restore_credit_note', $this->capture_metabox( wc_get_order( $order->get_id() ) ) );
+		$this->assertSame( [], wc_get_order_notes( [ 'order_id' => $missing->get_id() ] ), 'Viewing the order never writes.' );
+		$this->assertSame( '', $this->refund_of( $missing )->get_meta( CreditNoteIssuer::PENDING_META ), 'Viewing the order never flags a refund.' );
+	}
+
+	public function test_meta_box_lists_credit_note_of_deleted_refund(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$id     = $refund->get_id();
+		$doc    = Register::find( 'credit_note', $id );
+
+		add_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+		$refund->delete( true );
+		remove_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+		$this->assertFalse( wc_get_order( $id ) );
+
+		$html = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+
+		$this->assertStringContainsString( (string) $doc->number, $html );
+		$this->assertStringContainsString( 'Refund #' . $id . ' deleted', $html );
+		$this->assertStringContainsString( 'action=lumia_factures_invoices_download_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $id, $html );
+		$this->assertStringNotContainsString( 'lumia_factures_invoices_issue_credit_note', $html );
+	}
+
+	public function test_issue_credit_note_action_requires_nonce_and_manage_woocommerce(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund_without_hook( $order, 2.0 );
+		$id     = $refund->get_id();
+
+		$_GET['order_id']  = (string) $order->get_id();
+		$_GET['refund_id'] = (string) $id;
+
+		$handlers = [
+			'issue_credit_note'    => [ OrderTools::class, 'handle_issue_credit_note' ],
+			'restore_credit_note'  => [ OrderTools::class, 'handle_restore_credit_note' ],
+			'download_credit_note' => [ Download::class, 'handle_credit_note' ],
+		];
+
+		// Valid nonce, no capability.
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		foreach ( $handlers as $name => $callback ) {
+			$valid                = wp_create_nonce( 'lumia_factures_invoices_' . $name . '_' . $id );
+			$_GET['_wpnonce']     = $valid;
+			$_REQUEST['_wpnonce'] = $valid;
+			$this->assertHandlerDies( $callback, 403, $name );
+		}
+
+		// Capability, missing, bad or other refund's nonce.
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'shop_manager' ] ) );
+		foreach ( $handlers as $name => $callback ) {
+			foreach ( [ null, 'badnonce', wp_create_nonce( 'lumia_factures_invoices_' . $name . '_' . ( $id + 1 ) ) ] as $nonce ) {
+				unset( $_GET['_wpnonce'], $_REQUEST['_wpnonce'] );
+				if ( null !== $nonce ) {
+					$_GET['_wpnonce']     = $nonce;
+					$_REQUEST['_wpnonce'] = $nonce;
+				}
+				$this->assertHandlerDies( $callback, 403, $name );
+			}
+		}
+
+		$this->assertNull( Register::find( 'credit_note', $id ) );
+
+		// The URL of the meta box carries the refund's nonce.
+		parse_str( (string) wp_parse_url( wp_specialchars_decode( Download::credit_note_url( $order->get_id(), $id ) ), PHP_URL_QUERY ), $query );
+		$this->assertSame( 1, wp_verify_nonce( (string) $query['_wpnonce'], 'lumia_factures_invoices_download_credit_note_' . $id ) );
+	}
+
+	public function test_issue_credit_note_action_refuses_refund_of_another_order(): void {
+		$order  = $this->issued_order();
+		$other  = $this->issued_order();
+		$refund = $this->refund_without_hook( $order, 2.0 );
+
+		$this->assertSame( 'credit_note_not_issued', OrderTools::issue_credit_note_for( $other->get_id(), $refund->get_id() ) );
+		$this->assertSame( 'credit_note_not_issued', OrderTools::issue_credit_note_for( $order->get_id(), $order->get_id() ), 'An order id is not a refund.' );
+		$this->assertNull( Register::find( 'credit_note', $refund->get_id() ) );
+
+		$this->assertSame( 'credit_note_issued', OrderTools::issue_credit_note_for( $order->get_id(), $refund->get_id() ) );
+		$doc = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $doc );
+		$this->assertSame( $order->get_id(), $doc->parent_id );
+	}
+
+	public function test_restore_credit_note_action_rebuilds_only_missing_file(): void {
+		$order  = $this->issued_order();
+		$other  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+
+		$this->assertSame( 'credit_note_restore_refused', OrderTools::restore_credit_note_for( $order->get_id(), $refund->get_id() ), 'An intact file is never rebuilt.' );
+
+		wp_delete_file( (string) Archive::path( $doc ) );
+		$this->assertSame( 'credit_note_restore_refused', OrderTools::restore_credit_note_for( $other->get_id(), $refund->get_id() ) );
+		$this->assertSame( $doc->file, Register::find( 'credit_note', $refund->get_id() )->file );
+
+		$this->assertSame( 'credit_note_restored', OrderTools::restore_credit_note_for( $order->get_id(), $refund->get_id() ) );
+		$new = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $new );
+		$this->assertTrue( Archive::verify( $new ) );
+		$this->assertNotSame( $doc->file, $new->file );
+		$this->assertSame( $doc->number, $new->number );
+		$this->assertSame( $doc->issued_at, $new->issued_at );
+	}
+
+	public function test_download_credit_note_serves_register_file_after_refund_deleted(): void {
+		$order  = $this->issued_order();
+		$other  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$id     = $refund->get_id();
+		$doc    = Register::find( 'credit_note', $id );
+
+		$this->assertSame( Archive::path( $doc ), Download::credit_note_file_for( $order->get_id(), $id ) );
+
+		add_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+		$refund->delete( true );
+		remove_filter( 'lumia_factures_allow_credited_refund_deletion', '__return_true' );
+
+		$this->assertSame( Archive::path( $doc ), Download::credit_note_file_for( $order->get_id(), $id ) );
+
+		foreach ( [ [ $other->get_id(), $id ], [ $order->get_id(), $order->get_id() ], [ $order->get_id(), 0 ] ] as [ $order_id, $refund_id ] ) {
+			try {
+				Download::credit_note_file_for( $order_id, $refund_id );
+				$this->fail( 'Expected wp_die.' );
+			} catch ( WPDieException $e ) {
+				$this->assertSame( 404, $e->getCode() );
+			}
+		}
+
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		try {
+			Download::credit_note_file_for( $order->get_id(), $id );
+			$this->fail( 'Expected wp_die.' );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( 403, $e->getCode() );
+		}
+	}
+
+	public function test_pending_notice_counts_only_refunds_after_since_or_flagged_and_button_issues_them(): void {
+		$order = $this->issued_order();
+
+		// Before credit notes existed: not counted, issued on demand only.
+		$old = $this->refund_without_hook( $order, 1.0 );
+		$old->set_date_created( time() - DAY_IN_SECONDS );
+		$old->save();
+
+		// Old too, but flagged pending: counted.
+		$flagged = $this->refund_without_hook( $order, 2.0 );
+		$flagged->set_date_created( time() - DAY_IN_SECONDS );
+		$flagged->update_meta_data( CreditNoteIssuer::PENDING_META, 'import' );
+		$flagged->save();
+
+		update_option( CreditNoteIssuer::SINCE_OPTION, time() - HOUR_IN_SECONDS );
+
+		// Since the option, missed by the hook: counted.
+		$missed = $this->refund_without_hook( $order, 3.0 );
+
+		// Since the option and issued: not counted.
+		$this->refund( $order, 1.5 );
+
+		$this->assertSame( [ $flagged->get_id(), $missed->get_id() ], CreditNoteNotice::pending_ids() );
+
+		ob_start();
+		CreditNoteNotice::render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( '2 refunds have no credit note yet.', $html );
+		$this->assertStringContainsString( 'value="lumia_factures_invoices_issue_pending_credit_notes"', $html );
+		$this->assertStringNotContainsString( 'id="_wpnonce"', $html );
+		preg_match( '/name="_wpnonce" value="([^"]+)"/', $html, $match );
+		$this->assertSame( 1, wp_verify_nonce( $match[1], 'lumia_factures_invoices_issue_pending_credit_notes' ) );
+
+		// Not for a user who cannot manage WooCommerce.
+		$manager = get_current_user_id();
+		wp_set_current_user( self::factory()->user->create( [ 'role' => 'customer' ] ) );
+		ob_start();
+		CreditNoteNotice::render();
+		$this->assertSame( '', ob_get_clean() );
+		try {
+			CreditNoteNotice::handle();
+			$this->fail( 'Expected wp_die.' );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( 403, $e->getCode() );
+		}
+		wp_set_current_user( $manager );
+
+		$this->assertSame(
+			[
+				'issued' => 2,
+				'left'   => 0,
+			],
+			CreditNoteNotice::issue_pending()
+		);
+		$this->track( Register::find( 'credit_note', $flagged->get_id() ) );
+		$this->track( Register::find( 'credit_note', $missed->get_id() ) );
+		$this->assertNull( Register::find( 'credit_note', $old->get_id() ) );
+
+		ob_start();
+		CreditNoteNotice::render();
+		$this->assertSame( '', ob_get_clean() );
+
+		$_GET['lumia_factures_notice'] = 'credit_notes_pending_done';
+		$_GET['lumia_factures_issued'] = '2';
+		$_GET['lumia_factures_left']   = '0';
+		ob_start();
+		CreditNoteNotice::render();
+		$this->assertStringContainsString( '2 credit notes issued.', (string) ob_get_clean() );
+	}
+
+	public function test_orders_list_column_shows_credit_note_numbers(): void {
+		$order  = $this->issued_order();
+		$first  = $this->refund( $order, 3.0 );
+		$second = $this->refund( $order, 2.0 );
+
+		ob_start();
+		OrderTools::render_column( 'lumia_factures_invoice', $order->get_id() );
+		$html = (string) ob_get_clean();
+
+		$this->assertStringContainsString( (string) Register::find( 'invoice', $order->get_id() )->number, $html );
+		foreach ( [ $first, $second ] as $refund ) {
+			$this->assertStringContainsString( (string) Register::find( 'credit_note', $refund->get_id() )->number, $html );
+			$this->assertStringContainsString( 'refund_id=' . $refund->get_id(), $html );
+		}
+		$this->assertStringContainsString( 'lumia_factures_invoices_download_credit_note', $html );
+		$this->assertLessThan(
+			strpos( $html, (string) Register::find( 'credit_note', $first->get_id() )->number ),
+			strpos( $html, (string) Register::find( 'invoice', $order->get_id() )->number ),
+			'The credit notes come under the invoice number.'
+		);
 	}
 
 	public function test_file_for_requires_capability(): void {
@@ -304,6 +584,13 @@ class OrderToolsTest extends TestCase {
 		// lumia-tools moves `admin_notices` into its drawer: the action result is printed on `all_admin_notices`.
 		$this->assertSame( 10, has_action( 'all_admin_notices', [ OrderTools::class, 'render_notice' ] ) );
 		$this->assertFalse( has_action( 'admin_notices', [ OrderTools::class, 'render_notice' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_issue_credit_note', [ OrderTools::class, 'handle_issue_credit_note' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_restore_credit_note', [ OrderTools::class, 'handle_restore_credit_note' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_download_credit_note', [ Download::class, 'handle_credit_note' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_cancel_invoice', [ OrderTools::class, 'handle_cancel' ] ) );
+		$this->assertSame( 10, has_action( 'admin_post_lumia_factures_invoices_issue_pending_credit_notes', [ CreditNoteNotice::class, 'handle' ] ) );
+		$this->assertSame( 10, has_action( 'all_admin_notices', [ CreditNoteNotice::class, 'render' ] ) );
+		$this->assertFalse( has_action( 'admin_notices', [ CreditNoteNotice::class, 'render' ] ) );
 	}
 
 	/**
@@ -424,6 +711,72 @@ class OrderToolsTest extends TestCase {
 		ob_start();
 		OrderTools::render_meta_box( $order );
 		return (string) ob_get_clean();
+	}
+
+	/**
+	 * A refund of an amount with its credit note, remembered for tear_down.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param float    $amount Amount.
+	 */
+	private function refund( WC_Order $order, float $amount ): WC_Order_Refund {
+		$refund = OrderFactory::refund( wc_get_order( $order->get_id() ), [], $amount );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$this->assertNotNull( $doc );
+		$this->track( $doc );
+
+		return $refund;
+	}
+
+	/**
+	 * A refund of an amount created without the `woocommerce_order_refunded` listener: no credit note.
+	 * Created past Issuer::STALE_AFTER, so it is not in flight.
+	 *
+	 * @param WC_Order $order  Order.
+	 * @param float    $amount Amount.
+	 */
+	private function refund_without_hook( WC_Order $order, float $amount ): WC_Order_Refund {
+		remove_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10 );
+		try {
+			$refund = OrderFactory::refund( wc_get_order( $order->get_id() ), [], $amount );
+		} finally {
+			add_action( 'woocommerce_order_refunded', [ CreditNoteIssuer::class, 'on_refunded' ], 10, 2 );
+		}
+		$this->assertNull( Register::find( 'credit_note', $refund->get_id() ) );
+
+		// Past Issuer::STALE_AFTER: no longer in flight, the deferred paths take it.
+		$refund->set_date_created( time() - Issuer::STALE_AFTER - MINUTE_IN_SECONDS );
+		$refund->save();
+
+		return $refund;
+	}
+
+	/**
+	 * The refund as stored now.
+	 *
+	 * @param WC_Order_Refund $refund Refund.
+	 */
+	private function refund_of( WC_Order_Refund $refund ): WC_Order_Refund {
+		$fresh = wc_get_order( $refund->get_id() );
+		$this->assertInstanceOf( WC_Order_Refund::class, $fresh );
+
+		return $fresh;
+	}
+
+	/**
+	 * Calls an admin-post handler and expects it to die with this code.
+	 *
+	 * @param callable $callback Handler.
+	 * @param int      $code     HTTP code.
+	 * @param string   $name     Handler name, for the failure message.
+	 */
+	private function assertHandlerDies( callable $callback, int $code, string $name ): void { // phpcs:ignore WordPress.NamingConventions.ValidFunctionName.MethodNameInvalid -- PHPUnit assertion style.
+		try {
+			$callback();
+			$this->fail( 'Expected wp_die for ' . $name );
+		} catch ( WPDieException $e ) {
+			$this->assertSame( $code, $e->getCode(), $name );
+		}
 	}
 
 	/**

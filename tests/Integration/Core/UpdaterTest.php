@@ -125,15 +125,15 @@ class UpdaterTest extends TestCase {
 		$this->mock_http(
 			200,
 			array(
-				$this->release( 'v2.0.0' ),
-				$this->release( 'v2.0.1-dev.2' ),
-				$this->release( 'v2.0.1-dev.1' ),
+				$this->release( 'v98.0.0' ),
+				$this->release( 'v99.0.0-dev.2' ),
+				$this->release( 'v99.0.0-dev.1' ),
 			)
 		);
 
 		$result = $this->run_check();
 
-		$this->assertSame( '2.0.1-dev.2', $result->response[ self::BASENAME ]->new_version );
+		$this->assertSame( '99.0.0-dev.2', $result->response[ self::BASENAME ]->new_version );
 		$this->assertNotFalse( get_transient( 'lumia_factures_github_update_dev' ) );
 	}
 

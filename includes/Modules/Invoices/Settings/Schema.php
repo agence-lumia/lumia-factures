@@ -9,19 +9,49 @@ namespace Lumia\Factures\Modules\Invoices\Settings;
 
 defined( 'ABSPATH' ) || exit;
 
+use Lumia\Factures\Modules\Invoices\Documents\Register;
+use Lumia\Factures\Modules\Invoices\Emails\EmailIds;
 use Lumia\Factures\Modules\Invoices\Numbering\NumberFormat;
 
 /**
  * Single source of truth of the invoice settings.
  *
- * Settings are grouped (general, company, numbering, content, design), and the
+ * Settings are grouped (general, company, numbering, credit_notes, customer, content, design), and the
  * stored shape equals the form shape. Keys follow the legacy 1.x schema so that
  * stored settings can be mapped one to one. Label defaults are stored empty:
  * the translated default is resolved at render time.
  */
 final class Schema {
 
-	public const GROUPS = [ 'general', 'company', 'numbering', 'content', 'design' ];
+	public const GROUPS = [ 'general', 'company', 'numbering', 'credit_notes', 'customer', 'content', 'design' ];
+
+	/**
+	 * Numbered document types, and the group holding their numbering policy (`format`,
+	 * `start_number`, `reset_enabled`, `reset_period`).
+	 */
+	public const NUMBERED = [
+		'invoice'     => 'numbering',
+		'credit_note' => 'credit_notes',
+	];
+
+	/**
+	 * Ids of the WooCommerce refund email. WooCommerce renames it `customer_partially_refunded_order`
+	 * while it sends a partial refund (see EmailIds). It carries the credit note, never the invoice.
+	 */
+	public const REFUND_EMAILS = [ EmailIds::REFUND, EmailIds::PARTIAL_REFUND ];
+
+	/**
+	 * Credit note formats tried, in order, when an invoice format chosen before credit notes existed
+	 * (a 1.x import, a 2.0.x site) takes the prefix of the default one (`A{year}{number:5}` and
+	 * `AV-`). No literal invoice prefix can start like both `AV` and `CN`, so one of them always
+	 * keeps that invoice numbering. Used by Importer::sanitize_settings() and Upgrader.
+	 */
+	public const CREDIT_NOTE_FALLBACKS = [ 'AVOIR-{year}-{number:5}', 'CN-{year}-{number:5}' ];
+
+	/**
+	 * Keys of a numbering policy: reverted together when the policy is refused.
+	 */
+	private const POLICY_KEYS = [ 'format', 'reset_enabled', 'reset_period' ];
 
 	/**
 	 * Field definitions, cached.
@@ -51,7 +81,11 @@ final class Schema {
 	 * Sanitizes a (possibly partial) settings payload.
 	 *
 	 * A key absent from $input keeps its $current value; a present key is
-	 * sanitized; unknown groups and keys are dropped. $current is assumed valid.
+	 * sanitized; unknown groups and keys are dropped. $current is assumed valid,
+	 * and its number formats are the ones the documents were issued with (see
+	 * separate_series()). A refused numbering policy (format, reset_enabled,
+	 * reset_period) keeps its current value and adds an error; the other fields
+	 * are saved.
 	 *
 	 * @param array<string, mixed> $input   Raw payload, already unslashed.
 	 * @param array<string, mixed> $current Current valid settings.
@@ -74,21 +108,146 @@ final class Schema {
 			}
 		}
 
-		$numbering = $settings['numbering'];
-		$validated = NumberFormat::validate( (string) $numbering['format'], (bool) $numbering['reset_enabled'], (string) $numbering['reset_period'] );
+		// Each numbering policy is checked on its own: a refused one goes back to its current value.
+		foreach ( self::NUMBERED as $type => $group ) {
+			$policy    = $settings[ $group ];
+			$validated = NumberFormat::validate( (string) $policy['format'], (bool) $policy['reset_enabled'], (string) $policy['reset_period'] );
 
-		if ( true !== $validated ) {
-			$errors[] = $validated;
+			if ( true !== $validated ) {
+				if ( 'credit_note' === $type ) {
+					/* translators: %s: why the credit note number format is refused. */
+					$validated = sprintf( __( 'Credit note number: %s', 'lumia-factures' ), $validated );
+				}
 
-			foreach ( [ 'format', 'reset_enabled', 'reset_period' ] as $key ) {
-				$settings['numbering'][ $key ] = $current['numbering'][ $key ] ?? self::defaults()['numbering'][ $key ];
+				$errors[] = $validated;
+				$settings = self::revert_policy( $settings, $group, $current );
 			}
 		}
+
+		// Then the two series must never print the same number.
+		$settings = self::separate_series( $settings, $current, $errors );
 
 		return [
 			'settings' => $settings,
 			'errors'   => $errors,
 		];
+	}
+
+	/**
+	 * Keeps the invoice and credit note series from ever printing the same number.
+	 *
+	 * First each type whose prefix changes must leave alone the numbers of the other type
+	 * (prefix_is_free()): a refused one reverts on its own. Then the two formats being saved must
+	 * have distinct prefixes (NumberFormat::prefixes_differ()): the credit note policy goes back
+	 * first, and the invoice policy too when the conflict came from the invoice format alone.
+	 * One error at most, about the formats posted.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 * @param string[]                            $errors   Errors, appended to.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function separate_series( array $settings, array $current, array &$errors ): array {
+		$invoice_free = self::prefix_is_free( 'invoice', $settings, $current );
+		$credit_free  = self::prefix_is_free( 'credit_note', $settings, $current );
+
+		if ( ! self::prefixes_differ( $settings ) ) {
+			$errors[] = __( 'The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-.', 'lumia-factures' );
+		} elseif ( ! $invoice_free || ! $credit_free ) {
+			$errors[] = __( 'A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number.', 'lumia-factures' );
+		}
+
+		if ( ! $invoice_free ) {
+			$settings = self::revert_policy( $settings, self::NUMBERED['invoice'], $current );
+		}
+
+		if ( ! $credit_free ) {
+			$settings = self::revert_policy( $settings, self::NUMBERED['credit_note'], $current );
+		}
+
+		if ( ! self::prefixes_differ( $settings ) ) {
+			$settings = self::revert_policy( $settings, self::NUMBERED['credit_note'], $current );
+
+			if ( ! self::prefixes_differ( $settings ) ) {
+				$settings = self::revert_policy( $settings, self::NUMBERED['invoice'], $current );
+			}
+		}
+
+		return $settings;
+	}
+
+	/**
+	 * Whether the prefix of a type's new format leaves alone the numbers of the other type.
+	 *
+	 * Comparing the two formats being saved is not enough: Module::carry_counter() keeps each
+	 * series going, so after a swap of the prefixes (FA- and AV-) the next credit note would print
+	 * the number of an issued invoice, and Pipeline::number() would refuse value after value. A
+	 * prefix that changes must therefore also differ from the other type's current format, and no
+	 * number the register holds for the other type (printed by an earlier format) may start the way
+	 * the new numbers do. LIKE follows the collation of the register, as prefixes_differ() folds.
+	 * An unchanged prefix is not checked: the current settings are assumed valid.
+	 *
+	 * @param string                              $type     Numbered type, a key of NUMBERED.
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 */
+	private static function prefix_is_free( string $type, array $settings, array $current ): bool {
+		$other  = 'invoice' === $type ? 'credit_note' : 'invoice';
+		$format = (string) $settings[ self::NUMBERED[ $type ] ]['format'];
+
+		if ( NumberFormat::prefix( $format ) === NumberFormat::prefix( self::current_format( $current, $type ) ) ) {
+			return true;
+		}
+
+		$other_format = self::current_format( $current, $other );
+		$apart        = 'invoice' === $type
+			? NumberFormat::prefixes_differ( $format, $other_format )
+			: NumberFormat::prefixes_differ( $other_format, $format );
+
+		return $apart && ! Register::number_starts_with( $other, ...NumberFormat::number_starts( $format ) );
+	}
+
+	/**
+	 * Number format of a type in the current settings (the default when they have none).
+	 *
+	 * @param array<string, mixed> $current Current valid settings.
+	 * @param string               $type    Numbered type, a key of NUMBERED.
+	 */
+	private static function current_format( array $current, string $type ): string {
+		$group  = self::NUMBERED[ $type ];
+		$stored = isset( $current[ $group ] ) && is_array( $current[ $group ] ) ? $current[ $group ] : [];
+
+		return (string) ( $stored['format'] ?? self::fields()[ $group ]['format']['default'] );
+	}
+
+	/**
+	 * Whether the invoice and credit note formats of a settings array have distinct prefixes.
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings.
+	 */
+	private static function prefixes_differ( array $settings ): bool {
+		return NumberFormat::prefixes_differ(
+			(string) $settings[ self::NUMBERED['invoice'] ]['format'],
+			(string) $settings[ self::NUMBERED['credit_note'] ]['format']
+		);
+	}
+
+	/**
+	 * Puts a numbering policy back to its current value (the default when it has none).
+	 *
+	 * @param array<string, array<string, mixed>> $settings Settings being sanitized.
+	 * @param string                              $group    Group of the policy.
+	 * @param array<string, mixed>                $current  Current valid settings.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function revert_policy( array $settings, string $group, array $current ): array {
+		$stored = isset( $current[ $group ] ) && is_array( $current[ $group ] ) ? $current[ $group ] : [];
+
+		foreach ( self::POLICY_KEYS as $key ) {
+			$settings[ $group ][ $key ] = $stored[ $key ] ?? self::fields()[ $group ][ $key ]['default'];
+		}
+
+		return $settings;
 	}
 
 	/**
@@ -125,8 +284,10 @@ final class Schema {
 				return is_scalar( $value ) ? sanitize_textarea_field( str_replace( [ "\r\n", "\r" ], "\n", (string) $value ) ) : $previous;
 
 			case 'statuses':
+				return self::sanitize_list( $value, self::status_options() );
+
 			case 'emails':
-				return self::sanitize_list( $value, 'statuses' === $field['type'] ? self::status_options() : self::email_options() );
+				return self::sanitize_list( $value, self::email_options( (string) ( $field['scope'] ?? 'all' ) ) );
 
 			case 'text':
 			default:
@@ -174,11 +335,18 @@ final class Schema {
 	}
 
 	/**
-	 * WooCommerce email ids.
+	 * WooCommerce email ids, canonical (EmailIds::normalize()).
 	 *
+	 * The ids are read from the email objects, and WooCommerce renames the refund email object
+	 * `customer_partially_refunded_order` for the rest of the request once it sent a partial refund:
+	 * read as is, the stored `customer_refunded_order` would be dropped by the next save.
+	 *
+	 * @param string $scope `all`, `invoice` (every email but the refund one), `refund` (the refund
+	 *                      email only, see REFUND_EMAILS) or `customer` (the emails sent to the
+	 *                      customer, refund email included).
 	 * @return string[]
 	 */
-	public static function email_options(): array {
+	public static function email_options( string $scope = 'all' ): array {
 		if ( ! function_exists( 'WC' ) || ! WC()->mailer() ) {
 			return [];
 		}
@@ -186,9 +354,25 @@ final class Schema {
 		$ids = [];
 
 		foreach ( WC()->mailer()->get_emails() as $email ) {
-			if ( is_object( $email ) && ! empty( $email->id ) ) {
-				$ids[] = (string) $email->id;
+			if ( ! is_object( $email ) || empty( $email->id ) ) {
+				continue;
 			}
+
+			if ( 'customer' === $scope && ! ( method_exists( $email, 'is_customer_email' ) && $email->is_customer_email() ) ) {
+				continue;
+			}
+
+			$ids[] = EmailIds::normalize( (string) $email->id );
+		}
+
+		$ids = array_values( array_unique( $ids ) );
+
+		if ( 'invoice' === $scope ) {
+			return array_values( array_diff( $ids, self::REFUND_EMAILS ) );
+		}
+
+		if ( 'refund' === $scope ) {
+			return array_values( array_intersect( $ids, self::REFUND_EMAILS ) );
 		}
 
 		return $ids;
@@ -202,11 +386,13 @@ final class Schema {
 	public static function fields(): array {
 		if ( null === self::$fields ) {
 			self::$fields = [
-				'general'   => self::general(),
-				'company'   => self::company(),
-				'numbering' => self::numbering(),
-				'content'   => self::content(),
-				'design'    => self::design(),
+				'general'      => self::general(),
+				'company'      => self::company(),
+				'numbering'    => self::numbering(),
+				'credit_notes' => self::credit_notes(),
+				'customer'     => self::customer(),
+				'content'      => self::content(),
+				'design'       => self::design(),
 			];
 		}
 
@@ -239,7 +425,7 @@ final class Schema {
 	private static function general(): array {
 		return [
 			'trigger_statuses'  => self::field( 'statuses', [ 'processing', 'completed' ] ),
-			'email_attachments' => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice' ] ),
+			'email_attachments' => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice' ], [ 'scope' => 'invoice' ] ),
 		];
 	}
 
@@ -326,8 +512,18 @@ final class Schema {
 	 * @return array<string, array<string, mixed>>
 	 */
 	private static function numbering(): array {
+		return self::numbering_policy( 'FA-{year}-{number:5}' );
+	}
+
+	/**
+	 * Fields of a numbering policy.
+	 *
+	 * @param string $format Default format.
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function numbering_policy( string $format ): array {
 		return [
-			'format'        => self::field( 'text', 'FA-{year}-{number:5}' ),
+			'format'        => self::field( 'text', $format ),
 			'start_number'  => self::field(
 				'int',
 				1,
@@ -339,6 +535,69 @@ final class Schema {
 			'reset_enabled' => self::field( 'bool', true ),
 			'reset_period'  => self::field( 'select', 'yearly', [ 'options' => [ 'yearly', 'monthly' ] ] ),
 		];
+	}
+
+	/**
+	 * Group: credit_notes. Its own number series (the prefix must differ from the invoice one, see
+	 * sanitize()), title, refund reason and emails. There is no on/off switch: every refund of an
+	 * invoiced order gets a credit note.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function credit_notes(): array {
+		return array_merge(
+			self::numbering_policy( 'AV-{year}-{number:5}' ),
+			[
+				'title'             => self::field( 'text', '' ),
+				'reason_enabled'    => self::field( 'bool', true ),
+				'email_attachments' => self::field( 'emails', [ 'customer_refunded_order' ], [ 'scope' => 'refund' ] ),
+			]
+		);
+	}
+
+	/**
+	 * Group: customer. Where the customer finds the links to the order's documents: the My Account
+	 * orders list, the order details (My Account order view and thank-you page) and the emails.
+	 * Upgrader turns the first two off on an existing installation.
+	 *
+	 * @return array<string, array<string, mixed>>
+	 */
+	private static function customer(): array {
+		return [
+			'account_orders' => self::field( 'bool', true ),
+			'order_details'  => self::field( 'bool', true ),
+			'email_links'    => self::field( 'emails', [ 'customer_processing_order', 'customer_completed_order', 'customer_invoice', EmailIds::REFUND ], [ 'scope' => 'customer' ] ),
+		];
+	}
+
+	/**
+	 * Whether stored settings still equal the defaults, so were never saved by the user (the
+	 * activator stores the defaults).
+	 *
+	 * A group added by a later version is missing from the defaults stored by an earlier one: it is
+	 * read from the current defaults, as Module::settings() does, so an update does not turn the old
+	 * defaults into user settings. Groups in $except are left out of the comparison.
+	 *
+	 * @param mixed    $stored Stored option.
+	 * @param string[] $except Groups not compared.
+	 */
+	public static function left_at_defaults( $stored, array $except = [] ): bool {
+		if ( ! is_array( $stored ) ) {
+			return false;
+		}
+
+		$defaults = self::defaults();
+		foreach ( $defaults as $group => $values ) {
+			if ( ! array_key_exists( $group, $stored ) ) {
+				$stored[ $group ] = $values;
+			}
+		}
+
+		foreach ( $except as $group ) {
+			unset( $defaults[ $group ], $stored[ $group ] );
+		}
+
+		return $defaults == $stored; // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Same values, key order and int/float equality do not matter.
 	}
 
 	/**

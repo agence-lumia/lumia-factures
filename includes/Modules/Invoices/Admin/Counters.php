@@ -10,10 +10,12 @@ namespace Lumia\Factures\Modules\Invoices\Admin;
 defined( 'ABSPATH' ) || exit;
 
 use Lumia\Factures\Modules\Invoices\Numbering\Sequences;
+use Lumia\Factures\Modules\Invoices\Settings\Schema;
 
 /**
  * Admin-post handler of the "Raise" form of the Numbering tab. A counter can only go up:
- * the number of an issued invoice is never reissued (`Sequences::raise()` enforces it).
+ * the number of an issued document is never reissued (`Sequences::raise()` enforces it).
+ * Invoices and credit notes have their own counters; the table names the type of each.
  */
 final class Counters {
 
@@ -43,6 +45,43 @@ final class Counters {
 		$messages['counter_not_raised'] = __( 'The counter was not raised: the new value must be higher than the current one.', 'lumia-factures' );
 
 		return $messages;
+	}
+
+	/**
+	 * Document type a counter key belongs to (`invoice_2026` -> `invoice`, `credit_note` -> `credit_note`).
+	 *
+	 * @param string $key Counter key, see Sequences::key().
+	 * @return string A key of Schema::NUMBERED, '' when the key belongs to none.
+	 */
+	public static function document_type( string $key ): string {
+		$found = '';
+
+		foreach ( array_keys( Schema::NUMBERED ) as $type ) {
+			if ( ( $key === $type || str_starts_with( $key, $type . '_' ) ) && strlen( $type ) > strlen( $found ) ) {
+				$found = $type;
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Label of the document type a counter key belongs to.
+	 *
+	 * @param string $key Counter key.
+	 * @return string '' when the key belongs to no known type.
+	 */
+	public static function document_label( string $key ): string {
+		switch ( self::document_type( $key ) ) {
+			case 'invoice':
+				return __( 'Invoice', 'lumia-factures' );
+
+			case 'credit_note':
+				return __( 'Credit note', 'lumia-factures' );
+
+			default:
+				return '';
+		}
 	}
 
 	/**

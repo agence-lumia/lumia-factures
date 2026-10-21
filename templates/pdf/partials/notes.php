@@ -1,6 +1,6 @@
 <?php
 /**
- * Customer note.
+ * Customer note on an invoice, refund reason on a credit note.
  *
  * @package Lumia\Factures
  *

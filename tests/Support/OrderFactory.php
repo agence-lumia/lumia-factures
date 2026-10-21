@@ -11,10 +11,14 @@ namespace Lumia\Factures\Tests\Support;
 
 defined( 'ABSPATH' ) || exit;
 
+use RuntimeException;
 use WC_Coupon;
 use WC_Order;
 use WC_Order_Item_Fee;
+use WC_Order_Item_Product;
 use WC_Order_Item_Shipping;
+use WC_Order_Item_Tax;
+use WC_Order_Refund;
 use WC_Product;
 use WC_Product_Attribute;
 use WC_Product_Simple;
@@ -164,5 +168,83 @@ final class OrderFactory {
 		$order->save();
 
 		return wc_get_order( $order->get_id() );
+	}
+
+	/**
+	 * A saved refund of an order, created by WooCommerce (`wc_create_refund()`), no payment refunded
+	 * and no stock restored.
+	 *
+	 * @param WC_Order                         $order      Order.
+	 * @param array<int, array<string, mixed>> $line_items Refunded items keyed by order item id, as `wc_create_refund()`
+	 *                                                     takes them (`qty`, `refund_total`, `refund_tax`): see `refund_line()`.
+	 * @param float|null                       $amount     Refunded amount, null for the sum of the items.
+	 * @param string                           $reason     Refund reason.
+	 * @throws RuntimeException When WooCommerce refuses the refund.
+	 */
+	public static function refund( WC_Order $order, array $line_items, ?float $amount, string $reason = '' ): WC_Order_Refund {
+		if ( null === $amount ) {
+			$amount = 0.0;
+			foreach ( $line_items as $line ) {
+				$amount += (float) ( $line['refund_total'] ?? 0 ) + array_sum( array_map( 'floatval', (array) ( $line['refund_tax'] ?? [] ) ) );
+			}
+			$amount = round( $amount, wc_get_price_decimals() );
+		}
+
+		$refund = wc_create_refund(
+			[
+				'order_id'       => $order->get_id(),
+				'amount'         => $amount,
+				'reason'         => $reason,
+				'line_items'     => $line_items,
+				'refund_payment' => false,
+				'restock_items'  => false,
+			]
+		);
+		if ( is_wp_error( $refund ) ) {
+			throw new RuntimeException( esc_html( $refund->get_error_message() ) );
+		}
+
+		$fresh = wc_get_order( $refund->get_id() );
+		if ( ! $fresh instanceof WC_Order_Refund ) {
+			throw new RuntimeException( 'The refund was not saved.' );
+		}
+
+		return $fresh;
+	}
+
+	/**
+	 * One refunded item as the order screen sends it: the item's share of its total and taxes.
+	 *
+	 * The screen has one tax input per rate of the order on every row and posts them all, 0 for a
+	 * rate the item does not carry (WooCommerce 11+ keeps that 0 and records a tax item at 0).
+	 *
+	 * @param WC_Order_Item_Product|WC_Order_Item_Shipping|WC_Order_Item_Fee $item     Order item.
+	 * @param int|null                                                      $quantity Quantity refunded (products), null for the whole item.
+	 * @return array{qty: int|float, refund_total: float, refund_tax: array<int, float>}
+	 */
+	public static function refund_line( WC_Order_Item_Product|WC_Order_Item_Shipping|WC_Order_Item_Fee $item, ?int $quantity = null ): array {
+		$decimals = wc_get_price_decimals();
+		$ordered  = $item instanceof WC_Order_Item_Product ? $item->get_quantity() : 0;
+		$share    = null === $quantity || 0.0 === (float) $ordered ? 1.0 : $quantity / $ordered;
+		$taxes    = $item->get_taxes();
+
+		$refund_tax = [];
+		$order      = $item->get_order();
+		if ( $order instanceof WC_Order ) {
+			foreach ( $order->get_items( 'tax' ) as $tax_item ) {
+				if ( $tax_item instanceof WC_Order_Item_Tax ) {
+					$refund_tax[ (int) $tax_item->get_rate_id() ] = 0.0;
+				}
+			}
+		}
+		foreach ( (array) ( $taxes['total'] ?? [] ) as $rate_id => $tax ) {
+			$refund_tax[ (int) $rate_id ] = round( (float) $tax * $share, $decimals );
+		}
+
+		return [
+			'qty'          => null === $quantity ? $ordered : $quantity,
+			'refund_total' => round( (float) $item->get_total() * $share, $decimals ),
+			'refund_tax'   => $refund_tax,
+		];
 	}
 }

@@ -1,12 +1,13 @@
 <?php
 /**
- * Header: logo and company on one row, then the title band.
+ * Header: logo and company on one row, then the title band and, on a credit note, the invoice
+ * it credits (a mandatory mention, `reference` is never empty on a credit note).
  *
  * Tables, not flexbox: Dompdf supports neither flexbox nor grid.
  *
  * @package Lumia\Factures
  *
- * @var array{logo: array{src: string, width: int}|null, title: string, number: string} $header
+ * @var array{logo: array{src: string, width: int}|null, title: string, number: string, reference: string} $header
  * @var array<int, array{key: string, label: string, value: string}> $shop
  */
 
@@ -39,3 +40,6 @@ defined( 'ABSPATH' ) || exit;
 		<td class="lf-titlebar__label"><h1><?php echo esc_html( $header['title'] ); ?></h1></td>
 	</tr>
 </table>
+<?php if ( ! empty( $header['reference'] ) ) : ?>
+	<p class="lf-reference"><?php echo esc_html( (string) $header['reference'] ); ?></p>
+<?php endif; ?>
