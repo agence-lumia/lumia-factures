@@ -85,7 +85,7 @@ class OrderToolsTest extends TestCase {
 		$this->assertStringContainsString( (string) $doc->number, $html );
 		$this->assertStringContainsString( 'Refund #' . $issued->get_id() . ' (', $html );
 		$this->assertStringContainsString( 'action=lumia_factures_invoices_download_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $issued->get_id(), $html );
-		$this->assertStringNotContainsString( 'lumia_factures_invoices_restore_credit_note', $html );
+		$this->assertStringNotContainsString( 'Rebuild missing PDF', $html, 'An intact credit note offers Regenerate, not Rebuild.' );
 
 		$this->assertStringContainsString( 'action=lumia_factures_invoices_issue_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $missing->get_id(), $html );
 		$this->assertStringContainsString( 'action=lumia_factures_invoices_issue_credit_note&#038;order_id=' . $order->get_id() . '&#038;refund_id=' . $flagged->get_id(), $html );
@@ -185,13 +185,11 @@ class OrderToolsTest extends TestCase {
 		$this->assertSame( $order->get_id(), $doc->parent_id );
 	}
 
-	public function test_restore_credit_note_action_rebuilds_only_missing_file(): void {
+	public function test_restore_credit_note_action_rebuilds_missing_file(): void {
 		$order  = $this->issued_order();
 		$other  = $this->issued_order();
 		$refund = $this->refund( $order, 3.0 );
 		$doc    = Register::find( 'credit_note', $refund->get_id() );
-
-		$this->assertSame( 'credit_note_restore_refused', OrderTools::restore_credit_note_for( $order->get_id(), $refund->get_id() ), 'An intact file is never rebuilt.' );
 
 		wp_delete_file( (string) Archive::path( $doc ) );
 		$this->assertSame( 'credit_note_restore_refused', OrderTools::restore_credit_note_for( $other->get_id(), $refund->get_id() ) );
@@ -427,10 +425,55 @@ class OrderToolsTest extends TestCase {
 		$this->assertNull( Register::find( 'invoice', $order->get_id() ) );
 	}
 
-	public function test_restore_action_refuses_intact_file(): void {
-		$order = $this->issued_order();
+	public function test_restore_action_regenerates_intact_file_and_keeps_the_previous_one(): void {
+		$order    = $this->issued_order();
+		$doc      = Register::find( 'invoice', $order->get_id() );
+		$old_path = (string) Archive::path( $doc );
+		$bytes    = (string) file_get_contents( $old_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 
-		$this->assertSame( 'invoice_restore_refused', OrderTools::restore_for( $order->get_id() ) );
+		$this->assertSame( 'invoice_restored', OrderTools::restore_for( $order->get_id() ) );
+
+		$new = Register::find( 'invoice', $order->get_id() );
+		$this->track( $new );
+		$this->assertNotSame( $doc->file, $new->file );
+		$this->assertTrue( Archive::verify( $new ) );
+		$this->assertSame( $doc->number, $new->number );
+		$this->assertSame( $doc->issued_at, $new->issued_at );
+		$this->assertSame( $doc->sequence, $new->sequence );
+		$this->assertSame( $bytes, file_get_contents( $old_path ), 'The previous file is never overwritten nor deleted.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+	}
+
+	public function test_restore_credit_note_action_regenerates_intact_file(): void {
+		$order  = $this->issued_order();
+		$refund = $this->refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$old    = (string) Archive::path( $doc );
+
+		$this->assertSame( 'credit_note_restored', OrderTools::restore_credit_note_for( $order->get_id(), $refund->get_id() ) );
+
+		$new = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $new );
+		$this->assertNotSame( $doc->file, $new->file );
+		$this->assertTrue( Archive::verify( $new ) );
+		$this->assertSame( $doc->number, $new->number );
+		$this->assertSame( $doc->issued_at, $new->issued_at );
+		$this->assertFileExists( $old );
+	}
+
+	public function test_metabox_offers_regenerate_behind_a_confirmation_when_archive_is_intact(): void {
+		$order = $this->issued_order();
+		$html  = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+
+		$this->assertStringContainsString( 'Regenerate PDF', $html );
+		$this->assertStringContainsString( 'data-modal-confirm', $html );
+		$this->assertStringNotContainsString( 'Rebuild missing PDF', $html );
+
+		$doc = Register::find( 'invoice', $order->get_id() );
+		wp_delete_file( (string) Archive::path( $doc ) );
+		$html = $this->capture_metabox( wc_get_order( $order->get_id() ) );
+
+		$this->assertStringContainsString( 'Rebuild missing PDF', $html );
+		$this->assertStringNotContainsString( 'Regenerate PDF', $html );
 	}
 
 	public function test_restore_action_rebuilds_missing_file(): void {
@@ -639,7 +682,7 @@ class OrderToolsTest extends TestCase {
 
 		$this->assertStringContainsString( (string) $doc->number, $html );
 		$this->assertStringContainsString( 'lumia_factures_invoices_download', $html );
-		$this->assertStringNotContainsString( 'lumia_factures_invoices_restore', $html );
+		$this->assertStringNotContainsString( 'Rebuild missing PDF', $html, 'An intact invoice offers Regenerate, not Rebuild.' );
 
 		wp_delete_file( (string) Archive::path( $doc ) );
 		$this->assertStringContainsString( 'lumia_factures_invoices_restore', $this->capture_metabox( $order ) );

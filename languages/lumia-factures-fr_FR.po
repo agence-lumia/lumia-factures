@@ -1604,3 +1604,18 @@ msgstr "Documents"
 #: templates/front/order-documents.php:25
 msgid "Date"
 msgstr "Date"
+
+msgid "Regenerate the PDF of %s?"
+msgstr "Régénérer le PDF de %s ?"
+
+msgid "The PDF is rendered again from the current order data and settings. Its number and date do not change, and the current file is kept in the archive."
+msgstr "Le PDF est recalculé à partir des données actuelles de la commande et des réglages. Son numéro et sa date ne changent pas, et le fichier actuel reste conservé dans l’archive."
+
+msgid "Regenerate PDF"
+msgstr "Régénérer le PDF"
+
+msgid "Credit note PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive."
+msgstr "Le PDF de l’avoir %1$s a été régénéré à partir des données actuelles de la commande et des réglages, avec le même numéro et la même date. L’ancien fichier %2$s reste conservé dans l’archive."
+
+msgid "Invoice PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive."
+msgstr "Le PDF de la facture %1$s a été régénéré à partir des données actuelles de la commande et des réglages, avec le même numéro et la même date. L’ancien fichier %2$s reste conservé dans l’archive."

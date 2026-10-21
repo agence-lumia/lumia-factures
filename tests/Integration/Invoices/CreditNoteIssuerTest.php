@@ -891,6 +891,25 @@ class CreditNoteIssuerTest extends TestCase {
 		$this->assertTrue( Archive::verify( $doc ) );
 	}
 
+	public function test_regenerate_rerenders_intact_credit_note_with_same_number_and_date(): void {
+		$order  = $this->invoiced_order();
+		$refund = $this->amount_refund( $order, 3.0 );
+		$doc    = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $doc );
+		$old = (string) Archive::path( $doc );
+
+		$this->assertTrue( CreditNoteIssuer::restore( $doc, true ) );
+
+		$new = Register::find( 'credit_note', $refund->get_id() );
+		$this->track( $new );
+		$this->assertSame( $doc->number, $new->number );
+		$this->assertSame( $doc->issued_at, $new->issued_at );
+		$this->assertNotSame( $doc->file, $new->file );
+		$this->assertTrue( Archive::verify( $new ) );
+		$this->assertFileExists( $old );
+		$this->assertTrue( $this->has_note( $order, sprintf( 'Credit note PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive.', $doc->number, $doc->file ) ) );
+	}
+
 	public function test_restore_rebuilds_missing_file_only_and_refuses_when_refund_deleted_or_reused(): void {
 		$order  = $this->invoiced_order();
 		$refund = $this->amount_refund( $order, 3.0 );

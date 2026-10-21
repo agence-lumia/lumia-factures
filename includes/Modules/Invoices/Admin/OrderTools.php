@@ -68,6 +68,13 @@ final class OrderTools {
 	private static int $cancel_order_id = 0;
 
 	/**
+	 * Whether the meta box printed a button that opens the confirmation modal.
+	 *
+	 * @var bool
+	 */
+	private static bool $needs_modal = false;
+
+	/**
 	 * Registers the hooks (admin only).
 	 */
 	public static function register(): void {
@@ -138,6 +145,7 @@ final class OrderTools {
 	 */
 	public static function render_meta_box( $post_or_order ): void {
 		self::$cancel_order_id = 0;
+		self::$needs_modal     = false;
 
 		$order = self::resolve_order( $post_or_order );
 		if ( null === $order ) {
@@ -153,11 +161,15 @@ final class OrderTools {
 	 * offered "Cancel invoice".
 	 */
 	public static function render_footer(): void {
-		if ( self::$cancel_order_id <= 0 || ! self::on_order_screen() ) {
+		if ( ! self::$needs_modal || ! self::on_order_screen() ) {
 			return;
 		}
 
 		Admin::render_modal_overlay();
+
+		if ( self::$cancel_order_id <= 0 ) {
+			return;
+		}
 
 		printf(
 			'<form id="%1$s" method="post" action="%2$s" hidden><input type="hidden" name="action" value="%3$s"><input type="hidden" name="order_id" value="%4$d">',
@@ -259,7 +271,8 @@ final class OrderTools {
 	}
 
 	/**
-	 * Rebuilds the missing or damaged PDF of an issued invoice.
+	 * Rebuilds the PDF of an issued invoice: a missing or damaged one, or an intact one on request
+	 * (Issuer::restore() with `$regenerate`). Number and date are kept, the previous file stays.
 	 *
 	 * @param int $order_id Order id.
 	 * @return string Notice code: `invoice_restored` or `invoice_restore_refused`.
@@ -272,7 +285,7 @@ final class OrderTools {
 			return 'invoice_restore_refused';
 		}
 
-		return Issuer::restore( $doc, $order ) ? 'invoice_restored' : 'invoice_restore_refused';
+		return Issuer::restore( $doc, $order, true ) ? 'invoice_restored' : 'invoice_restore_refused';
 	}
 
 	/**
@@ -295,7 +308,8 @@ final class OrderTools {
 	}
 
 	/**
-	 * Rebuilds the missing or damaged PDF of a credit note of the order.
+	 * Rebuilds the PDF of a credit note of the order: a missing or damaged one, or an intact one on
+	 * request (CreditNoteIssuer::restore() with `$regenerate`).
 	 *
 	 * @param int $order_id  Order id, as posted.
 	 * @param int $refund_id Refund id, as posted.
@@ -309,7 +323,7 @@ final class OrderTools {
 			return 'credit_note_restore_refused';
 		}
 
-		return CreditNoteIssuer::restore( $doc ) ? 'credit_note_restored' : 'credit_note_restore_refused';
+		return CreditNoteIssuer::restore( $doc, true ) ? 'credit_note_restored' : 'credit_note_restore_refused';
 	}
 
 	/**
@@ -433,18 +447,13 @@ final class OrderTools {
 				esc_html__( 'Download PDF', 'lumia-factures' )
 			);
 
-			if ( ! Archive::verify( $doc ) ) {
-				printf(
-					' <a href="%1$s" class="button">%2$s</a>',
-					esc_url( self::action_url( 'restore', $order_id ) ),
-					esc_html__( 'Rebuild missing PDF', 'lumia-factures' )
-				);
-			}
+			echo ' ' . self::rebuild_button( self::action_url( 'restore', $order_id ), $doc, 'button' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Escaped in rebuild_button().
 
 			echo '</p>';
 
 			if ( '' === InvoiceCancellation::refusal( $order ) ) {
 				self::$cancel_order_id = $order_id;
+				self::$needs_modal     = true;
 				printf(
 					'<p><button type="button" class="button" data-modal-confirm data-modal-danger data-modal-form="%1$s" data-modal-title="%2$s" data-modal-message="%3$s" data-modal-confirm-label="%4$s">%4$s</button></p>',
 					esc_attr( self::CANCEL_FORM ),
@@ -552,6 +561,38 @@ final class OrderTools {
 	}
 
 	/**
+	 * The rebuild link of an issued document: "Rebuild missing PDF" when its archive is missing or
+	 * damaged, otherwise "Regenerate PDF" behind a confirmation (a rendering fix).
+	 *
+	 * @param string         $url   Signed restore URL.
+	 * @param IssuedDocument $doc   Issued invoice or credit note.
+	 * @param string         $classes Button classes.
+	 * @return string Escaped HTML.
+	 */
+	private static function rebuild_button( string $url, IssuedDocument $doc, string $classes ): string {
+		if ( ! Archive::verify( $doc ) ) {
+			return sprintf(
+				'<a href="%1$s" class="%2$s">%3$s</a>',
+				esc_url( $url ),
+				esc_attr( $classes ),
+				esc_html__( 'Rebuild missing PDF', 'lumia-factures' )
+			);
+		}
+
+		self::$needs_modal = true;
+
+		return sprintf(
+			'<a href="%1$s" class="%2$s" data-modal-confirm data-modal-title="%3$s" data-modal-message="%4$s" data-modal-confirm-label="%5$s">%5$s</a>',
+			esc_url( $url ),
+			esc_attr( $classes ),
+			/* translators: %s: invoice or credit note number */
+			esc_attr( sprintf( __( 'Regenerate the PDF of %s?', 'lumia-factures' ), (string) $doc->number ) ),
+			esc_attr__( 'The PDF is rendered again from the current order data and settings. Its number and date do not change, and the current file is kept in the archive.', 'lumia-factures' ),
+			esc_attr__( 'Regenerate PDF', 'lumia-factures' )
+		);
+	}
+
+	/**
 	 * One refund of the meta box: its credit note, or why it has none and the issue button.
 	 *
 	 * @param WC_Order            $order  Order.
@@ -579,15 +620,7 @@ final class OrderTools {
 				esc_html__( 'Download PDF', 'lumia-factures' )
 			);
 
-			if ( ! Archive::verify( $doc ) ) {
-				$html .= sprintf(
-					' <a href="%1$s" class="button button-small">%2$s</a>',
-					esc_url( self::refund_action_url( 'restore_credit_note', $order_id, $refund_id ) ),
-					esc_html__( 'Rebuild missing PDF', 'lumia-factures' )
-				);
-			}
-
-			return $html;
+			return $html . ' ' . self::rebuild_button( self::refund_action_url( 'restore_credit_note', $order_id, $refund_id ), $doc, 'button button-small' );
 		}
 
 		$reason = CreditNoteIssuer::refusal( $refund );
