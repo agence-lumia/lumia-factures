@@ -102,12 +102,12 @@ class UpdaterTest extends TestCase {
 	}
 
 	public function test_injects_update_when_newer_release(): void {
-		$this->mock_http( 200, $this->release( '2.0.1' ) );
+		$this->mock_http( 200, $this->release( '99.0.0' ) );
 
 		$result = $this->run_check();
 
-		$this->assertSame( '2.0.1', $result->response[ self::BASENAME ]->new_version );
-		$this->assertStringEndsWith( 'lumia-factures-2.0.1.zip', $result->response[ self::BASENAME ]->package );
+		$this->assertSame( '99.0.0', $result->response[ self::BASENAME ]->new_version );
+		$this->assertStringEndsWith( 'lumia-factures-99.0.0.zip', $result->response[ self::BASENAME ]->package );
 		$this->assertSame( 'LumiaFactures', $this->last_args['headers']['User-Agent'] );
 	}
 
