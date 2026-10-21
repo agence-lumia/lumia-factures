@@ -269,21 +269,25 @@ final class Issuer {
 	}
 
 	/**
-	 * Rebuilds the archived PDF of an issued invoice whose file is missing or damaged.
+	 * Rebuilds the archived PDF of an issued invoice whose file is missing or damaged, or, on an
+	 * explicit admin request, regenerates an intact one (a rendering fix).
 	 *
-	 * Number and date are kept. The new PDF goes to a new file; the damaged one is left in
-	 * place, never deleted. Does nothing when the archive is intact.
+	 * Number and date are kept. The new PDF goes to a new file; the previous one is left in
+	 * place, never overwritten nor deleted. Without `$regenerate`, does nothing when the archive
+	 * is intact.
 	 *
-	 * @param IssuedDocument $doc   Issued document.
-	 * @param WC_Order       $order Its order.
+	 * @param IssuedDocument $doc        Issued document.
+	 * @param WC_Order       $order      Its order.
+	 * @param bool           $regenerate Also re-render an intact archive (admin action only).
 	 * @return bool True when a new file was archived and recorded.
 	 */
-	public static function restore( IssuedDocument $doc, WC_Order $order ): bool {
+	public static function restore( IssuedDocument $doc, WC_Order $order, bool $regenerate = false ): bool {
 		if ( 'issued' !== $doc->status || null === $doc->number || $doc->order_id !== $order->get_id() ) {
 			return false;
 		}
 
-		if ( Archive::verify( $doc ) ) {
+		$intact = Archive::verify( $doc );
+		if ( $intact && ! $regenerate ) {
 			return false;
 		}
 
@@ -308,11 +312,18 @@ final class Issuer {
 		}
 
 		$order->add_order_note(
-			sprintf(
-				/* translators: %s: invoice number */
-				__( 'Invoice PDF %s was missing or damaged and has been rebuilt from the current order data.', 'lumia-factures' ),
-				$doc->number
-			)
+			$intact
+				? sprintf(
+					/* translators: 1: invoice number, 2: previous archived file */
+					__( 'Invoice PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive.', 'lumia-factures' ),
+					$doc->number,
+					(string) $doc->file
+				)
+				: sprintf(
+					/* translators: %s: invoice number */
+					__( 'Invoice PDF %s was missing or damaged and has been rebuilt from the current order data.', 'lumia-factures' ),
+					$doc->number
+				)
 		);
 
 		return true;

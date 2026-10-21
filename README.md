@@ -9,7 +9,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 - Issues PDF invoices for WooCommerce orders, rendered with Dompdf. An issued invoice is never modified: its number, date and archived PDF are fixed.
 - Continuous, unique numbering per document type, with a configurable format (`{year}`, `{month}`, `{number}`...) and yearly, monthly or no reset; counters can be raised, never lowered.
 - Amounts that always add up to the WooCommerce total (a rounding row absorbs any drift), in the order's currency, with the VAT rates read from the order.
-- Automatic issue on the order statuses you choose, manual issue and restore from the order screen, an invoice column in the order list, and the PDF attached to the WooCommerce e-mails you choose.
+- Automatic issue on the order statuses you choose, manual issue, rebuild and regeneration of the PDF (same number and date, the previous file kept) from the order screen, an invoice column in the order list, and the PDF attached to the WooCommerce e-mails you choose.
 - Write-once PDF archive in `wp-content/uploads/lumia-factures/`, protected from web access.
 - Settings screen (company, numbering, content, design) with a live PDF preview.
 - HPOS and legacy order storage.
@@ -19,7 +19,7 @@ The interface is in English and ships with a French translation (`fr_FR`).
 
 - Imports the invoices, numbers, counters, settings and PDFs of the former Facture PDF Lumia plugin (see [Migrating from Facture PDF Lumia](#migrating-from-facture-pdf-lumia)); the old customer download links and shortcode keep working.
 - Customer download of the invoice by link (order key for guests), by the `[lumia_factures_invoice]` shortcode, and by the Bricks dynamic tags.
-- Credit notes (2.1): one numbered, archived credit note per refund, in its own series (`AV-{year}-{number:5}` by default), attached to the refund e-mail; "Cancel invoice" credits the invoice of an unpaid order without moving money; `wp lumia-factures issue-credit-notes` issues the credit notes of refunds made before 2.1.
+- Credit notes (2.1): one numbered, archived credit note per refund, in its own series (`AV-{year}-{number:5}` by default), attached to the refund e-mail; "Cancel invoice" credits the invoice of an unpaid order without moving money; `wp lumia-factures issue-credit-notes` can issue the credit notes of refunds made before 2.1 (never automatic).
 - Customer access (2.1): the invoice and credit notes in My Account, on the thank-you page, as links in the customer e-mails, with the `[lumia_factures_documents]` shortcode and the Bricks tags. On a site updated from 2.0 the My Account and order page links start off (turn them on under General > Customer access).
 - A demo order built from the shop's products for the live preview while the shop has no order.
 

@@ -9,7 +9,7 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"POT-Creation-Date: 2026-10-20T19:35:06+00:00\n"
+"POT-Creation-Date: 2026-10-21T07:24:16+00:00\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "X-Generator: WP-CLI 2.12.0\n"
 "X-Domain: lumia-factures\n"
@@ -71,13 +71,13 @@ msgstr ""
 
 #: includes/Admin/Admin.php:178
 #: includes/Admin/Admin.php:314
-#: includes/Modules/Invoices/Admin/OrderTools.php:126
+#: includes/Modules/Invoices/Admin/OrderTools.php:134
 msgid "Confirm"
 msgstr ""
 
 #: includes/Admin/Admin.php:179
 #: includes/Admin/Admin.php:313
-#: includes/Modules/Invoices/Admin/OrderTools.php:127
+#: includes/Modules/Invoices/Admin/OrderTools.php:135
 msgid "Cancel"
 msgstr ""
 
@@ -220,8 +220,8 @@ msgid "The counter was not raised: the new value must be higher than the current
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/Counters.php:77
-#: includes/Modules/Invoices/Admin/OrderTools.php:96
-#: includes/Modules/Invoices/Admin/OrderTools.php:182
+#: includes/Modules/Invoices/Admin/OrderTools.php:104
+#: includes/Modules/Invoices/Admin/OrderTools.php:195
 #: includes/Modules/Invoices/Front/CustomerLinks.php:81
 #: includes/Modules/Invoices/Front/DocumentList.php:47
 #: includes/Modules/Invoices/Rendering/Context.php:219
@@ -230,7 +230,7 @@ msgid "Invoice"
 msgstr ""
 
 #: includes/Modules/Invoices/Admin/Counters.php:80
-#: includes/Modules/Invoices/Front/DocumentList.php:62
+#: includes/Modules/Invoices/Front/DocumentList.php:64
 #: includes/Modules/Invoices/Rendering/Context.php:218
 #: templates/admin/invoices/content.php:62
 #: templates/admin/invoices/content.php:67
@@ -241,7 +241,7 @@ msgstr ""
 #: includes/Modules/Invoices/Admin/CreditNoteNotice.php:170
 #: includes/Modules/Invoices/Admin/MigrationNotice.php:127
 #: includes/Modules/Invoices/Admin/MigrationNotice.php:232
-#: includes/Modules/Invoices/Admin/OrderTools.php:722
+#: includes/Modules/Invoices/Admin/OrderTools.php:759
 #: includes/Modules/Invoices/Admin/Preview.php:53
 msgid "You are not allowed to do this."
 msgstr ""
@@ -413,161 +413,174 @@ msgstr ""
 msgid "not started"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:327
+#: includes/Modules/Invoices/Admin/OrderTools.php:344
 msgid "Invoice cancelled"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:429
-#: includes/Modules/Invoices/Admin/OrderTools.php:535
-#: includes/Modules/Invoices/Admin/OrderTools.php:575
+#: includes/Modules/Invoices/Admin/OrderTools.php:447
+#: includes/Modules/Invoices/Admin/OrderTools.php:548
+#: includes/Modules/Invoices/Admin/OrderTools.php:620
 msgid "Download PDF"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:436
-#: includes/Modules/Invoices/Admin/OrderTools.php:582
-msgid "Rebuild missing PDF"
-msgstr ""
-
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Admin/OrderTools.php:448
+#: includes/Modules/Invoices/Admin/OrderTools.php:461
 #, php-format
 msgid "Cancel invoice %s?"
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Admin/OrderTools.php:450
+#: includes/Modules/Invoices/Admin/OrderTools.php:463
 #, php-format
 msgid "No money is moved: this records a full refund and issues a credit note that cancels invoice %s."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:451
+#: includes/Modules/Invoices/Admin/OrderTools.php:464
 msgid "Cancel invoice"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:464
+#: includes/Modules/Invoices/Admin/OrderTools.php:477
 msgid "No invoice can be issued for this order: its Facture PDF Lumia invoice could not be imported (conflict). See the migration report."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:465
+#: includes/Modules/Invoices/Admin/OrderTools.php:478
 msgid "No invoice can be issued for this order until the Facture PDF Lumia data is imported."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:473
+#: includes/Modules/Invoices/Admin/OrderTools.php:486
 msgid "No invoice has been issued for this order yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:475
+#: includes/Modules/Invoices/Admin/OrderTools.php:488
 msgid "Issue invoice now"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:482
+#: includes/Modules/Invoices/Admin/OrderTools.php:495
 msgid "The current order status does not allow an invoice yet."
 msgstr ""
 
 #. translators: %d: refund id
-#: includes/Modules/Invoices/Admin/OrderTools.php:533
+#: includes/Modules/Invoices/Admin/OrderTools.php:546
 #, php-format
 msgid "Refund #%d deleted"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:543
+#: includes/Modules/Invoices/Admin/OrderTools.php:556
 #: templates/admin/invoices/general.php:62
 msgid "Credit notes"
 msgstr ""
 
+#: includes/Modules/Invoices/Admin/OrderTools.php:578
+msgid "Rebuild missing PDF"
+msgstr ""
+
+#. translators: %s: invoice or credit note number
+#: includes/Modules/Invoices/Admin/OrderTools.php:589
+#, php-format
+msgid "Regenerate the PDF of %s?"
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:590
+msgid "The PDF is rendered again from the current order data and settings. Its number and date do not change, and the current file is kept in the archive."
+msgstr ""
+
+#: includes/Modules/Invoices/Admin/OrderTools.php:591
+msgid "Regenerate PDF"
+msgstr ""
+
 #. translators: 1: refund id, 2: refunded amount
-#: includes/Modules/Invoices/Admin/OrderTools.php:563
+#: includes/Modules/Invoices/Admin/OrderTools.php:608
 #, php-format
 msgid "Refund #%1$d (%2$s)"
 msgstr ""
 
 #. translators: %s: why the credit note was not issued
-#: includes/Modules/Invoices/Admin/OrderTools.php:598
+#: includes/Modules/Invoices/Admin/OrderTools.php:635
 #, php-format
 msgid "No credit note yet (was: %s)"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:601
+#: includes/Modules/Invoices/Admin/OrderTools.php:638
 msgid "No credit note yet."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:606
+#: includes/Modules/Invoices/Admin/OrderTools.php:643
 msgid "Issue credit note"
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:622
+#: includes/Modules/Invoices/Admin/OrderTools.php:659
 msgid "Nothing was refunded: no credit note."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:623
+#: includes/Modules/Invoices/Admin/OrderTools.php:660
 msgid "This refund was just created: its credit note can be issued in a few minutes."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:624
+#: includes/Modules/Invoices/Admin/OrderTools.php:661
 msgid "The refunded order no longer exists."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:625
+#: includes/Modules/Invoices/Admin/OrderTools.php:662
 msgid "Waiting for the Facture PDF Lumia import."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:626
+#: includes/Modules/Invoices/Admin/OrderTools.php:663
 msgid "The Facture PDF Lumia invoice of this order could not be imported (conflict)."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:627
+#: includes/Modules/Invoices/Admin/OrderTools.php:664
 msgid "This refund reuses the id of a deleted refund that carries a credit note: no credit note can be issued for it."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:628
+#: includes/Modules/Invoices/Admin/OrderTools.php:665
 msgid "Refused by the lumia_factures_can_issue_credit_note filter."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:629
+#: includes/Modules/Invoices/Admin/OrderTools.php:666
 msgid "The order has no invoice: issue the invoice first."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:690
+#: includes/Modules/Invoices/Admin/OrderTools.php:727
 msgid "The invoice has been issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:691
+#: includes/Modules/Invoices/Admin/OrderTools.php:728
 msgid "The invoice could not be issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:692
+#: includes/Modules/Invoices/Admin/OrderTools.php:729
 msgid "The invoice PDF has been rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:693
+#: includes/Modules/Invoices/Admin/OrderTools.php:730
 msgid "The invoice PDF could not be rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:694
+#: includes/Modules/Invoices/Admin/OrderTools.php:731
 msgid "The credit note has been issued."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:695
+#: includes/Modules/Invoices/Admin/OrderTools.php:732
 msgid "The credit note could not be issued. The reason is shown in the Invoice box."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:696
+#: includes/Modules/Invoices/Admin/OrderTools.php:733
 msgid "The credit note PDF has been rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:697
+#: includes/Modules/Invoices/Admin/OrderTools.php:734
 msgid "The credit note PDF could not be rebuilt."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:698
+#: includes/Modules/Invoices/Admin/OrderTools.php:735
 msgid "The invoice has been cancelled by a credit note."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:699
+#: includes/Modules/Invoices/Admin/OrderTools.php:736
 msgid "The full refund has been recorded, but its credit note is not issued yet. The reason is shown in the Invoice box."
 msgstr ""
 
-#: includes/Modules/Invoices/Admin/OrderTools.php:700
+#: includes/Modules/Invoices/Admin/OrderTools.php:737
 msgid "The invoice could not be cancelled."
 msgstr ""
 
@@ -645,25 +658,31 @@ msgid "Total"
 msgstr ""
 
 #. translators: 1: credit note number, 2: refund id, 3: invoice number
-#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:339
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:347
 #, php-format
 msgid "Credit note %1$s issued for refund #%2$d (invoice %3$s)."
 msgstr ""
 
 #. translators: 1: refund id, 2: credit note number
-#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:869
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:947
 #, php-format
 msgid "Refund #%1$d was deleted; credit note %2$s stays issued and the order no longer matches it."
 msgstr ""
 
 #. translators: %s: credit note number
-#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:906
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:984
 #, php-format
 msgid "This refund carries credit note %s and cannot be deleted."
 msgstr ""
 
+#. translators: 1: credit note number, 2: previous archived file
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:1052
+#, php-format
+msgid "Credit note PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive."
+msgstr ""
+
 #. translators: %s: credit note number
-#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:970
+#: includes/Modules/Invoices/Documents/CreditNoteIssuer.php:1058
 #, php-format
 msgid "Credit note PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""
@@ -682,8 +701,14 @@ msgstr ""
 msgid "Invoice %s issued."
 msgstr ""
 
+#. translators: 1: invoice number, 2: previous archived file
+#: includes/Modules/Invoices/Documents/Issuer.php:318
+#, php-format
+msgid "Invoice PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive."
+msgstr ""
+
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Documents/Issuer.php:313
+#: includes/Modules/Invoices/Documents/Issuer.php:324
 #, php-format
 msgid "Invoice PDF %s was missing or damaged and has been rebuilt from the current order data."
 msgstr ""
@@ -758,7 +783,7 @@ msgstr ""
 msgid "The PDF of credit note %s could not be generated; the PDF will be built on first download."
 msgstr ""
 
-#: includes/Modules/Invoices/Front/CustomerDownload.php:355
+#: includes/Modules/Invoices/Front/CustomerDownload.php:356
 msgid "Document not found."
 msgstr ""
 
@@ -773,55 +798,55 @@ msgid "Download my invoice"
 msgstr ""
 
 #. translators: 1: imported invoice number format, 2: default credit note number format, 3: credit note number format used instead
-#: includes/Modules/Invoices/Migration/Importer.php:260
+#: includes/Modules/Invoices/Migration/Importer.php:253
 #, php-format
 msgid "The invoice number format %1$s starts like the default credit note number format %2$s: credit notes will be numbered %3$s. Another format can be chosen in the Numbering tab."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:334
+#: includes/Modules/Invoices/Migration/Importer.php:327
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the date its PDF was generated was used."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id
-#: includes/Modules/Invoices/Migration/Importer.php:341
+#: includes/Modules/Invoices/Migration/Importer.php:334
 #, php-format
 msgid "Invoice %1$s of order %2$d had no invoice date: the order creation date was used."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:384
+#: includes/Modules/Invoices/Migration/Importer.php:377
 #, php-format
 msgid "Invoice %s imported from Facture PDF Lumia."
 msgstr ""
 
 #. translators: 1: invoice number, 2: order id, 3: file path
-#: includes/Modules/Invoices/Migration/Importer.php:451
+#: includes/Modules/Invoices/Migration/Importer.php:444
 #, php-format
 msgid "The legacy PDF of invoice %1$s (order %2$d, %3$s) is not a readable PDF of the legacy folder: it was not imported, the PDF will be built on first need."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:505
+#: includes/Modules/Invoices/Migration/Importer.php:498
 msgid "An invoice is being issued for this order."
 msgstr ""
 
 #. translators: %s: invoice number
-#: includes/Modules/Invoices/Migration/Importer.php:509
+#: includes/Modules/Invoices/Migration/Importer.php:502
 #, php-format
 msgid "The order already has invoice %s."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:515
+#: includes/Modules/Invoices/Migration/Importer.php:508
 msgid "The number is already used by another invoice."
 msgstr ""
 
-#: includes/Modules/Invoices/Migration/Importer.php:521
+#: includes/Modules/Invoices/Migration/Importer.php:514
 msgid "The invoice could not be recorded (database error, see the PHP error log)."
 msgstr ""
 
 #. translators: %d: order id
-#: includes/Modules/Invoices/Migration/Importer.php:544
+#: includes/Modules/Invoices/Migration/Importer.php:537
 #, php-format
 msgid "Order %d: part of the import could not be written (see the PHP error log)."
 msgstr ""
@@ -1073,16 +1098,16 @@ msgid "Design"
 msgstr ""
 
 #. translators: %s: why the credit note number format is refused.
-#: includes/Modules/Invoices/Settings/Schema.php:111
+#: includes/Modules/Invoices/Settings/Schema.php:119
 #, php-format
 msgid "Credit note number: %s"
 msgstr ""
 
-#: includes/Modules/Invoices/Settings/Schema.php:147
+#: includes/Modules/Invoices/Settings/Schema.php:155
 msgid "The credit note number format must start with a prefix that differs from the invoice number format, e.g. AV- and FA-."
 msgstr ""
 
-#: includes/Modules/Invoices/Settings/Schema.php:149
+#: includes/Modules/Invoices/Settings/Schema.php:157
 msgid "A number format cannot take a prefix that the other document type uses or has already printed (swapping FA- and AV-, for example): an invoice and a credit note would share a number."
 msgstr ""
 

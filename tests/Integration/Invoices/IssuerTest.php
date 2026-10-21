@@ -221,6 +221,32 @@ class IssuerTest extends TestCase {
 		);
 	}
 
+	public function test_regenerate_rerenders_intact_archive_with_same_number_and_date(): void {
+		$order = $this->order();
+		$order->update_status( 'processing' );
+
+		$doc      = Register::find( 'invoice', $order->get_id() );
+		$old_path = (string) Archive::path( $doc );
+		$bytes    = (string) file_get_contents( $old_path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+
+		$this->assertTrue( Issuer::restore( $doc, wc_get_order( $order->get_id() ), true ) );
+
+		$new = Register::find( 'invoice', $order->get_id() );
+		$this->track( $new );
+		$this->assertSame( $doc->number, $new->number );
+		$this->assertSame( $doc->issued_at, $new->issued_at );
+		$this->assertSame( $doc->sequence, $new->sequence );
+		$this->assertNotSame( $doc->file, $new->file );
+		$this->assertTrue( Archive::verify( $new ) );
+		$this->assertSame( $bytes, file_get_contents( $old_path ), 'The previous file stays, unchanged.' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$this->assertTrue(
+			$this->has_note(
+				$order,
+				sprintf( 'Invoice PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive.', $doc->number, $doc->file )
+			)
+		);
+	}
+
 	public function test_restore_keeps_damaged_file(): void {
 		$order = $this->order();
 		$order->update_status( 'processing' );

@@ -990,16 +990,18 @@ final class CreditNoteIssuer {
 	}
 
 	/**
-	 * Rebuilds the archived PDF of an issued credit note whose file is missing or damaged.
+	 * Rebuilds the archived PDF of an issued credit note whose file is missing or damaged, or, on
+	 * an explicit admin request, regenerates an intact one (a rendering fix).
 	 *
-	 * Number and date are kept; the new PDF goes to a new file, the damaged one is left in place.
-	 * Refused when the archive is intact, or when the refund is gone or is no longer the one the
-	 * credit note was issued for (its data cannot be rendered again).
+	 * Number and date are kept; the new PDF goes to a new file, the previous one is left in place.
+	 * Refused when the archive is intact (unless `$regenerate`), or when the refund is gone or is
+	 * no longer the one the credit note was issued for (its data cannot be rendered again).
 	 *
-	 * @param IssuedDocument $doc Issued credit note.
+	 * @param IssuedDocument $doc        Issued credit note.
+	 * @param bool           $regenerate Also re-render an intact archive (admin action only).
 	 * @return bool True when a new file was archived and recorded.
 	 */
-	public static function restore( IssuedDocument $doc ): bool {
+	public static function restore( IssuedDocument $doc, bool $regenerate = false ): bool {
 		if ( self::TYPE !== $doc->type || 'issued' !== $doc->status || null === $doc->number || $doc->parent_id <= 0 ) {
 			return false;
 		}
@@ -1014,7 +1016,8 @@ final class CreditNoteIssuer {
 			return false;
 		}
 
-		if ( Archive::verify( $doc ) ) {
+		$intact = Archive::verify( $doc );
+		if ( $intact && ! $regenerate ) {
 			return false;
 		}
 
@@ -1043,11 +1046,18 @@ final class CreditNoteIssuer {
 		}
 
 		$parent->add_order_note(
-			sprintf(
-				/* translators: %s: credit note number */
-				__( 'Credit note PDF %s was missing or damaged and has been rebuilt from the current order data.', 'lumia-factures' ),
-				$doc->number
-			)
+			$intact
+				? sprintf(
+					/* translators: 1: credit note number, 2: previous archived file */
+					__( 'Credit note PDF %1$s has been regenerated from the current order data and settings, with the same number and date. The previous file %2$s is kept in the archive.', 'lumia-factures' ),
+					$doc->number,
+					(string) $doc->file
+				)
+				: sprintf(
+					/* translators: %s: credit note number */
+					__( 'Credit note PDF %s was missing or damaged and has been rebuilt from the current order data.', 'lumia-factures' ),
+					$doc->number
+				)
 		);
 
 		return true;

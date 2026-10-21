@@ -274,8 +274,9 @@ final class Register {
 	/**
 	 * Replaces the archived file of an issued document.
 	 *
-	 * The only legitimate caller is the issuer's restore of a missing or damaged
-	 * archive: the number and the date are kept, only the file is re-recorded.
+	 * The only legitimate caller is the issuers' restore (a missing or damaged archive, or
+	 * an admin regeneration): the number and the date are kept, only the file is
+	 * re-recorded, and the previous file stays on disk.
 	 *
 	 * @param int    $id       Row id.
 	 * @param string $old_file Currently recorded relative path (must match).
